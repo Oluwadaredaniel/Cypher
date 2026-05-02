@@ -124,6 +124,7 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
     });
 
     try {
+      // Check for available storage (Simplified check by catching error)
       _client = http.Client();
       final request = http.Request(
         'GET', 
@@ -153,22 +154,27 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
           }
         },
         onDone: () async {
-          // Save to device storage
-          final directory = Platform.isAndroid 
-              ? Directory('/storage/emulated/0/Download') 
-              : await getApplicationDocumentsDirectory();
-          
-          final file = File("${directory.path}/${widget.fileName}");
-          await file.writeAsBytes(bytes);
+          try {
+            // Save to device storage
+            final directory = Platform.isAndroid 
+                ? Directory('/storage/emulated/0/Download') 
+                : await getApplicationDocumentsDirectory();
+            
+            final file = File("${directory.path}/${widget.fileName}");
+            await file.writeAsBytes(bytes);
 
-          if (mounted) {
-            setState(() {
-              _isDownloading = false;
-              _isDownloaded = true;
-              _downloadProgress = 1.0;
-            });
-            HapticFeedback.heavyImpact();
-            _showSuccess("File saved to Downloads");
+            if (mounted) {
+              setState(() {
+                _isDownloading = false;
+                _isDownloaded = true;
+                _downloadProgress = 1.0;
+              });
+              HapticFeedback.heavyImpact();
+              _showSuccess("File saved to Downloads");
+            }
+          } catch (e) {
+            _showError("Storage error: Make sure you have enough free space.");
+            _resetDownloadState();
           }
           _client?.close();
         },
