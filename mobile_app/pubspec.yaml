@@ -1,0 +1,42 @@
+name: cypher
+description: "CYPHER - Android PC Remote Control"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
+  provider: ^6.1.1
+  google_fonts: ^6.1.0
+  shimmer: ^3.0.0
+  animate_do: ^3.3.4
+  flutter_svg: ^2.0.9
+  percent_indicator: ^4.2.3
+  fluttertoast: ^8.2.4
+  file_picker: ^6.1.1
+  path_provider: ^2.1.2
+  path: ^1.9.0
+  device_info_plus: ^9.1.0
+  uuid: ^4.3.3
+  qr_flutter: ^4.1.0
+  intl: ^0.19.0
+  bonsoir: ^2.1.1
+  workmanager: ^0.5.2
+  qr_code_scanner: ^1.0.1
+  flutter_markdown: ^0.7.3+1
+  firebase_core: ^3.1.1
+  firebase_analytics: ^11.2.0
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
