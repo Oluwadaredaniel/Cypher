@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CYPHER — The Seamless Link</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&family=Plus+Jakarta+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    <title>CYPHER — Beyond Connectivity.</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Plus+Jakarta+Sans:wght@300;400;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
     <style>
@@ -29,15 +29,14 @@
         }
 
         h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; font-weight: 700; }
-
         .container { max-width: 1200px; margin: 0 auto; padding: 0 6%; }
 
-        /* --- UI UTILS --- */
+        /* --- UI ELEMENTS --- */
         .glass { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(10px); border: 1px solid var(--border); }
-        .gradient-text { background: linear-gradient(to right, #fff, #6C63FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .btn {
             padding: 18px 36px; border-radius: 100px; font-weight: 700; text-decoration: none;
             display: inline-flex; align-items: center; gap: 10px; transition: 0.4s cubic-bezier(0.2, 1, 0.3, 1);
+            font-size: 15px;
         }
         .btn-p { background: var(--accent); color: #fff; }
         .btn-p:hover { transform: translateY(-4px); box-shadow: 0 15px 30px var(--glow); }
@@ -55,72 +54,76 @@
 
         /* --- HERO --- */
         .hero { padding: 220px 0 120px; text-align: center; position: relative; }
-        .hero h1 { font-size: clamp(50px, 9vw, 110px); line-height: 0.9; letter-spacing: -4px; margin-bottom: 30px; }
+        .hero h1 { font-size: clamp(50px, 9vw, 110px); line-height: 0.85; letter-spacing: -4px; margin-bottom: 30px; }
         .hero p { font-size: clamp(18px, 2vw, 22px); color: var(--text-dim); max-width: 650px; margin: 0 auto 50px; line-height: 1.4; }
 
-        /* --- DEVICES (CSS ONLY) --- */
-        .mockup-group { position: relative; height: 600px; margin-top: 100px; }
-        .laptop {
-            width: 750px; aspect-ratio: 16/10; background: #000; border: 14px solid #1a1a1a;
-            border-radius: 24px; position: absolute; left: 50%; transform: translateX(-50%);
-            box-shadow: 0 40px 100px rgba(0,0,0,0.8); z-index: 1; overflow: hidden;
-        }
-        .laptop-screen { height: 100%; background: #080808; padding: 30px; display: flex; flex-direction: column; }
-        .phone {
-            width: 250px; height: 500px; background: #000; border: 10px solid #1a1a1a;
-            border-radius: 44px; position: absolute; right: 10%; bottom: -40px; z-index: 2;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.8); overflow: hidden;
-        }
-        .phone-screen { height: 100%; padding: 25px; display: flex; flex-direction: column; justify-content: space-between; }
-
-        /* --- THE PROBLEM --- */
-        .section-label { color: var(--accent); font-weight: 800; font-size: 13px; letter-spacing: 2px; margin-bottom: 20px; display: block; }
-        .story-section { padding: 150px 0; }
+        /* --- THE OBSERVATION / STORY --- */
+        .section-label { color: var(--accent); font-weight: 800; font-size: 13px; letter-spacing: 2px; margin-bottom: 20px; display: block; text-transform: uppercase; }
+        .story-section { padding: 120px 0; }
         .story-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 80px; align-items: center; }
         .story-content h2 { font-size: 56px; line-height: 1.05; margin-bottom: 30px; }
         .observation-box { background: var(--surface); padding: 35px; border-radius: 32px; border: 1px solid var(--border); }
         .observation-box p { font-style: italic; color: var(--text-dim); font-size: 18px; line-height: 1.6; }
 
-        /* --- THE EXPERIENCE (ALEX) --- */
-        .experience { padding: 150px 0; background: #080808; position: relative; }
-        .step-row { display: flex; gap: 100px; margin-bottom: 200px; align-items: center; }
-        .step-row:nth-child(even) { flex-direction: row-reverse; }
-        .step-info { flex: 1; }
-        .step-info h3 { font-size: 40px; margin-bottom: 20px; }
-        .step-visual { flex: 1; display: flex; justify-content: center; }
+        /* --- THE EXPERIENCE (ALEX JOURNEY) --- */
+        .experience-section { padding: 150px 0; background: #080808; border-top: 1px solid var(--border); overflow: hidden; }
+        .exp-step { display: flex; align-items: center; gap: 80px; margin-bottom: 200px; opacity: 0; transform: translateY(50px); }
+        .exp-step:nth-child(even) { flex-direction: row-reverse; }
+        .exp-text { flex: 1; }
+        .exp-text h3 { font-size: 44px; margin-bottom: 20px; color: var(--accent); }
+        .exp-text p { font-size: 18px; color: var(--text-dim); line-height: 1.6; }
+        .exp-visual { flex: 1.3; display: flex; justify-content: center; align-items: center; }
 
-        /* --- FEATURES (NON-GENERIC) --- */
-        .feature-showcase { padding: 150px 0; }
-        .feature-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 24px; }
-        .f-item { padding: 50px; border-radius: 40px; }
-        .f-wide { grid-column: span 4; background: var(--surface); }
-        .f-square { grid-column: span 2; border: 1px solid var(--border); }
-        .f-full { grid-column: span 6; background: linear-gradient(135deg, #111, #080808); }
+        /* --- CSS DEVICES --- */
+        .phone-mockup {
+            width: 280px; height: 560px; background: #000; border: 10px solid #1a1a1a;
+            border-radius: 48px; position: relative; box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+            padding: 15px; display: flex; flex-direction: column;
+        }
+        .phone-notch { width: 120px; height: 25px; background: #1a1a1a; margin: 0 auto; border-bottom-left-radius: 15px; border-bottom-right-radius: 15px; position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 10; }
+        .phone-screen { flex: 1; background: #050505; border-radius: 36px; overflow: hidden; padding: 25px; position: relative; display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,0.05); }
+
+        .laptop-mockup {
+            width: 100%; max-width: 600px; aspect-ratio: 16/10; background: #000; border: 14px solid #1a1a1a;
+            border-radius: 24px; box-shadow: 0 50px 100px rgba(0,0,0,0.5); padding: 20px; display: flex; flex-direction: column;
+        }
+        .laptop-screen { flex: 1; background: #080808; border-radius: 6px; padding: 25px; border: 1px solid rgba(255,255,255,0.05); }
+
+        /* --- UI ELEMENTS FOR ANIMATION --- */
+        .ui-card { background: #111; padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 12px; display: flex; align-items: center; gap: 15px; }
+        .ui-card.active { border-color: var(--accent); background: rgba(108, 99, 255, 0.15); }
+        .ui-icon { width: 35px; height: 35px; border-radius: 8px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .ui-progress { height: 6px; background: #1a1a1a; border-radius: 3px; flex: 1; overflow: hidden; position: relative; }
+        .ui-bar { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent); width: 0%; }
+
+        /* --- FEATURES GRID --- */
+        .feature-grid { padding: 150px 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+        .f-card { background: var(--surface); padding: 50px; border-radius: 44px; border: 1px solid var(--border); transition: 0.4s; }
+        .f-card:hover { border-color: var(--accent); transform: translateY(-5px); }
+        .f-card h3 { font-size: 26px; margin-bottom: 18px; }
+        .f-card p { color: var(--text-dim); line-height: 1.6; font-size: 15px; }
+        .f-icon { font-size: 36px; margin-bottom: 30px; color: var(--accent); }
 
         /* --- SETUP ROADMAP --- */
-        .roadmap { padding: 120px 0; }
-        .roadmap-items { display: flex; flex-direction: column; gap: 40px; counter-reset: step; }
-        .r-item { display: flex; gap: 40px; align-items: center; padding: 40px; border-radius: 32px; transition: 0.3s; }
-        .r-item:hover { background: rgba(108, 99, 255, 0.05); }
-        .r-item::before {
-            counter-increment: step; content: "0" counter(step);
-            font-size: 60px; font-weight: 900; color: rgba(108, 99, 255, 0.2);
-        }
+        .roadmap { padding: 120px 0; text-align: center; }
+        .step-row-static { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 80px; text-align: left; }
+        .step-card { background: var(--surface); padding: 35px; border-radius: 28px; border: 1px solid var(--border); }
+        .step-num { font-size: 36px; font-weight: 900; color: var(--accent); margin-bottom: 20px; opacity: 0.2; }
 
         /* --- CTA --- */
-        .cta { padding: 150px 0; text-align: center; }
-        .cta-card { background: var(--accent); padding: 100px 40px; border-radius: 50px; box-shadow: 0 30px 60px var(--glow); }
+        .cta-section { padding: 150px 0; }
+        .cta-card { background: linear-gradient(135deg, #6C63FF 0%, #3B348F 100%); padding: 120px 40px; border-radius: 60px; text-align: center; box-shadow: 0 40px 100px var(--glow); }
 
-        footer { padding: 80px 0; text-align: center; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 14px; }
-        .em-dev { color: var(--accent); font-weight: 800; text-decoration: none; }
+        footer { padding: 80px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-dim); font-size: 14px; }
+        .emerald-link { color: var(--accent); font-weight: 800; text-decoration: none; border-bottom: 1px solid transparent; transition: 0.3s; }
+        .emerald-link:hover { border-bottom-color: var(--accent); }
 
-        @media (max-width: 1000px) {
+        @media (max-width: 900px) {
             .hero h1 { font-size: 60px; }
-            .laptop { width: 95%; height: 350px; position: relative; left: 0; transform: none; }
-            .phone { display: none; }
-            .story-grid, .step-row { grid-template-columns: 1fr; flex-direction: column !important; text-align: center; }
-            .feature-grid { grid-template-columns: 1fr; }
-            .f-item { grid-column: span 1 !important; }
+            .story-grid, .exp-step { flex-direction: column !important; text-align: center; gap: 60px; }
+            .feature-grid, .step-row-static { grid-template-columns: 1fr; }
+            .laptop-mockup { display: none; }
+            .exp-visual { order: -1; }
         }
     </style>
 </head>
@@ -129,124 +132,130 @@
     <nav>
         <div class="container nav-inner">
             <div class="logo">C<span>Y</span>PHER</div>
-            <a href="#download" class="btn btn-p" style="padding: 12px 24px; font-size: 13px;">Get Cypher</a>
+            <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn btn-p" style="padding: 12px 25px; font-size: 13px;">Get Cypher</a>
         </div>
     </nav>
 
     <!-- HERO -->
     <header class="hero container">
-        <span class="section-label">PROXIMITY SYNC 1.0</span>
-        <h1 class="gradient-text">Your PC.<br>Now in your pocket.</h1>
-        <p>The first 1:1 local link that treats your Android and PC as one single device. No accounts, no internet, no friction.</p>
+        <span class="section-label">P2P Proximity Link</span>
+        <h1 class="gradient-text">Sync your world,<br>not the cloud.</h1>
+        <p>Experience the direct, high-speed connection between Android and Windows. No cables, no middlemen, just raw local power.</p>
 
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-            <a href="#download" class="btn btn-p">Start for Free</a>
+            <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn btn-p">Download APK & EXE</a>
             <a href="#experience" class="btn btn-s">The Experience</a>
-        </div>
-
-        <div class="mockup-group">
-            <div class="laptop">
-                <div class="laptop-screen">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
-                        <div style="font-weight: 900; color: var(--accent); font-size: 18px;">CYPHER ADMIN</div>
-                        <div style="background: rgba(48, 209, 88, 0.1); color: #30D158; padding: 6px 16px; border-radius: 100px; font-size: 11px; font-weight: bold;">● LIVE ON LOCAL NETWORK</div>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div style="height: 100px; background: #111; border-radius: 16px; border: 1px solid rgba(255,255,255,0.03);"></div>
-                        <div style="height: 100px; background: #111; border-radius: 16px; border: 1px solid rgba(255,255,255,0.03);"></div>
-                    </div>
-                    <div style="flex: 1; margin-top: 20px; background: #050505; border-radius: 16px; display: flex; align-items: center; justify-content: center;">
-                         <div style="font-size: 44px; font-weight: 900; letter-spacing: 12px; color: #1a1a1a;">847 291</div>
-                    </div>
-                </div>
-            </div>
-            <div class="phone">
-                <div class="phone-screen">
-                    <div style="font-weight: 900; font-size: 10px; color: var(--accent);">CYPHER MOBILE</div>
-                    <div style="height: 140px; background: rgba(108, 99, 255, 0.05); border: 1px solid var(--border); border-radius: 20px; display: flex; align-items: center; justify-content: center;">
-                        <div style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid var(--accent); border-top-color: transparent;"></div>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div style="height: 80px; background: #111; border-radius: 16px;"></div>
-                        <div style="height: 80px; background: #111; border-radius: 16px;"></div>
-                    </div>
-                    <div style="height: 50px; background: var(--accent); border-radius: 100px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px;">RECEIVING...</div>
-                </div>
-            </div>
         </div>
     </header>
 
-    <!-- THE "WE NOTICED" SECTION -->
+    <!-- THE STORY / OBSERVATION -->
     <section class="story-section container">
         <div class="story-grid">
             <div class="story-content">
                 <span class="section-label">THE OBSERVATION</span>
-                <h2>We noticed sharing is broken.</h2>
-                <p>Bluetooth pairing takes forever. USB cords are always in another room. Cloud drives are slow and track your data. Quick Share is great, but what if you want more than just files?</p>
-                <p>We built Cypher because we wanted to <b>control</b> our world, not just sync it. A system that feels like your phone is a physical extension of your PC.</p>
+                <h2>We noticed sharing is still broken.</h2>
+                <p>Bluetooth is too slow. USB cables are never where you need them. Cloud drives track your activity and charge you for space. Why is it so hard to move a file across the room?</p>
+                <p>We built Cypher to be the "Invisible Bridge." A zero-cloud, high-bandwidth link that handles permissions and firewalls automatically, so you can just focus on your work.</p>
             </div>
             <div class="observation-box">
-                <p>"I was tired of emailing myself links and walking across the house just to put my PC to sleep. Cypher turns your phone into the ultimate remote brain."</p>
+                <p>"I was tired of emailing links to myself just to open them on my laptop. Cypher turns your phone into a high-speed physical remote for your PC."</p>
                 <div style="margin-top: 30px; display: flex; align-items: center; gap: 15px;">
-                    <div style="width: 45px; height: 45px; background: var(--accent); border-radius: 50%;"></div>
+                    <div style="width: 45px; height: 45px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px;">E</div>
                     <div>
-                        <div style="font-weight: bold;">Emerald</div>
-                        <div style="font-size: 12px; color: var(--text-dim);">Lead Designer</div>
+                        <div style="font-weight: 900;">Emerald</div>
+                        <div style="font-size: 12px; color: var(--text-dim);">Founder & Lead Designer</div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- THE EXPERIENCE (ALEX JOURNEY) -->
-    <section id="experience" class="experience">
+    <!-- THE EXPERIENCE (IMMERSIVE ALEX STORY) -->
+    <section id="experience" class="experience-section">
         <div class="container">
             <div style="text-align: center; margin-bottom: 120px;">
-                <span class="section-label">USER STORY</span>
-                <h2 style="font-size: 54px;">One minute with Alex.</h2>
+                <span class="section-label">USER JOURNEY</span>
+                <h2 style="font-size: 60px;">Meet Alex.</h2>
             </div>
 
             <!-- STEP 1 -->
-            <div class="step-row">
-                <div class="step-info">
-                    <h3>The Instant Link.</h3>
-                    <p>Alex sits on his bed and opens Cypher. No manual pairing needed—the app auto-discovers his PC on the network. He enters the 6-digit code from his monitor. Link established.</p>
+            <div class="exp-step">
+                <div class="exp-text">
+                    <h3>01. Zero Config Setup</h3>
+                    <p>Alex sits down and opens CYPHER on his PC. The app automatically secures firewall permissions and starts a beacon. His phone finds the PC instantly on the WiFi. No IPs, no technical headaches.</p>
                 </div>
-                <div class="step-visual">
-                    <div class="glass" style="padding: 40px; border-radius: 32px; width: 340px; text-align: center;">
-                        <div style="font-size: 12px; color: var(--accent); font-weight: 900; margin-bottom: 20px;">SYSTEM SCANNING...</div>
-                        <div style="background: #111; padding: 20px; border-radius: 16px; border: 1px solid var(--accent);">Found: <b>Emerald-PC</b></div>
+                <div class="exp-visual">
+                    <div class="laptop-mockup">
+                        <div class="laptop-screen">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                                <div style="font-weight: 900; color: var(--accent); font-size: 14px;">CYPHER CORE</div>
+                                <div style="color: #30D158; font-size: 11px; font-weight: bold;">● ADVERTISING</div>
+                            </div>
+                            <div style="text-align: center; margin-top: 40px;">
+                                <div style="font-size: 10px; color: #444; margin-bottom: 15px;">ENTER THIS CODE ON PHONE</div>
+                                <div style="font-size: 42px; font-weight: 900; letter-spacing: 12px; color: #fff;">847 291</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- STEP 2 -->
-            <div class="step-row">
-                <div class="step-info">
-                    <h3>The 1TB Pocket Drive.</h3>
-                    <p>Instead of getting up, Alex browses his PC's entire file system from his phone screen. He finds a 2GB work folder, hits 'Download', and it streams directly via WiFi 6 at 50MB/s.</p>
+            <div class="exp-step">
+                <div class="exp-text">
+                    <h3>02. The Entire PC, Ported.</h3>
+                    <p>Alex is on the sofa. He opens the **Remote Browser** on his phone. He sees his entire PC directory—Desktop, Downloads, hidden system files—everything. He finds a 4GB video file in one tap.</p>
                 </div>
-                <div class="step-visual">
-                    <div class="phone">
-                        <div class="phone-screen" style="justify-content: flex-start;">
-                            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 20px;">📁 C:\Users\Desktop\Project</div>
-                            <div style="background: rgba(108, 99, 255, 0.1); padding: 15px; border-radius: 12px; border: 1px solid var(--accent);">📄 Presentation.mp4</div>
-                            <div style="margin-top: 10px; background: #111; padding: 15px; border-radius: 12px;">📁 Assets</div>
+                <div class="exp-visual">
+                    <div class="phone-mockup">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <div style="font-weight: 900; font-size: 11px; color: var(--accent); margin-bottom: 25px;">REMOTE C:\ DRIVE</div>
+                            <div class="ui-card"><div class="ui-icon">📁</div> <div>Documents</div></div>
+                            <div class="ui-card active"><div class="ui-icon" style="color: var(--accent);">📄</div> <div>Project_Final.mp4</div></div>
+                            <div class="ui-card"><div class="ui-icon">📁</div> <div>Assets</div></div>
+                            <div style="flex: 1;"></div>
+                            <div style="height: 50px; background: var(--accent); border-radius: 100px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px;">DOWNLOAD TO PHONE</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- STEP 3 -->
-            <div class="step-row">
-                <div class="step-info">
-                    <h3>Total Mastery.</h3>
-                    <p>The movie is over. Alex is tired. He doesn't go to the desk. He taps 'Hibernate' on his phone, and his PC shuts down securely. Seamless.</p>
+            <div class="exp-step">
+                <div class="exp-text">
+                    <h3>03. Warp Speed. No Limits.</h3>
+                    <p>Alex hits 'Download'. CYPHER engages **64KB High-Speed Buffers**. The 4GB file streams directly at 50MB/s. No cloud lag, no Bluetooth pairing. Just pure WiFi throughput.</p>
                 </div>
-                <div class="step-visual">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div class="glass" style="width: 140px; height: 140px; border-radius: 24px; display: flex; align-items: center; justify-content: center; font-weight: 900; color: #FF453A;">🔴 OFF</div>
-                        <div class="glass" style="width: 140px; height: 140px; border-radius: 24px; display: flex; align-items: center; justify-content: center; font-weight: 900; border-color: var(--accent);">🌙 SLEEP</div>
+                <div class="exp-visual">
+                    <div class="phone-mockup">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen" style="justify-content: center; align-items: center;">
+                            <div style="width: 140px; height: 140px; border: 5px solid #111; border-top-color: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 900;">72%</div>
+                            <div style="margin-top: 30px; font-weight: 900; color: var(--accent); font-size: 20px;">52.4 MB/s</div>
+                            <div style="color: #444; font-size: 12px; margin-top: 5px;">P2P LINK SECURE</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 4 -->
+            <div class="exp-step">
+                <div class="exp-text">
+                    <h3>04. Absolute Command.</h3>
+                    <p>The work is done. Alex doesn't stand up. He taps 'Hibernate' on his phone. His PC shuts down instantly and securely. Power, permissions, and sharing—all in his hand.</p>
+                </div>
+                <div class="exp-visual">
+                    <div class="phone-mockup">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen" style="justify-content: center;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <div class="ui-card" style="height: 100px; justify-content: center; flex-direction: column; margin: 0; color: #FF453A;">🔴 Off</div>
+                                <div class="ui-card active" style="height: 100px; justify-content: center; flex-direction: column; margin: 0;">🌙 Sleep</div>
+                                <div class="ui-card" style="height: 100px; justify-content: center; flex-direction: column; margin: 0;">🔒 Lock</div>
+                                <div class="ui-card" style="height: 100px; justify-content: center; flex-direction: column; margin: 0;">🔄 Reset</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -254,107 +263,96 @@
     </section>
 
     <!-- FEATURES -->
-    <section id="features" class="feature-showcase container">
-        <span class="section-label">CAPABILITIES</span>
-        <h2 style="font-size: 54px; margin-bottom: 60px;">Engineered for power.</h2>
-
-        <div class="feature-grid">
-            <div class="f-item f-wide">
-                <div class="logo" style="margin-bottom: 20px; font-size: 44px;">⚡</div>
-                <h3>Warp-Speed Sync</h3>
-                <p style="color: var(--text-dim); margin-top: 15px;">We optimized the data pipeline with 64KB buffers to saturate your WiFi bandwidth. Transfer GBs of data as fast as a wired connection.</p>
-            </div>
-            <div class="f-item f-square">
-                <div style="font-size: 40px; margin-bottom: 20px;">🛡️</div>
-                <h3>Privacy First</h3>
-                <p style="color: var(--text-dim);">No cloud servers. Your files move directly from Phone to PC over your local network. Private by default.</p>
-            </div>
-            <div class="f-item f-square">
-                <div style="font-size: 40px; margin-bottom: 20px;">📋</div>
-                <h3>Live Clipboard</h3>
-                <p style="color: var(--text-dim);">Copy on Android, paste on Windows instantly using Ctrl+Alt+V. The ultimate workflow multiplier.</p>
-            </div>
-            <div class="f-item f-wide">
-                <div style="font-size: 40px; margin-bottom: 20px;">🔋</div>
-                <h3>Smart Presence</h3>
-                <p style="color: var(--text-dim);">Get background notifications if your PC battery is low or if a guest requests access to your shared folders.</p>
-            </div>
+    <section id="features" class="container feature-grid">
+        <div class="f-card">
+            <div class="f-icon">🚀</div>
+            <h3>Warp Speed</h3>
+            <p>Engineered with 64KB socket buffers to saturate your WiFi bandwidth. No more waiting for Bluetooth.</p>
+        </div>
+        <div class="f-card">
+            <div class="f-icon">🛡️</div>
+            <h3>Zero Cloud</h3>
+            <p>Your data stays on your network. No external servers, no tracking, no privacy risks.</p>
+        </div>
+        <div class="f-card">
+            <div class="f-icon">📋</div>
+            <h3>Sync Clipboard</h3>
+            <p>Copy on Android, paste on Windows instantly with a global hotkey (Ctrl+Alt+V). Perfect for links.</p>
+        </div>
+        <div class="f-card">
+            <div class="f-icon">📡</div>
+            <h3>Auto-Magic</h3>
+            <p>Zero configuration required. Our mDNS beacon lets your phone find your PC the second you link up.</p>
+        </div>
+        <div class="f-card">
+            <div class="f-icon">🔋</div>
+            <h3>Smart Alerts</h3>
+            <p>Get background notifications if your PC battery is low or if a guest requests access.</p>
+        </div>
+        <div class="f-card">
+            <div class="f-icon">📂</div>
+            <h3>Two-Way Link</h3>
+            <p>Browse your phone from your PC or your PC from your phone. True bidirectional file mastery.</p>
         </div>
     </section>
 
-    <!-- SETUP -->
-    <section id="install" class="roadmap container">
+    <!-- ROADMAP -->
+    <section id="install" class="container roadmap">
         <span class="section-label">GETTING STARTED</span>
-        <h2 style="font-size: 54px; margin-bottom: 60px;">From zero to linked.</h2>
-        <div class="roadmap-items">
-            <div class="r-item glass">
-                <div>
-                    <h4>Download the Bundle</h4>
-                    <p style="color: var(--text-dim);">Get the APK for your phone and the EXE for your PC below.</p>
-                </div>
-            </div>
-            <div class="r-item glass">
-                <div>
-                    <h4>Migrate to PC</h4>
-                    <p style="color: var(--text-dim);">Move the EXE file from your phone to your computer via USB once.</p>
-                </div>
-            </div>
-            <div class="r-item glass">
-                <div>
-                    <h4>Pair & Power</h4>
-                    <p style="color: var(--text-dim);">Run both apps, enter your 6-digit pin, and enjoy the link.</p>
-                </div>
-            </div>
+        <h2 style="font-size: 54px;">Install in 4 steps.</h2>
+        <div class="step-row-static">
+            <div class="step-card"><div class="step-num">01</div><h4>Download</h4><p style="color: var(--text-dim); font-size: 14px;">Download the APK and EXE to your phone.</p></div>
+            <div class="step-card"><div class="step-num">02</div><h4>Install APK</h4><p style="color: var(--text-dim); font-size: 14px;">Open the APK on Android and grant permissions.</p></div>
+            <div class="step-card"><div class="step-num">03</div><h4>Move EXE</h4><p style="color: var(--text-dim); font-size: 14px;">Connect to PC once and move the EXE file over.</p></div>
+            <div class="step-card"><div class="step-num">04</div><h4>Pair</h4><p style="color: var(--text-dim); font-size: 14px;">Enter the 6-digit code to finalize the link.</p></div>
         </div>
     </section>
 
     <!-- CTA -->
-    <section id="download" class="cta container">
+    <section id="download" class="container cta-section">
         <div class="cta-card">
-            <h2 style="font-size: 54px; margin-bottom: 20px;">Ready to go local?</h2>
-            <p style="margin-bottom: 50px; font-weight: 500;">Ditch the cords. Ditch the cloud. Start using CYPHER.</p>
+            <h2 style="font-size: clamp(40px, 6vw, 80px); line-height: 1; margin-bottom: 30px;">Ready to link?</h2>
+            <p style="margin-bottom: 50px; font-weight: 500;">Ditch the cords. Ditch the cloud. Use CYPHER.</p>
             <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-            <!-- REPLACE THESE WITH YOUR GITHUB RELEASE LINKS -->
-            <a href="PASTE_YOUR_EXE_LINK_HERE" class="btn btn-white">Download for Windows</a>
-            <a href="PASTE_YOUR_APK_LINK_HERE" class="btn btn-s" style="background: rgba(0,0,0,0.2); border: none;">Download for Android</a>
-        </div>
+                <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn btn-white">Windows (.exe)</a>
+                <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn btn-s" style="background: rgba(0,0,0,0.2); border: none;">Android (.apk)</a>
+            </div>
         </div>
     </section>
 
     <footer class="container">
         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 20px;">
-            <div>© 2024 CYPHER. A Peer-to-Peer Production.</div>
-            <div>Designed by <a href="https://www.tiktok.com/@emerald_dev1" target="_blank" class="em-dev">Emerald</a></div>
+            <div>© 2026 CYPHER. Privacy First. Local First.</div>
+            <div>Designed by <a href="https://www.tiktok.com/@emerald_dev1" target="_blank" class="emerald-link">Emerald</a></div>
         </div>
     </footer>
 
     <script>
         gsap.registerPlugin(ScrollTrigger);
 
-        // --- ENTRANCE ---
-        gsap.from(".hero h1", { opacity: 0, y: 100, duration: 1.2, ease: "power4.out" });
-        gsap.from(".hero p", { opacity: 0, y: 50, duration: 1.2, delay: 0.3, ease: "power4.out" });
-        gsap.from(".laptop", { opacity: 0, scale: 0.8, duration: 2, delay: 0.6, ease: "expo.out" });
-        gsap.from(".phone", { opacity: 0, x: 100, duration: 2, delay: 1, ease: "expo.out" });
+        // Entrance
+        gsap.from(".hero h1, .hero p", { opacity: 0, y: 50, duration: 1.2, stagger: 0.3 });
 
-        // --- STORY ---
-        gsap.from(".story-content, .observation-box", {
-            scrollTrigger: { trigger: ".story-section", start: "top 80%" },
-            opacity: 0, y: 50, stagger: 0.3, duration: 1
-        });
-
-        // --- TIMELINE ---
-        gsap.utils.toArray(".step-row").forEach(row => {
-            gsap.from(row, {
-                scrollTrigger: { trigger: row, start: "top 80%" },
-                opacity: 0, y: 100, duration: 1
+        // Step animations (Timeline)
+        gsap.utils.toArray(".exp-step").forEach(step => {
+            gsap.to(step, {
+                scrollTrigger: {
+                    trigger: step,
+                    start: "top 80%",
+                },
+                opacity: 1,
+                y: 0,
+                duration: 1,
+                ease: "power4.out"
             });
         });
 
-        // --- FEATURES ---
-        gsap.from(".f-item", {
-            scrollTrigger: { trigger: ".feature-grid", start: "top 80%" },
-            opacity: 0, scale: 0.9, stagger: 0.1, duration: 0.8
+        // Feature cards
+        gsap.utils.toArray(".f-card").forEach(card => {
+            gsap.from(card, {
+                scrollTrigger: { trigger: card, start: "top 90%" },
+                opacity: 0, y: 30, duration: 0.6
+            });
         });
     </script>
 </body>
