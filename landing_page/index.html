@@ -3,357 +3,1108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CYPHER — Beyond Connectivity.</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Plus+Jakarta+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    <title>CYPHER — Your PC. Your Phone. One Link.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
     <style>
-        :root {
-            --bg: #050505;
-            --accent: #6C63FF;
-            --surface: #0D0D0D;
-            --border: rgba(255, 255, 255, 0.05);
-            --text: #FFFFFF;
-            --text-dim: #86868B;
-            --glow: rgba(108, 99, 255, 0.15);
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{
+          --bg:#050507;
+          --surface:#0C0C10;
+          --card:#111118;
+          --card2:#161620;
+          --border:rgba(255,255,255,0.06);
+          --border-mid:rgba(255,255,255,0.1);
+          --border-glow:rgba(108,99,255,0.3);
+          --accent:#6C63FF;
+          --accent2:#9D97FF;
+          --green:#30D158;
+          --red:#FF453A;
+          --amber:#FF9F0A;
+          --white:#FFFFFF;
+          --dim:#86868B;
+          --dim2:#3A3A3C;
+          --glow:rgba(108,99,255,0.18);
         }
+        html{scroll-behavior:smooth;background:var(--bg)}
+        body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--white);overflow-x:hidden;-webkit-font-smoothing:antialiased;cursor:none}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { scroll-behavior: smooth; background: var(--bg); }
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            overflow-x: hidden;
-            -webkit-font-smoothing: antialiased;
-        }
+        /* CURSOR */
+        .cursor{position:fixed;width:10px;height:10px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:screen;transition:width .3s,height .3s}
+        .cursor-ring{position:fixed;width:36px;height:36px;border:1px solid rgba(108,99,255,0.4);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width .3s,height .3s,border-color .3s}
+        body.cx .cursor{width:20px;height:20px}
+        body.cx .cursor-ring{width:60px;height:60px;border-color:rgba(108,99,255,0.15)}
 
-        h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; font-weight: 700; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 6%; }
+        /* NOISE + GRID */
+        body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:.022;pointer-events:none;z-index:1}
+        .grid-bg{position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,.013) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.013) 1px,transparent 1px);background-size:80px 80px;pointer-events:none;z-index:0}
 
-        /* --- UI ELEMENTS --- */
-        .glass { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(10px); border: 1px solid var(--border); }
-        .btn {
-            padding: 18px 36px; border-radius: 100px; font-weight: 700; text-decoration: none;
-            display: inline-flex; align-items: center; gap: 10px; transition: 0.4s cubic-bezier(0.2, 1, 0.3, 1);
-            font-size: 15px;
-        }
-        .btn-p { background: var(--accent); color: #fff; }
-        .btn-p:hover { transform: translateY(-4px); box-shadow: 0 15px 30px var(--glow); }
-        .btn-s { border: 1px solid var(--border); color: #fff; }
-        .btn-s:hover { background: rgba(255,255,255,0.05); }
+        /* NAV */
+        nav{position:fixed;top:0;width:100%;z-index:100;padding:24px 0;transition:padding .4s,background .4s}
+        nav.scrolled{padding:14px 0;background:rgba(5,5,7,.88);backdrop-filter:blur(24px);border-bottom:1px solid var(--border)}
+        .nav-inner{max-width:1200px;margin:0 auto;padding:0 6%;display:flex;justify-content:space-between;align-items:center}
+        .logo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;letter-spacing:.08em}
+        .logo .y{color:var(--accent)}
+        .nav-links{display:flex;gap:36px;align-items:center}
+        .nav-links a{font-size:14px;color:var(--dim);text-decoration:none;transition:color .2s;letter-spacing:.02em}
+        .nav-links a:hover{color:var(--white)}
+        .nav-cta{padding:10px 24px;background:var(--accent);border-radius:100px;font-size:13px;font-weight:600;color:#fff;text-decoration:none;transition:transform .2s,box-shadow .2s;letter-spacing:.02em}
+        .nav-cta:hover{transform:translateY(-2px);box-shadow:0 8px 24px var(--glow)}
 
-        /* --- NAV --- */
-        nav {
-            position: fixed; width: 100%; top: 0; z-index: 1000; padding: 20px 0;
-            background: rgba(5,5,5,0.7); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border);
-        }
-        .nav-inner { display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-size: 24px; font-weight: 900; letter-spacing: 1px; }
-        .logo span { color: var(--accent); }
+        /* HERO */
+        .hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:160px 6% 120px;position:relative;overflow:hidden}
+        .orb{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none}
+        .orb-1{width:600px;height:600px;background:radial-gradient(circle,rgba(108,99,255,.13),transparent 70%);top:-200px;left:50%;transform:translateX(-50%)}
+        .orb-2{width:280px;height:280px;background:radial-gradient(circle,rgba(48,209,88,.07),transparent 70%);bottom:80px;right:8%}
+        .orb-3{width:200px;height:200px;background:radial-gradient(circle,rgba(255,159,10,.06),transparent 70%);top:200px;left:5%}
+        .hero-badge{display:inline-flex;align-items:center;gap:10px;background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.2);border-radius:100px;padding:8px 18px;font-size:12px;font-weight:500;color:var(--accent2);letter-spacing:.12em;text-transform:uppercase;margin-bottom:40px;opacity:0}
+        .live-dot{width:6px;height:6px;background:var(--green);border-radius:50%;animation:ldot 2s infinite}
+        @keyframes ldot{0%,100%{box-shadow:0 0 0 0 rgba(48,209,88,.5)}50%{box-shadow:0 0 0 6px rgba(48,209,88,0)}}
+        .hero h1{font-family:'Syne',sans-serif;font-size:clamp(54px,8.5vw,112px);font-weight:800;line-height:.88;letter-spacing:-.035em;margin-bottom:32px;opacity:0}
+        .h1-ghost{display:block;color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.2);margin-top:6px}
+        .hero p{font-size:clamp(16px,1.8vw,20px);color:var(--dim);max-width:560px;line-height:1.6;margin-bottom:52px;font-weight:300;opacity:0}
+        .hero-btns{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;opacity:0}
+        .btn-p{padding:16px 36px;background:var(--accent);border-radius:100px;font-size:15px;font-weight:600;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:10px;transition:transform .25s cubic-bezier(.2,1,.3,1),box-shadow .25s;letter-spacing:.01em}
+        .btn-p:hover{transform:translateY(-4px);box-shadow:0 20px 40px rgba(108,99,255,.35)}
+        .btn-s{padding:16px 36px;border:1px solid var(--border);border-radius:100px;font-size:15px;font-weight:500;color:var(--dim);text-decoration:none;display:inline-flex;align-items:center;gap:10px;transition:border-color .25s,color .25s,transform .25s;letter-spacing:.01em}
+        .btn-s:hover{border-color:var(--border-glow);color:var(--white);transform:translateY(-2px)}
+        .scroll-hint{position:absolute;bottom:48px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;opacity:0;animation:sfade .8s 2.5s forwards}
+        @keyframes sfade{to{opacity:.4}}
+        .scroll-line{width:1px;height:48px;background:linear-gradient(to bottom,transparent,var(--accent));animation:sline 2s 2.5s infinite}
+        @keyframes sline{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
 
-        /* --- HERO --- */
-        .hero { padding: 220px 0 120px; text-align: center; position: relative; }
-        .hero h1 { font-size: clamp(50px, 9vw, 110px); line-height: 0.85; letter-spacing: -4px; margin-bottom: 30px; }
-        .hero p { font-size: clamp(18px, 2vw, 22px); color: var(--text-dim); max-width: 650px; margin: 0 auto 50px; line-height: 1.4; }
+        /* PARTICLES */
+        .ptcl-wrap{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+        .ptcl{position:absolute;width:2px;height:2px;background:var(--accent);border-radius:50%;animation:fp linear infinite;opacity:0}
+        @keyframes fp{0%{transform:translateY(0) translateX(0);opacity:0}10%{opacity:.5}90%{opacity:.15}100%{transform:translateY(-400px) translateX(var(--d));opacity:0}}
 
-        /* --- THE OBSERVATION / STORY --- */
-        .section-label { color: var(--accent); font-weight: 800; font-size: 13px; letter-spacing: 2px; margin-bottom: 20px; display: block; text-transform: uppercase; }
-        .story-section { padding: 120px 0; }
-        .story-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 80px; align-items: center; }
-        .story-content h2 { font-size: 56px; line-height: 1.05; margin-bottom: 30px; }
-        .observation-box { background: var(--surface); padding: 35px; border-radius: 32px; border: 1px solid var(--border); }
-        .observation-box p { font-style: italic; color: var(--text-dim); font-size: 18px; line-height: 1.6; }
+        /* MARQUEE */
+        .mq-section{padding:36px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden;position:relative;z-index:2}
+        .mq-track{display:flex;animation:mq 28s linear infinite;width:max-content}
+        @keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+        .mq-item{display:flex;align-items:center;gap:14px;padding:0 44px;font-family:'Syne',sans-serif;font-size:12px;font-weight:600;color:var(--dim2);letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+        .mq-dot{color:var(--accent)}
 
-        /* --- THE EXPERIENCE (ALEX JOURNEY) --- */
-        .experience-section { padding: 150px 0; background: #080808; border-top: 1px solid var(--border); overflow: hidden; }
-        .exp-step { display: flex; align-items: center; gap: 80px; margin-bottom: 200px; opacity: 0; transform: translateY(50px); }
-        .exp-step:nth-child(even) { flex-direction: row-reverse; }
-        .exp-text { flex: 1; }
-        .exp-text h3 { font-size: 44px; margin-bottom: 20px; color: var(--accent); }
-        .exp-text p { font-size: 18px; color: var(--text-dim); line-height: 1.6; }
-        .exp-visual { flex: 1.3; display: flex; justify-content: center; align-items: center; }
+        /* SHARED */
+        section{position:relative;z-index:2}
+        .wrap{max-width:1200px;margin:0 auto;padding:0 6%}
+        .sec-label{font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:24px;display:flex;align-items:center;gap:12px}
+        .sec-label::before{content:'';width:28px;height:1px;background:var(--accent)}
+        .sec-label.center{justify-content:center}
+        .sec-label.center::before{display:none}
+        .reveal{opacity:0;transform:translateY(28px);transition:opacity .8s cubic-bezier(.2,1,.3,1),transform .8s cubic-bezier(.2,1,.3,1)}
+        .reveal.v{opacity:1;transform:none}
+        .d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}.d4{transition-delay:.4s}
 
-        /* --- CSS DEVICES --- */
-        .phone-mockup {
-            width: 280px; height: 560px; background: #000; border: 10px solid #1a1a1a;
-            border-radius: 48px; position: relative; box-shadow: 0 40px 80px rgba(0,0,0,0.6);
-            padding: 15px; display: flex; flex-direction: column;
-        }
-        .phone-notch { width: 120px; height: 25px; background: #1a1a1a; margin: 0 auto; border-bottom-left-radius: 15px; border-bottom-right-radius: 15px; position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 10; }
-        .phone-screen { flex: 1; background: #050505; border-radius: 36px; overflow: hidden; padding: 25px; position: relative; display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,0.05); }
+        /* STATS BAR */
+        .stats-bar{padding:80px 0;border-bottom:1px solid var(--border)}
+        .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+        .stat-block{padding:32px 40px;border-right:1px solid var(--border);text-align:center}
+        .stat-block:last-child{border-right:none}
+        .stat-big{font-family:'Syne',sans-serif;font-size:clamp(36px,4vw,56px);font-weight:800;letter-spacing:-.02em;color:var(--white);margin-bottom:8px}
+        .stat-big span{color:var(--accent)}
+        .stat-sub{font-size:13px;color:var(--dim);font-weight:300}
 
-        .laptop-mockup {
-            width: 100%; max-width: 600px; aspect-ratio: 16/10; background: #000; border: 14px solid #1a1a1a;
-            border-radius: 24px; box-shadow: 0 50px 100px rgba(0,0,0,0.5); padding: 20px; display: flex; flex-direction: column;
-        }
-        .laptop-screen { flex: 1; background: #080808; border-radius: 6px; padding: 25px; border: 1px solid rgba(255,255,255,0.05); }
+        /* CONCEPT */
+        .concept{padding:140px 0}
+        .concept-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:80px;align-items:start}
+        .concept-text h2{font-family:'Syne',sans-serif;font-size:clamp(36px,4vw,58px);font-weight:800;line-height:1;letter-spacing:-.025em;margin-bottom:28px}
+        .concept-text h2 em{font-style:normal;color:transparent;-webkit-text-stroke:1px var(--dim2)}
+        .concept-text p{font-size:17px;color:var(--dim);line-height:1.7;font-weight:300;margin-bottom:18px}
+        .quote-card{background:var(--card);border:1px solid var(--border);border-radius:28px;padding:44px;position:relative}
+        .quote-card::before{content:'"';position:absolute;top:-18px;left:36px;font-family:'Syne',sans-serif;font-size:90px;line-height:1;color:var(--accent);opacity:.12}
+        .quote-card p{font-size:18px;line-height:1.65;color:rgba(255,255,255,.7);font-weight:300;font-style:italic;margin-bottom:28px}
+        .qa{display:flex;align-items:center;gap:16px}
+        .qa-av{width:44px;height:44px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:18px;font-weight:800}
+        .qa-name{font-size:14px;font-weight:600;margin-bottom:2px}
+        .qa-role{font-size:12px;color:var(--dim)}
 
-        /* --- UI ELEMENTS FOR ANIMATION --- */
-        .ui-card { background: #111; padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 12px; display: flex; align-items: center; gap: 15px; }
-        .ui-card.active { border-color: var(--accent); background: rgba(108, 99, 255, 0.15); }
-        .ui-icon { width: 35px; height: 35px; border-radius: 8px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-        .ui-progress { height: 6px; background: #1a1a1a; border-radius: 3px; flex: 1; overflow: hidden; position: relative; }
-        .ui-bar { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent); width: 0%; }
+        /* DEMO */
+        .demo{padding:60px 0 140px}
+        .demo-hdr{text-align:center;margin-bottom:100px}
+        .demo-hdr h2{font-family:'Syne',sans-serif;font-size:clamp(40px,5.5vw,76px);font-weight:800;letter-spacing:-.035em;line-height:.92;margin-bottom:20px}
+        .demo-hdr p{font-size:17px;color:var(--dim);font-weight:300}
+        .devices{position:relative;display:flex;justify-content:center;align-items:flex-end;margin-bottom:80px}
+        .laptop{width:640px;background:#08080d;border:10px solid #1a1a24;border-radius:24px 24px 0 0;box-shadow:0 60px 120px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.04);overflow:hidden;flex-shrink:0}
+        .lscreen{background:#050507;padding:24px;min-height:360px}
+        .lbase{background:#111118;height:18px;border-radius:0 0 24px 24px;position:relative}
+        .lbase::after{content:'';position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:130px;height:5px;background:#08080d;border-radius:4px 4px 0 0}
+        .phone{width:185px;background:#08080d;border:8px solid #1a1a24;border-radius:40px;box-shadow:0 40px 80px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.04);overflow:hidden;position:absolute;right:-25px;bottom:18px;z-index:10}
+        .pnb{height:26px;background:#050507;display:flex;align-items:center;justify-content:center}
+        .pnb::after{content:'';width:60px;height:11px;background:#1a1a24;border-radius:8px}
+        .psc{background:#050507;padding:14px;min-height:360px;display:flex;flex-direction:column}
 
-        /* --- FEATURES GRID --- */
-        .feature-grid { padding: 150px 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-        .f-card { background: var(--surface); padding: 50px; border-radius: 44px; border: 1px solid var(--border); transition: 0.4s; }
-        .f-card:hover { border-color: var(--accent); transform: translateY(-5px); }
-        .f-card h3 { font-size: 26px; margin-bottom: 18px; }
-        .f-card p { color: var(--text-dim); line-height: 1.6; font-size: 15px; }
-        .f-icon { font-size: 36px; margin-bottom: 30px; color: var(--accent); }
+        /* PC UI */
+        .pc-dash{display:flex;height:312px}
+        .pc-side{width:138px;background:rgba(255,255,255,.02);border-right:1px solid var(--border);padding:16px;flex-shrink:0}
+        .pc-wm{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;letter-spacing:.05em;margin-bottom:4px}
+        .pc-wm span{color:var(--accent)}
+        .pc-sp{display:inline-flex;align-items:center;gap:5px;font-size:9px;color:var(--dim);background:rgba(255,255,255,.04);border-radius:100px;padding:3px 8px;margin-bottom:20px}
+        .sdot{width:5px;height:5px;background:var(--green);border-radius:50%;animation:ldot 2s infinite}
+        .pcn{padding:7px 10px;border-radius:8px;font-size:10px;color:var(--dim);margin-bottom:2px;display:flex;align-items:center;gap:7px;transition:background .2s,color .2s}
+        .pcn.a{background:rgba(108,99,255,.14);color:var(--accent)}
+        .pc-body{flex:1;padding:18px;overflow:hidden}
+        .pc-tb{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+        .pc-ttl{font-family:'Syne',sans-serif;font-size:14px;font-weight:800}
+        .pc-badge{display:flex;align-items:center;gap:6px;font-size:9px;color:var(--green);background:rgba(48,209,88,.07);border:1px solid rgba(48,209,88,.14);border-radius:100px;padding:4px 10px}
+        .ccard{background:rgba(108,99,255,.07);border:1px solid rgba(108,99,255,.14);border-radius:14px;padding:14px;text-align:center;margin-bottom:14px}
+        .clbl{font-size:8px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}
+        .cdig{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;letter-spacing:.2em;color:var(--accent)}
+        .cip{display:flex;align-items:center;gap:8px;font-size:9px;color:var(--dim);margin-top:7px;justify-content:center}
+        .cipv{color:var(--white);font-weight:500}
+        .cpbtn{background:rgba(255,255,255,.06);border-radius:6px;padding:2px 7px;font-size:8px;color:var(--dim)}
+        .sprow{display:flex;gap:7px}
+        .spill{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center}
+        .spl{font-size:8px;color:var(--dim);margin-bottom:3px}
+        .spv{font-size:13px;font-weight:700}
+        .spv.g{color:var(--green)}.spv.a{color:var(--amber)}
 
-        /* --- SETUP ROADMAP --- */
-        .roadmap { padding: 120px 0; text-align: center; }
-        .step-row-static { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 80px; text-align: left; }
-        .step-card { background: var(--surface); padding: 35px; border-radius: 28px; border: 1px solid var(--border); }
-        .step-num { font-size: 36px; font-weight: 900; color: var(--accent); margin-bottom: 20px; opacity: 0.2; }
+        /* PHONE UI */
+        .ph{display:flex;flex-direction:column;height:100%}
+        .ph-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+        .ph-wm{font-family:'Syne',sans-serif;font-size:8px;font-weight:800;letter-spacing:.08em}
+        .ph-wm span{color:var(--accent)}
+        .ph-pcn{font-size:11px;font-weight:700;margin-bottom:2px}
+        .ph-conn{display:flex;align-items:center;gap:4px;font-size:8px;color:var(--green)}
+        .ph-gear{width:22px;height:22px;background:rgba(255,255,255,.06);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:10px}
+        .ph-stor{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+        .rng{width:36px;height:36px;flex-shrink:0;position:relative}
+        .rng svg{transform:rotate(-90deg)}
+        .rng-txt{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:8px;font-weight:700}
+        .ph-si-t{font-size:9px;font-weight:700;margin-bottom:1px}
+        .ph-si-s{font-size:7px;color:var(--dim)}
+        .ph-qr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+        .ph-qc{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px}
+        .ph-qi{width:26px;height:26px;background:rgba(108,99,255,.14);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;margin-bottom:5px}
+        .ph-qt{font-size:9px;font-weight:700;margin-bottom:1px}
+        .ph-qs{font-size:7px;color:var(--dim)}
+        .ph-bnav{display:flex;justify-content:space-around;background:rgba(255,255,255,.03);border-top:1px solid var(--border);padding:7px 0;margin:auto -14px 0}
+        .ph-ni{display:flex;flex-direction:column;align-items:center;gap:2px}
+        .ph-icon{font-size:12px}
+        .ph-nl{font-size:7px;color:var(--dim)}
+        .ph-nl.a{color:var(--accent)}
 
-        /* --- CTA --- */
-        .cta-section { padding: 150px 0; }
-        .cta-card { background: linear-gradient(135deg, #6C63FF 0%, #3B348F 100%); padding: 120px 40px; border-radius: 60px; text-align: center; box-shadow: 0 40px 100px var(--glow); }
+        /* FEATURE DEEP DIVES */
+        .features{padding:40px 0 140px}
+        .features-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:72px}
+        .features-hdr h2{font-family:'Syne',sans-serif;font-size:clamp(36px,4vw,56px);font-weight:800;letter-spacing:-.025em;line-height:1}
+        .features-hdr p{font-size:15px;color:var(--dim);max-width:260px;text-align:right;font-weight:300;line-height:1.6}
+        .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+        .fc{background:var(--card);border:1px solid var(--border);border-radius:28px;padding:40px;transition:border-color .3s,transform .3s;position:relative;overflow:hidden}
+        .fc::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 20%,var(--glow),transparent 60%);opacity:0;transition:opacity .4s}
+        .fc:hover{border-color:rgba(108,99,255,.22);transform:translateY(-4px)}
+        .fc:hover::before{opacity:1}
+        .fc.span2{grid-column:span 2}
+        .fi{width:50px;height:50px;background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.14);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:26px}
+        .fc h3{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;margin-bottom:12px;letter-spacing:-.01em}
+        .fc p{font-size:15px;color:var(--dim);line-height:1.65;font-weight:300}
+        .fc-badge{display:inline-block;background:rgba(48,209,88,.09);border:1px solid rgba(48,209,88,.18);color:var(--green);font-size:11px;font-weight:600;padding:4px 12px;border-radius:100px;margin-top:18px;letter-spacing:.04em}
+        .fc-badge.amber{background:rgba(255,159,10,.09);border-color:rgba(255,159,10,.18);color:var(--amber)}
 
-        footer { padding: 80px 0; border-top: 1px solid var(--border); text-align: center; color: var(--text-dim); font-size: 14px; }
-        .emerald-link { color: var(--accent); font-weight: 800; text-decoration: none; border-bottom: 1px solid transparent; transition: 0.3s; }
-        .emerald-link:hover { border-bottom-color: var(--accent); }
+        /* COMPARISON */
+        .compare{padding:40px 0 140px}
+        .compare-hdr{text-align:center;margin-bottom:72px}
+        .compare-hdr h2{font-family:'Syne',sans-serif;font-size:clamp(36px,4.5vw,64px);font-weight:800;letter-spacing:-.03em;line-height:.95;margin-bottom:20px}
+        .compare-hdr p{font-size:17px;color:var(--dim);font-weight:300}
+        .compare-table{width:100%;border-collapse:collapse;border-radius:24px;overflow:hidden}
+        .compare-table th{padding:20px 28px;text-align:left;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border)}
+        .compare-table th:first-child{width:30%}
+        .compare-table th.hl{color:var(--accent);background:rgba(108,99,255,.05)}
+        .compare-table td{padding:18px 28px;font-size:14px;border-bottom:1px solid var(--border);color:var(--dim)}
+        .compare-table td:first-child{color:var(--white);font-weight:500}
+        .compare-table tr:last-child td{border-bottom:none}
+        .compare-table td.hl{background:rgba(108,99,255,.04)}
+        .compare-table tr:hover td{background:rgba(255,255,255,.015)}
+        .tick{color:var(--green);font-size:16px}
+        .cross{color:var(--red);font-size:16px}
+        .partial{color:var(--amber);font-size:13px;font-weight:500}
 
-        @media (max-width: 900px) {
-            .hero h1 { font-size: 60px; }
-            .story-grid, .exp-step { flex-direction: column !important; text-align: center; gap: 60px; }
-            .feature-grid, .step-row-static { grid-template-columns: 1fr; }
-            .laptop-mockup { display: none; }
-            .exp-visual { order: -1; }
+        /* PRIVACY */
+        .privacy{padding:40px 0 140px}
+        .privacy-inner{background:var(--card);border:1px solid var(--border);border-radius:44px;padding:80px;position:relative;overflow:hidden}
+        .privacy-inner::before{content:'';position:absolute;top:-100px;right:-100px;width:400px;height:400px;background:radial-gradient(circle,rgba(48,209,88,.06),transparent 60%);border-radius:50%}
+        .privacy-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+        .privacy-text h2{font-family:'Syne',sans-serif;font-size:clamp(32px,3.5vw,52px);font-weight:800;letter-spacing:-.025em;line-height:1.05;margin-bottom:24px}
+        .privacy-text p{font-size:16px;color:var(--dim);line-height:1.7;font-weight:300;margin-bottom:16px}
+        .privacy-list{list-style:none;display:flex;flex-direction:column;gap:20px}
+        .privacy-list li{display:flex;align-items:flex-start;gap:16px}
+        .pli-icon{width:40px;height:40px;background:rgba(48,209,88,.08);border:1px solid rgba(48,209,88,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+        .pli-text strong{display:block;font-size:15px;font-weight:600;margin-bottom:4px}
+        .pli-text span{font-size:13px;color:var(--dim);line-height:1.5}
+
+        /* SCREENSHOTS */
+        .screenshots{padding:40px 0 140px}
+        .screenshots-hdr{text-align:center;margin-bottom:72px}
+        .screenshots-hdr h2{font-family:'Syne',sans-serif;font-size:clamp(36px,4.5vw,64px);font-weight:800;letter-spacing:-.03em;line-height:.95;margin-bottom:20px}
+        .screenshots-hdr p{font-size:17px;color:var(--dim);font-weight:300}
+        .screens-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;align-items:end}
+        .screen-card{background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden;transition:transform .3s,border-color .3s}
+        .screen-card:hover{transform:translateY(-8px);border-color:rgba(108,99,255,.25)}
+        .screen-card:nth-child(3){transform:scale(1.06)}
+        .screen-card:nth-child(3):hover{transform:scale(1.06) translateY(-8px)}
+        .sc-bar{height:8px;background:var(--accent)}
+        .sc-body{padding:16px}
+        .sc-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;margin-bottom:8px;letter-spacing:.02em}
+        .sc-ui{background:var(--surface);border-radius:10px;padding:12px;min-height:160px;display:flex;flex-direction:column;gap:8px}
+        .sc-row{height:8px;background:rgba(255,255,255,.06);border-radius:4px}
+        .sc-row.accent{background:rgba(108,99,255,.25);width:60%}
+        .sc-row.short{width:45%}
+        .sc-row.med{width:75%}
+        .sc-icon-row{display:flex;gap:6px;margin-top:4px}
+        .sc-ico{width:28px;height:28px;background:rgba(108,99,255,.15);border-radius:8px}
+        .sc-ico.g{background:rgba(48,209,88,.12)}
+        .sc-ico.r{background:rgba(255,69,58,.12)}
+        .sc-tag{font-size:10px;color:var(--dim);margin-top:auto;padding-top:8px}
+
+        /* TECH SPECS */
+        .techspecs{padding:40px 0 140px}
+        .techspecs-hdr{text-align:center;margin-bottom:72px}
+        .techspecs-hdr h2{font-family:'Syne',sans-serif;font-size:clamp(36px,4.5vw,64px);font-weight:800;letter-spacing:-.03em;line-height:.95;margin-bottom:20px}
+        .techspecs-hdr p{font-size:17px;color:var(--dim);font-weight:300}
+        .spec-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px}
+        .spec-card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:36px}
+        .spec-card h3{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:24px;color:var(--accent);letter-spacing:-.01em}
+        .spec-list{list-style:none;display:flex;flex-direction:column;gap:12px}
+        .spec-list li{display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border);font-size:14px}
+        .spec-list li:last-child{border-bottom:none;padding-bottom:0}
+        .spec-list li span:first-child{color:var(--dim)}
+        .spec-list li span:last-child{color:var(--white);font-weight:500;font-family:'DM Sans',monospace;font-size:13px}
+        .stack-pills{display:flex;flex-wrap:wrap;gap:8px}
+        .stack-pill{padding:6px 14px;background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.15);border-radius:100px;font-size:12px;color:var(--accent2);font-weight:500}
+
+        /* INSTALL */
+        .install{padding:40px 0 140px}
+        .install-hdr{text-align:center;margin-bottom:100px}
+        .install-hdr h2{font-family:'Syne',sans-serif;font-size:clamp(40px,5vw,72px);font-weight:800;letter-spacing:-.035em;line-height:.92;margin-bottom:20px}
+        .install-hdr p{font-size:17px;color:var(--dim);font-weight:300}
+        .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative}
+        .steps::before{content:'';position:absolute;top:32px;left:12%;right:12%;height:1px;background:linear-gradient(to right,transparent,var(--border),var(--border),transparent)}
+        .step{text-align:center;padding:0 20px}
+        .step-num{width:64px;height:64px;background:var(--card);border:1px solid var(--border);border-radius:20px;margin:0 auto 22px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--accent);position:relative;z-index:1;transition:border-color .3s,transform .3s}
+        .step:hover .step-num{border-color:var(--accent);transform:translateY(-4px)}
+        .step h4{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:10px;letter-spacing:-.01em}
+        .step p{font-size:14px;color:var(--dim);line-height:1.6;font-weight:300}
+
+        /* FAQ */
+        .faq{padding:40px 0 140px}
+        .faq-hdr{text-align:center;margin-bottom:72px}
+        .faq-hdr h2{font-family:'Syne',sans-serif;font-size:clamp(36px,4.5vw,64px);font-weight:800;letter-spacing:-.03em;line-height:.95;margin-bottom:20px}
+        .faq-hdr p{font-size:17px;color:var(--dim);font-weight:300}
+        .faq-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+        .faq-item{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;transition:border-color .3s}
+        .faq-item:hover{border-color:rgba(108,99,255,.2)}
+        .faq-q{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:14px;letter-spacing:-.01em}
+        .faq-a{font-size:15px;color:var(--dim);line-height:1.65;font-weight:300}
+        .faq-a strong{color:var(--white);font-weight:500}
+
+        /* CTA */
+        .cta{padding:40px 0 160px}
+        .cta-box{position:relative;overflow:hidden;border-radius:52px;padding:130px 80px;text-align:center;border:1px solid rgba(108,99,255,.18)}
+        .cta-box::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 30% 0%,rgba(108,99,255,.2),transparent 50%),radial-gradient(ellipse at 70% 100%,rgba(108,99,255,.12),transparent 50%)}
+        .cta-box::after{content:'';position:absolute;inset:0;background:var(--card);z-index:-1}
+        .cta-ey{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:28px;position:relative;z-index:1}
+        .cta-box h2{font-family:'Syne',sans-serif;font-size:clamp(48px,7vw,96px);font-weight:800;letter-spacing:-.04em;line-height:.88;margin-bottom:28px;position:relative;z-index:1}
+        .cta-box p{font-size:18px;color:var(--dim);margin-bottom:56px;font-weight:300;position:relative;z-index:1}
+        .cta-btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
+        .btn-w{padding:18px 44px;background:var(--white);color:#050507;border-radius:100px;font-size:15px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:10px;transition:transform .25s,box-shadow .25s;letter-spacing:.01em}
+        .btn-w:hover{transform:translateY(-4px);box-shadow:0 20px 40px rgba(255,255,255,.12)}
+        .btn-g{padding:18px 44px;border:1px solid rgba(255,255,255,.12);border-radius:100px;font-size:15px;font-weight:500;color:rgba(255,255,255,.6);text-decoration:none;display:inline-flex;align-items:center;gap:10px;transition:border-color .25s,color .25s}
+        .btn-g:hover{border-color:rgba(255,255,255,.3);color:var(--white)}
+
+        /* FOOTER */
+        footer{padding:60px 0;border-top:1px solid var(--border)}
+        .ft{display:flex;justify-content:space-between;align-items:center}
+        .ft-logo{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;letter-spacing:.06em}
+        .ft-logo span{color:var(--accent)}
+        .ft-copy{font-size:13px;color:var(--dim)}
+        .ft-link{color:var(--accent);text-decoration:none;font-weight:600;transition:opacity .2s}
+        .ft-link:hover{opacity:.7}
+
+        /* RESPONSIVE */
+        @media(max-width:900px){
+          .concept-grid,.privacy-grid,.faq-grid,.spec-grid{grid-template-columns:1fr}
+          .feat-grid{grid-template-columns:1fr}
+          .fc.span2{grid-column:span 1}
+          .steps{grid-template-columns:1fr 1fr}
+          .steps::before{display:none}
+          .screens-grid{grid-template-columns:repeat(2,1fr)}
+          .screen-card:nth-child(3){transform:none}
+          .stats-grid{grid-template-columns:1fr 1fr}
+          .stat-block:nth-child(2){border-right:none}
+          .features-hdr{flex-direction:column;gap:16px;align-items:flex-start}
+          .features-hdr p{text-align:left;max-width:100%}
+          .compare-table{font-size:12px}
+          .laptop{width:90vw}
+          .phone{right:-15px;width:145px}
+          .nav-links{display:none}
+          .cta-box{padding:80px 32px}
+          .ft{flex-direction:column;gap:20px;text-align:center}
+          .privacy-inner{padding:48px 32px}
         }
     </style>
 </head>
 <body>
 
-    <nav>
-        <div class="container nav-inner">
-            <div class="logo">C<span>Y</span>PHER</div>
-            <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn btn-p" style="padding: 12px 25px; font-size: 13px;">Get Cypher</a>
+<div class="cursor" id="cur"></div>
+<div class="cursor-ring" id="ring"></div>
+<div class="grid-bg"></div>
+
+<!-- NAV -->
+<nav id="nav">
+    <div class="nav-inner">
+        <div class="logo">C<span class="y">Y</span>PHER</div>
+        <div class="nav-links">
+            <a href="#demo">Product</a>
+            <a href="#features">Features</a>
+            <a href="#compare">vs Others</a>
+            <a href="#faq">FAQ</a>
+            <a href="#install">Install</a>
         </div>
-    </nav>
+        <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="nav-cta">Download Free</a>
+    </div>
+</nav>
 
-    <!-- HERO -->
-    <header class="hero container">
-        <span class="section-label">P2P Proximity Link</span>
-        <h1 class="gradient-text">Sync your world,<br>not the cloud.</h1>
-        <p>Experience the direct, high-speed connection between Android and Windows. No cables, no middlemen, just raw local power.</p>
+<!-- HERO -->
+<header class="hero">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="ptcl-wrap" id="ptcl"></div>
 
-        <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-            <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn btn-p">Download APK & EXE</a>
-            <a href="#experience" class="btn btn-s">The Experience</a>
-        </div>
-    </header>
+    <div class="hero-badge" id="hb">
+        <span class="live-dot"></span>
+        Zero Cloud · Local First · Always Private
+    </div>
+    <h1 id="ht">Your PC.<br><span class="h1-ghost">Your phone.</span></h1>
+    <p id="hp">CYPHER creates a direct, encrypted link between your Android and Windows PC — no cables, no cloud, no middlemen. Move files at full WiFi speed, control your PC from your couch.</p>
+    <div class="hero-btns" id="hb2">
+        <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn-p">
+            Download Free
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a href="#demo" class="btn-s">See it in action</a>
+    </div>
+    <div class="scroll-hint"><div class="scroll-line"></div></div>
+</header>
 
-    <!-- THE STORY / OBSERVATION -->
-    <section class="story-section container">
-        <div class="story-grid">
-            <div class="story-content">
-                <span class="section-label">THE OBSERVATION</span>
-                <h2>We noticed sharing is still broken.</h2>
-                <p>Bluetooth is too slow. USB cables are never where you need them. Cloud drives track your activity and charge you for space. Why is it so hard to move a file across the room?</p>
-                <p>We built Cypher to be the "Invisible Bridge." A zero-cloud, high-bandwidth link that handles permissions and firewalls automatically, so you can just focus on your work.</p>
+<!-- MARQUEE -->
+<div class="mq-section">
+    <div class="mq-track" id="mq">
+        <div class="mq-item"><span class="mq-dot">✦</span>Zero Cloud Storage</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Local WiFi Transfer</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Up to 50 MB/s Speed</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>End-to-End Private</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Remote PC Control</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Clipboard Sync</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>No Internet Required</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Free Forever</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Guest File Sharing</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Smart Macros</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Zero Cloud Storage</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Local WiFi Transfer</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Up to 50 MB/s Speed</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>End-to-End Private</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Remote PC Control</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Clipboard Sync</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>No Internet Required</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Free Forever</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Guest File Sharing</div>
+        <div class="mq-item"><span class="mq-dot">✦</span>Smart Macros</div>
+    </div>
+</div>
+
+<!-- STATS BAR -->
+<section class="stats-bar">
+    <div class="wrap">
+        <div class="stats-grid">
+            <div class="stat-block reveal">
+                <div class="stat-big"><span id="s1">0</span> MB/s</div>
+                <div class="stat-sub">Peak transfer speed over local WiFi</div>
             </div>
-            <div class="observation-box">
-                <p>"I was tired of emailing links to myself just to open them on my laptop. Cypher turns your phone into a high-speed physical remote for your PC."</p>
-                <div style="margin-top: 30px; display: flex; align-items: center; gap: 15px;">
-                    <div style="width: 45px; height: 45px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px;">E</div>
-                    <div>
-                        <div style="font-weight: 900;">Emerald</div>
-                        <div style="font-size: 12px; color: var(--text-dim);">Founder & Lead Designer</div>
+            <div class="stat-block reveal d1">
+                <div class="stat-big"><span id="s2">0</span></div>
+                <div class="stat-sub">External servers used. Ever.</div>
+            </div>
+            <div class="stat-block reveal d2">
+                <div class="stat-big"><span id="s3">0</span>+</div>
+                <div class="stat-sub">Features built for real workflows</div>
+            </div>
+            <div class="stat-block reveal d3">
+                <div class="stat-big"><span id="s4">100</span><span>%</span></div>
+                <div class="stat-sub">Free. No subscriptions. No limits.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CONCEPT -->
+<section class="concept">
+    <div class="wrap">
+        <div class="concept-grid">
+            <div class="reveal">
+                <div class="sec-label">The Observation</div>
+                <h2>Sharing files <em>shouldn't</em> need the internet.</h2>
+                <p>Bluetooth is painfully slow. USB cables are never where you need them. Cloud drives charge you for your own storage and silently track what you access.</p>
+                <p>CYPHER is the invisible bridge — a zero-cloud, direct link between your phone and PC that handles everything automatically. Your data never leaves your room.</p>
+            </div>
+            <div class="reveal d2">
+                <div class="quote-card">
+                    <p>"I was tired of emailing files to myself just to get them on my laptop. CYPHER is the app I always wanted — instant, private, and shockingly fast."</p>
+                    <div class="qa">
+                        <div class="qa-av">E</div>
+                        <div>
+                            <div class="qa-name">Emerald</div>
+                            <div class="qa-role">Founder & Lead Designer</div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- THE EXPERIENCE (IMMERSIVE ALEX STORY) -->
-    <section id="experience" class="experience-section">
-        <div class="container">
-            <div style="text-align: center; margin-bottom: 120px;">
-                <span class="section-label">USER JOURNEY</span>
-                <h2 style="font-size: 60px;">Meet Alex.</h2>
-            </div>
-
-            <!-- STEP 1 -->
-            <div class="exp-step">
-                <div class="exp-text">
-                    <h3>01. Zero Config Setup</h3>
-                    <p>Alex sits down and opens CYPHER on his PC. The app automatically secures firewall permissions and starts a beacon. His phone finds the PC instantly on the WiFi. No IPs, no technical headaches.</p>
-                </div>
-                <div class="exp-visual">
-                    <div class="laptop-mockup">
-                        <div class="laptop-screen">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-                                <div style="font-weight: 900; color: var(--accent); font-size: 14px;">CYPHER CORE</div>
-                                <div style="color: #30D158; font-size: 11px; font-weight: bold;">● ADVERTISING</div>
+<!-- DEMO -->
+<section id="demo" class="demo">
+    <div class="wrap">
+        <div class="demo-hdr reveal">
+            <div class="sec-label center">The Product</div>
+            <h2>One link.<br>Total control.</h2>
+            <p>Your devices talk directly — no middleman, no account required.</p>
+        </div>
+        <div class="devices reveal">
+            <div>
+                <div class="laptop">
+                    <div class="lscreen">
+                        <div class="pc-dash">
+                            <div class="pc-side">
+                                <div class="pc-wm">C<span>Y</span>PHER</div>
+                                <div class="pc-sp"><div class="sdot"></div>Connected</div>
+                                <div class="pcn a">📁 Files</div>
+                                <div class="pcn">👥 Guests</div>
+                                <div class="pcn">📜 Log</div>
+                                <div class="pcn">⚙️ Settings</div>
                             </div>
-                            <div style="text-align: center; margin-top: 40px;">
-                                <div style="font-size: 10px; color: #444; margin-bottom: 15px;">ENTER THIS CODE ON PHONE</div>
-                                <div style="font-size: 42px; font-weight: 900; letter-spacing: 12px; color: #fff;">847 291</div>
+                            <div class="pc-body">
+                                <div class="pc-tb">
+                                    <div class="pc-ttl">Shared Files</div>
+                                    <div class="pc-badge"><div class="sdot"></div>Emerald's Phone</div>
+                                </div>
+                                <div class="ccard">
+                                    <div class="clbl">Your connect code</div>
+                                    <div class="cdig" id="cdig">8 4 7 2 9 1</div>
+                                    <div class="cip">
+                                        <span>Your PC address:</span>
+                                        <span class="cipv">192.168.137.1</span>
+                                        <span class="cpbtn">Copy</span>
+                                    </div>
+                                </div>
+                                <div class="sprow">
+                                    <div class="spill"><div class="spl">CPU</div><div class="spv g">12%</div></div>
+                                    <div class="spill"><div class="spl">RAM</div><div class="spv a">67%</div></div>
+                                    <div class="spill"><div class="spl">Storage</div><div class="spv">46%</div></div>
+                                </div>
                             </div>
                         </div>
                     </div>
+                    <div class="lbase"></div>
                 </div>
             </div>
-
-            <!-- STEP 2 -->
-            <div class="exp-step">
-                <div class="exp-text">
-                    <h3>02. The Entire PC, Ported.</h3>
-                    <p>Alex is on the sofa. He opens the **Remote Browser** on his phone. He sees his entire PC directory—Desktop, Downloads, hidden system files—everything. He finds a 4GB video file in one tap.</p>
-                </div>
-                <div class="exp-visual">
-                    <div class="phone-mockup">
-                        <div class="phone-notch"></div>
-                        <div class="phone-screen">
-                            <div style="font-weight: 900; font-size: 11px; color: var(--accent); margin-bottom: 25px;">REMOTE C:\ DRIVE</div>
-                            <div class="ui-card"><div class="ui-icon">📁</div> <div>Documents</div></div>
-                            <div class="ui-card active"><div class="ui-icon" style="color: var(--accent);">📄</div> <div>Project_Final.mp4</div></div>
-                            <div class="ui-card"><div class="ui-icon">📁</div> <div>Assets</div></div>
-                            <div style="flex: 1;"></div>
-                            <div style="height: 50px; background: var(--accent); border-radius: 100px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px;">DOWNLOAD TO PHONE</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- STEP 3 -->
-            <div class="exp-step">
-                <div class="exp-text">
-                    <h3>03. Warp Speed. No Limits.</h3>
-                    <p>Alex hits 'Download'. CYPHER engages **64KB High-Speed Buffers**. The 4GB file streams directly at 50MB/s. No cloud lag, no Bluetooth pairing. Just pure WiFi throughput.</p>
-                </div>
-                <div class="exp-visual">
-                    <div class="phone-mockup">
-                        <div class="phone-notch"></div>
-                        <div class="phone-screen" style="justify-content: center; align-items: center;">
-                            <div style="width: 140px; height: 140px; border: 5px solid #111; border-top-color: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 900;">72%</div>
-                            <div style="margin-top: 30px; font-weight: 900; color: var(--accent); font-size: 20px;">52.4 MB/s</div>
-                            <div style="color: #444; font-size: 12px; margin-top: 5px;">P2P LINK SECURE</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- STEP 4 -->
-            <div class="exp-step">
-                <div class="exp-text">
-                    <h3>04. Absolute Command.</h3>
-                    <p>The work is done. Alex doesn't stand up. He taps 'Hibernate' on his phone. His PC shuts down instantly and securely. Power, permissions, and sharing—all in his hand.</p>
-                </div>
-                <div class="exp-visual">
-                    <div class="phone-mockup">
-                        <div class="phone-notch"></div>
-                        <div class="phone-screen" style="justify-content: center;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                <div class="ui-card" style="height: 100px; justify-content: center; flex-direction: column; margin: 0; color: #FF453A;">🔴 Off</div>
-                                <div class="ui-card active" style="height: 100px; justify-content: center; flex-direction: column; margin: 0;">🌙 Sleep</div>
-                                <div class="ui-card" style="height: 100px; justify-content: center; flex-direction: column; margin: 0;">🔒 Lock</div>
-                                <div class="ui-card" style="height: 100px; justify-content: center; flex-direction: column; margin: 0;">🔄 Reset</div>
+            <div class="phone">
+                <div class="pnb"></div>
+                <div class="psc">
+                    <div class="ph">
+                        <div class="ph-hdr">
+                            <div>
+                                <div class="ph-wm">C<span>Y</span>PHER</div>
+                                <div class="ph-pcn">My PC</div>
+                                <div class="ph-conn"><div class="sdot" style="width:5px;height:5px"></div>Connected</div>
                             </div>
+                            <div class="ph-gear">⚙️</div>
+                        </div>
+                        <div class="ph-stor">
+                            <div class="rng">
+                                <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="13" fill="none" stroke="#1A1A1A" stroke-width="4"/><circle cx="18" cy="18" r="13" fill="none" stroke="#6C63FF" stroke-width="4" stroke-dasharray="49 33" stroke-linecap="round"/></svg>
+                                <div class="rng-txt">59%</div>
+                            </div>
+                            <div><div class="ph-si-t">PC Storage</div><div class="ph-si-s">234 GB of 500 GB</div></div>
+                        </div>
+                        <div class="ph-qr">
+                            <div class="ph-qc"><div class="ph-qi">📥</div><div class="ph-qt">Get from PC</div><div class="ph-qs">Browse files</div></div>
+                            <div class="ph-qc"><div class="ph-qi">📤</div><div class="ph-qt">Send to PC</div><div class="ph-qs">Upload files</div></div>
+                        </div>
+                        <div class="ph-bnav">
+                            <div class="ph-ni"><div class="ph-icon">📁</div><div class="ph-nl a">Files</div></div>
+                            <div class="ph-ni"><div class="ph-icon">📤</div><div class="ph-nl">Send</div></div>
+                            <div class="ph-ni"><div class="ph-icon">🎮</div><div class="ph-nl">Controls</div></div>
+                            <div class="ph-ni"><div class="ph-icon">···</div><div class="ph-nl">More</div></div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- FEATURES -->
-    <section id="features" class="container feature-grid">
-        <div class="f-card">
-            <div class="f-icon">🚀</div>
-            <h3>Warp Speed</h3>
-            <p>Engineered with 64KB socket buffers to saturate your WiFi bandwidth. No more waiting for Bluetooth.</p>
+<!-- FEATURES -->
+<section id="features" class="features">
+    <div class="wrap">
+        <div class="features-hdr reveal">
+            <h2>Everything you need.<br>Nothing you don't.</h2>
+            <p>Every feature was built because someone actually needed it.</p>
         </div>
-        <div class="f-card">
-            <div class="f-icon">🛡️</div>
-            <h3>Zero Cloud</h3>
-            <p>Your data stays on your network. No external servers, no tracking, no privacy risks.</p>
-        </div>
-        <div class="f-card">
-            <div class="f-icon">📋</div>
-            <h3>Sync Clipboard</h3>
-            <p>Copy on Android, paste on Windows instantly with a global hotkey (Ctrl+Alt+V). Perfect for links.</p>
-        </div>
-        <div class="f-card">
-            <div class="f-icon">📡</div>
-            <h3>Auto-Magic</h3>
-            <p>Zero configuration required. Our mDNS beacon lets your phone find your PC the second you link up.</p>
-        </div>
-        <div class="f-card">
-            <div class="f-icon">🔋</div>
-            <h3>Smart Alerts</h3>
-            <p>Get background notifications if your PC battery is low or if a guest requests access.</p>
-        </div>
-        <div class="f-card">
-            <div class="f-icon">📂</div>
-            <h3>Two-Way Link</h3>
-            <p>Browse your phone from your PC or your PC from your phone. True bidirectional file mastery.</p>
-        </div>
-    </section>
-
-    <!-- ROADMAP -->
-    <section id="install" class="container roadmap">
-        <span class="section-label">GETTING STARTED</span>
-        <h2 style="font-size: 54px;">Install in 4 steps.</h2>
-        <div class="step-row-static">
-            <div class="step-card"><div class="step-num">01</div><h4>Download</h4><p style="color: var(--text-dim); font-size: 14px;">Download the APK and EXE to your phone.</p></div>
-            <div class="step-card"><div class="step-num">02</div><h4>Install APK</h4><p style="color: var(--text-dim); font-size: 14px;">Open the APK on Android and grant permissions.</p></div>
-            <div class="step-card"><div class="step-num">03</div><h4>Move EXE</h4><p style="color: var(--text-dim); font-size: 14px;">Connect to PC once and move the EXE file over.</p></div>
-            <div class="step-card"><div class="step-num">04</div><h4>Pair</h4><p style="color: var(--text-dim); font-size: 14px;">Enter the 6-digit code to finalize the link.</p></div>
-        </div>
-    </section>
-
-    <!-- CTA -->
-    <section id="download" class="container cta-section">
-        <div class="cta-card">
-            <h2 style="font-size: clamp(40px, 6vw, 80px); line-height: 1; margin-bottom: 30px;">Ready to link?</h2>
-            <p style="margin-bottom: 50px; font-weight: 500;">Ditch the cords. Ditch the cloud. Use CYPHER.</p>
-            <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-                <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn btn-white">Windows (.exe)</a>
-                <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn btn-s" style="background: rgba(0,0,0,0.2); border: none;">Android (.apk)</a>
+        <div class="feat-grid">
+            <div class="fc span2 reveal">
+                <div class="fi">🚀</div>
+                <h3>Warp-speed file transfers</h3>
+                <p>Built on direct TCP socket connections with 64KB buffers that saturate your local WiFi bandwidth. Move a 4GB video in under two minutes with zero quality loss, zero compression artifacts. No cloud hop. No throttling. Pure, unmediated throughput from one device to the other.</p>
+                <span class="fc-badge">Up to 50 MB/s</span>
+            </div>
+            <div class="fc reveal d1">
+                <div class="fi">🛡️</div>
+                <h3>Zero cloud architecture</h3>
+                <p>Your files never touch an external server. CYPHER operates entirely on your local network — your data stays in your room, under your control, always.</p>
+            </div>
+            <div class="fc reveal d1">
+                <div class="fi">📋</div>
+                <h3>Clipboard sync without conflict</h3>
+                <p>Copy on your phone and paste on your PC without overwriting your existing clipboard. A dedicated "Paste from Phone" right-click option keeps both clipboards separate.</p>
+                <span class="fc-badge amber">Smart design</span>
+            </div>
+            <div class="fc reveal d2">
+                <div class="fi">🎮</div>
+                <h3>Full remote control</h3>
+                <p>Shut down, sleep, lock, restart your PC. Control media playback, adjust volume, take screenshots. Everything from your phone without touching the keyboard.</p>
+            </div>
+            <div class="fc reveal d2">
+                <div class="fi">👥</div>
+                <h3>Temporary guest access</h3>
+                <p>Generate a time-limited QR code. Anyone can scan it and browse specific folders on your PC — no install required, auto-expires when you say so.</p>
+            </div>
+            <div class="fc reveal d3">
+                <div class="fi">⚡</div>
+                <h3>One-tap macros</h3>
+                <p>Build sequences of PC actions triggered from one phone tap. Open apps, adjust settings, run commands — your personal automation, always in your pocket.</p>
+            </div>
+            <div class="fc reveal">
+                <div class="fi">🔔</div>
+                <h3>PC notification mirror</h3>
+                <p>See your Windows notifications on your phone in real time. Never miss a desktop alert while you're away from your keyboard.</p>
+            </div>
+            <div class="fc span2 reveal d1">
+                <div class="fi">📂</div>
+                <h3>True two-way file mastery</h3>
+                <p>Browse your entire PC file system from your phone — every folder, every file, metadata included. Download anything to your phone. Send anything from your phone to any folder on your PC, including a destination picker so you choose exactly where it goes. Preview images, text files, and documents before downloading. Delete files remotely. All transfers show real-time progress with speed in MB/s and time remaining.</p>
+                <span class="fc-badge">Hero feature</span>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <footer class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 20px;">
-            <div>© 2026 CYPHER. Privacy First. Local First.</div>
-            <div>Designed by <a href="https://www.tiktok.com/@emerald_dev1" target="_blank" class="emerald-link">Emerald</a></div>
+<!-- COMPARISON -->
+<section id="compare" class="compare">
+    <div class="wrap">
+        <div class="compare-hdr reveal">
+            <div class="sec-label center">vs The Alternatives</div>
+            <h2>Why CYPHER<br>wins every time.</h2>
+            <p>Honest comparison. No marketing fluff.</p>
         </div>
-    </footer>
+        <div class="reveal">
+            <table class="compare-table">
+                <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th class="hl">CYPHER</th>
+                    <th>Google Drive</th>
+                    <th>Bluetooth</th>
+                    <th>USB Cable</th>
+                    <th>AirDrop</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>Transfer speed</td>
+                    <td class="hl"><strong style="color:#fff">Up to 50 MB/s</strong></td>
+                    <td><span class="partial">~5 MB/s (internet)</span></td>
+                    <td><span class="partial">~3 MB/s</span></td>
+                    <td><span class="partial">~40 MB/s</span></td>
+                    <td><span class="partial">~20 MB/s</span></td>
+                </tr>
+                <tr>
+                    <td>Needs internet</td>
+                    <td class="hl"><span class="tick">✓ Never</span></td>
+                    <td><span class="cross">✗ Always</span></td>
+                    <td><span class="tick">✓ Never</span></td>
+                    <td><span class="tick">✓ Never</span></td>
+                    <td><span class="tick">✓ Never</span></td>
+                </tr>
+                <tr>
+                    <td>Data stored in cloud</td>
+                    <td class="hl"><span class="tick">✓ Never</span></td>
+                    <td><span class="cross">✗ Always</span></td>
+                    <td><span class="tick">✓ Never</span></td>
+                    <td><span class="tick">✓ Never</span></td>
+                    <td><span class="tick">✓ Never</span></td>
+                </tr>
+                <tr>
+                    <td>Android + Windows</td>
+                    <td class="hl"><span class="tick">✓ Yes</span></td>
+                    <td><span class="tick">✓ Yes</span></td>
+                    <td><span class="tick">✓ Yes</span></td>
+                    <td><span class="tick">✓ Yes</span></td>
+                    <td><span class="cross">✗ Apple only</span></td>
+                </tr>
+                <tr>
+                    <td>Remote PC control</td>
+                    <td class="hl"><span class="tick">✓ Full</span></td>
+                    <td><span class="cross">✗ No</span></td>
+                    <td><span class="cross">✗ No</span></td>
+                    <td><span class="cross">✗ No</span></td>
+                    <td><span class="cross">✗ No</span></td>
+                </tr>
+                <tr>
+                    <td>Clipboard sync</td>
+                    <td class="hl"><span class="tick">✓ Yes</span></td>
+                    <td><span class="cross">✗ No</span></td>
+                    <td><span class="cross">✗ No</span></td>
+                    <td><span class="cross">✗ No</span></td>
+                    <td><span class="partial">Partial (Apple only)</span></td>
+                </tr>
+                <tr>
+                    <td>Guest file sharing</td>
+                    <td class="hl"><span class="tick">✓ QR + timed</span></td>
+                    <td><span class="partial">Link sharing only</span></td>
+                    <td><span class="cross">✗ No</span></td>
+                    <td><span class="cross">✗ No</span></td>
+                    <td><span class="cross">✗ No</span></td>
+                </tr>
+                <tr>
+                    <td>Cost</td>
+                    <td class="hl"><span class="tick">✓ Free forever</span></td>
+                    <td><span class="cross">✗ 15GB then paid</span></td>
+                    <td><span class="tick">✓ Free</span></td>
+                    <td><span class="tick">✓ Free</span></td>
+                    <td><span class="tick">✓ Free</span></td>
+                </tr>
+                <tr>
+                    <td>Physical cable needed</td>
+                    <td class="hl"><span class="tick">✓ Never</span></td>
+                    <td><span class="tick">✓ Never</span></td>
+                    <td><span class="tick">✓ Never</span></td>
+                    <td><span class="cross">✗ Always</span></td>
+                    <td><span class="tick">✓ Never</span></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
 
-    <script>
-        gsap.registerPlugin(ScrollTrigger);
+<!-- PRIVACY -->
+<section class="privacy">
+    <div class="wrap">
+        <div class="privacy-inner reveal">
+            <div class="privacy-grid">
+                <div>
+                    <div class="sec-label">Privacy Promise</div>
+                    <h2>What CYPHER collects about you.</h2>
+                    <p>Short answer: nothing. Long answer: also nothing. Here's exactly how it works.</p>
+                    <p>CYPHER is a local-network application. Every byte of data — files, clipboard content, notifications, commands — travels directly between your phone and your PC over your own WiFi. There is no CYPHER server in the middle. There is no account. There is no analytics beacon.</p>
+                </div>
+                <ul class="privacy-list">
+                    <li>
+                        <div class="pli-icon">🔒</div>
+                        <div class="pli-text">
+                            <strong>No external servers</strong>
+                            <span>All traffic stays on your local network. CYPHER has no backend infrastructure to send data to.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="pli-icon">👤</div>
+                        <div class="pli-text">
+                            <strong>No accounts required</strong>
+                            <span>No email, no sign-up, no profile. You are not a user in any database anywhere.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="pli-icon">📊</div>
+                        <div class="pli-text">
+                            <strong>No analytics or tracking</strong>
+                            <span>No usage stats, no crash reports phoning home, no telemetry. CYPHER does not know you exist.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="pli-icon">🗑️</div>
+                        <div class="pli-text">
+                            <strong>Uninstall = total removal</strong>
+                            <span>Nothing persists on external servers because nothing was ever sent there. Uninstall and it's like CYPHER never existed.</span>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
 
-        // Entrance
-        gsap.from(".hero h1, .hero p", { opacity: 0, y: 50, duration: 1.2, stagger: 0.3 });
+<!-- SCREENSHOTS -->
+<section class="screenshots">
+    <div class="wrap">
+        <div class="screenshots-hdr reveal">
+            <div class="sec-label center">The App</div>
+            <h2>Built to look as good<br>as it performs.</h2>
+            <p>Dark, precise, premium. Every screen designed with intention.</p>
+        </div>
+        <div class="screens-grid reveal">
+            <div class="screen-card">
+                <div class="sc-bar" style="background:#30D158"></div>
+                <div class="sc-body">
+                    <div class="sc-title">SPLASH SCREEN</div>
+                    <div class="sc-ui">
+                        <div style="text-align:center;padding:20px 0">
+                            <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;letter-spacing:.06em">C<span style="color:var(--accent)">Y</span>PHER</div>
+                            <div style="font-size:9px;color:var(--dim);margin-top:6px">Your files. Anywhere.</div>
+                            <div style="width:80px;height:2px;background:var(--accent);border-radius:2px;margin:14px auto 0"></div>
+                        </div>
+                    </div>
+                    <div class="sc-tag">Cinematic entry</div>
+                </div>
+            </div>
+            <div class="screen-card">
+                <div class="sc-bar"></div>
+                <div class="sc-body">
+                    <div class="sc-title">ONBOARDING</div>
+                    <div class="sc-ui">
+                        <div style="width:60px;height:60px;background:rgba(108,99,255,.12);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 10px">📁</div>
+                        <div class="sc-row accent"></div>
+                        <div class="sc-row short" style="background:rgba(255,255,255,.04)"></div>
+                        <div style="display:flex;justify-content:center;gap:6px;margin-top:8px">
+                            <div style="width:20px;height:6px;background:var(--accent);border-radius:3px"></div>
+                            <div style="width:6px;height:6px;background:var(--dim2);border-radius:3px"></div>
+                            <div style="width:6px;height:6px;background:var(--dim2);border-radius:3px"></div>
+                        </div>
+                    </div>
+                    <div class="sc-tag">3-slide intro</div>
+                </div>
+            </div>
+            <div class="screen-card">
+                <div class="sc-bar" style="background:var(--accent)"></div>
+                <div class="sc-body">
+                    <div class="sc-title">HOME SCREEN</div>
+                    <div class="sc-ui">
+                        <div style="font-size:8px;font-weight:700;color:var(--accent)">CYPHER</div>
+                        <div style="font-size:11px;font-weight:700">My PC</div>
+                        <div class="sc-row" style="background:var(--card);height:32px;border-radius:8px;margin:4px 0"></div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                            <div style="background:var(--card);border-radius:8px;height:36px"></div>
+                            <div style="background:var(--card);border-radius:8px;height:36px"></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-around;margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">
+                            <div style="font-size:9px;color:var(--accent)">Files</div>
+                            <div style="font-size:9px;color:var(--dim)">Send</div>
+                            <div style="font-size:9px;color:var(--dim)">Controls</div>
+                            <div style="font-size:9px;color:var(--dim)">More</div>
+                        </div>
+                    </div>
+                    <div class="sc-tag">Main hub</div>
+                </div>
+            </div>
+            <div class="screen-card">
+                <div class="sc-bar" style="background:#FF9F0A"></div>
+                <div class="sc-body">
+                    <div class="sc-title">FILE BROWSER</div>
+                    <div class="sc-ui">
+                        <div style="font-size:8px;color:var(--dim)">My PC › Downloads</div>
+                        <div class="sc-row"></div>
+                        <div class="sc-row med"></div>
+                        <div class="sc-row short"></div>
+                        <div class="sc-row"></div>
+                        <div class="sc-row med"></div>
+                    </div>
+                    <div class="sc-tag">Full PC browser</div>
+                </div>
+            </div>
+            <div class="screen-card">
+                <div class="sc-bar" style="background:#FF453A"></div>
+                <div class="sc-body">
+                    <div class="sc-title">CONTROLS</div>
+                    <div class="sc-ui">
+                        <div class="sc-icon-row">
+                            <div class="sc-ico r"></div>
+                            <div class="sc-ico" style="background:rgba(255,159,10,.12)"></div>
+                            <div class="sc-ico" style="background:rgba(10,132,255,.12)"></div>
+                        </div>
+                        <div style="width:44px;height:44px;background:rgba(108,99,255,.2);border-radius:50%;margin:8px auto;display:flex;align-items:center;justify-content:center;font-size:16px">⏯</div>
+                        <div class="sc-row" style="background:rgba(108,99,255,.2)"></div>
+                    </div>
+                    <div class="sc-tag">Remote control panel</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
-        // Step animations (Timeline)
-        gsap.utils.toArray(".exp-step").forEach(step => {
-            gsap.to(step, {
-                scrollTrigger: {
-                    trigger: step,
-                    start: "top 80%",
-                },
-                opacity: 1,
-                y: 0,
-                duration: 1,
-                ease: "power4.out"
-            });
-        });
+<!-- TECH SPECS -->
+<section class="techspecs">
+    <div class="wrap">
+        <div class="techspecs-hdr reveal">
+            <div class="sec-label center">Under the Hood</div>
+            <h2>Built by a developer,<br>for developers.</h2>
+            <p>The full technical picture — no hand-waving.</p>
+        </div>
+        <div class="spec-grid">
+            <div class="spec-card reveal">
+                <h3>Mobile App</h3>
+                <ul class="spec-list">
+                    <li><span>Framework</span><span>Flutter / Dart</span></li>
+                    <li><span>Target</span><span>Android 10+</span></li>
+                    <li><span>State management</span><span>Provider</span></li>
+                    <li><span>Networking</span><span>dart:http + streams</span></li>
+                    <li><span>Local storage</span><span>SharedPreferences</span></li>
+                    <li><span>Auth</span><span>Token-based (X-Auth-Token)</span></li>
+                    <li><span>Transfer method</span><span>Chunked HTTP stream</span></li>
+                    <li><span>File picker</span><span>file_picker package</span></li>
+                </ul>
+            </div>
+            <div class="spec-card reveal d1">
+                <h3>PC App</h3>
+                <ul class="spec-list">
+                    <li><span>Language</span><span>Python 3.12</span></li>
+                    <li><span>UI framework</span><span>CustomTkinter</span></li>
+                    <li><span>Backend</span><span>Flask + flask-cors</span></li>
+                    <li><span>System stats</span><span>psutil</span></li>
+                    <li><span>Screenshot</span><span>Pillow + pyautogui</span></li>
+                    <li><span>Volume control</span><span>pycaw + comtypes</span></li>
+                    <li><span>Clipboard</span><span>pyperclip</span></li>
+                    <li><span>System tray</span><span>pystray</span></li>
+                </ul>
+            </div>
+            <div class="spec-card reveal d2">
+                <h3>Network Architecture</h3>
+                <ul class="spec-list">
+                    <li><span>Transport</span><span>TCP/IP (local WiFi)</span></li>
+                    <li><span>Protocol</span><span>HTTP REST (Flask)</span></li>
+                    <li><span>Port</span><span>5000 (configurable)</span></li>
+                    <li><span>Transfer buffer</span><span>64KB chunks</span></li>
+                    <li><span>Auth method</span><span>Session token header</span></li>
+                    <li><span>Connection</span><span>Phone hotspot → PC WiFi</span></li>
+                    <li><span>Internet required</span><span>Never</span></li>
+                </ul>
+            </div>
+            <div class="spec-card reveal d3">
+                <h3>Tech Stack</h3>
+                <div class="stack-pills" style="margin-bottom:24px">
+                    <span class="stack-pill">Flutter</span>
+                    <span class="stack-pill">Python</span>
+                    <span class="stack-pill">Flask</span>
+                    <span class="stack-pill">CustomTkinter</span>
+                    <span class="stack-pill">psutil</span>
+                    <span class="stack-pill">Pillow</span>
+                    <span class="stack-pill">pycaw</span>
+                    <span class="stack-pill">pystray</span>
+                    <span class="stack-pill">pyautogui</span>
+                    <span class="stack-pill">dart:http</span>
+                    <span class="stack-pill">Provider</span>
+                    <span class="stack-pill">SharedPreferences</span>
+                </div>
+                <ul class="spec-list">
+                    <li><span>Packaging (PC)</span><span>PyInstaller → .exe</span></li>
+                    <li><span>Packaging (Mobile)</span><span>flutter build apk</span></li>
+                    <li><span>Distribution</span><span>GitHub Releases</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
 
-        // Feature cards
-        gsap.utils.toArray(".f-card").forEach(card => {
-            gsap.from(card, {
-                scrollTrigger: { trigger: card, start: "top 90%" },
-                opacity: 0, y: 30, duration: 0.6
-            });
-        });
-    </script>
+<!-- INSTALL -->
+<section id="install" class="install">
+    <div class="wrap">
+        <div class="install-hdr reveal">
+            <div class="sec-label center">Getting Started</div>
+            <h2>Running in<br>4 steps.</h2>
+            <p>No accounts. No configuration. No headaches.</p>
+        </div>
+        <div class="steps">
+            <div class="step reveal">
+                <div class="step-num">01</div>
+                <h4>Download both apps</h4>
+                <p>Grab the .exe for your Windows PC and the .apk for your Android phone from the GitHub releases page.</p>
+            </div>
+            <div class="step reveal d1">
+                <div class="step-num">02</div>
+                <h4>Enable your hotspot</h4>
+                <p>Turn on your phone's mobile hotspot. Connect your PC to it via WiFi like you would any network.</p>
+            </div>
+            <div class="step reveal d2">
+                <div class="step-num">03</div>
+                <h4>Enter the PC address</h4>
+                <p>CYPHER on your PC shows your address. Type it into the phone app. Takes 5 seconds.</p>
+            </div>
+            <div class="step reveal d3">
+                <div class="step-num">04</div>
+                <h4>Enter the connect code</h4>
+                <p>A 6-digit code confirms the link is real. Enter it once — your devices remember each other after that.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="faq">
+    <div class="wrap">
+        <div class="faq-hdr reveal">
+            <div class="sec-label center">FAQ</div>
+            <h2>Questions people<br>actually ask.</h2>
+            <p>Honest answers. No corporate speak.</p>
+        </div>
+        <div class="faq-grid">
+            <div class="faq-item reveal">
+                <div class="faq-q">Does CYPHER work without internet?</div>
+                <div class="faq-a">Yes, completely. CYPHER communicates directly between your phone and PC over your local WiFi or phone hotspot. <strong>No internet connection is ever required</strong> for any feature.</div>
+            </div>
+            <div class="faq-item reveal d1">
+                <div class="faq-q">How fast are file transfers actually?</div>
+                <div class="faq-a">On a typical phone hotspot over 5GHz WiFi, you can expect <strong>20–50 MB/s</strong> — fast enough to transfer a 1GB file in about 30 seconds. Speed depends on your hotspot hardware.</div>
+            </div>
+            <div class="faq-item reveal d1">
+                <div class="faq-q">Is my data safe? Who can see my files?</div>
+                <div class="faq-a">Only devices you explicitly pair. CYPHER uses token-based authentication — random devices on the same network cannot access your files. <strong>No external party can ever see your data</strong> because it never leaves your network.</div>
+            </div>
+            <div class="faq-item reveal d2">
+                <div class="faq-q">Does the PC have to stay on?</div>
+                <div class="faq-a">Yes — your PC needs to be powered on and running the CYPHER app for the connection to work. You can use CYPHER to put your PC to sleep remotely, but you can't wake it up (hardware limitation).</div>
+            </div>
+            <div class="faq-item reveal d2">
+                <div class="faq-q">What file types are supported?</div>
+                <div class="faq-a"><strong>All of them.</strong> CYPHER transfers raw file bytes — documents, videos, images, executables, archives, anything. There are no restrictions on file type or size.</div>
+            </div>
+            <div class="faq-item reveal d3">
+                <div class="faq-q">Do I need a Google account or subscription?</div>
+                <div class="faq-a">No accounts, no subscriptions, no sign-ups. CYPHER is <strong>completely free</strong> and requires nothing except the apps themselves. There is no premium tier.</div>
+            </div>
+            <div class="faq-item reveal d3">
+                <div class="faq-q">What happens if the connection drops?</div>
+                <div class="faq-a">CYPHER automatically detects disconnection and shows a reconnection screen. Active transfers can be retried. The app remembers your PC address so reconnecting is <strong>one tap</strong>.</div>
+            </div>
+            <div class="faq-item reveal d4">
+                <div class="faq-q">Can multiple phones connect at once?</div>
+                <div class="faq-a">Currently one primary device at a time. Guest access allows additional temporary connections but with limited folder access. <strong>Multi-device support</strong> is planned for a future release.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+    <div class="wrap">
+        <div class="cta-box reveal">
+            <div class="cta-ey">Free. Forever. Local.</div>
+            <h2>Ready to<br>link up?</h2>
+            <p>Ditch the cables. Ditch the cloud. Just CYPHER.</p>
+            <div class="cta-btns">
+                <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn-w">
+                    Windows .exe
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v8M3 7l4 5 4-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
+                <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="btn-g">
+                    Android .apk
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v8M3 7l4 5 4-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <div class="wrap ft">
+        <div class="ft-logo">C<span>Y</span>PHER</div>
+        <div class="ft-copy">© 2026 CYPHER · Privacy First · Local First · Designed by <a href="https://www.tiktok.com/@emerald_dev1" target="_blank" class="ft-link">Emerald</a></div>
+    </div>
+</footer>
+
+<script>
+    // CURSOR
+    const cur=document.getElementById('cur'),ring=document.getElementById('ring');
+    let mx=0,my=0,rx=0,ry=0;
+    document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px'});
+    (function ar(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(ar)})();
+    document.querySelectorAll('a,button,.fc,.step,.faq-item,.screen-card,.spec-card').forEach(el=>{
+      el.addEventListener('mouseenter',()=>document.body.classList.add('cx'));
+      el.addEventListener('mouseleave',()=>document.body.classList.remove('cx'));
+    });
+
+    // NAV
+    window.addEventListener('scroll',()=>document.getElementById('nav').classList.toggle('scrolled',scrollY>60));
+
+    // HERO FADE IN
+    ['hb','ht','hp','hb2'].forEach((id,i)=>{
+      const el=document.getElementById(id);
+      if(!el)return;
+      el.style.transform='translateY(22px)';
+      setTimeout(()=>{
+        el.style.transition='opacity .9s cubic-bezier(.2,1,.3,1),transform .9s cubic-bezier(.2,1,.3,1)';
+        el.style.opacity='1';el.style.transform='none';
+      },300+i*140);
+    });
+
+    // PARTICLES
+    const ptcl=document.getElementById('ptcl');
+    for(let i=0;i<22;i++){
+      const p=document.createElement('div');
+      p.className='ptcl';
+      p.style.cssText=`left:${Math.random()*100}%;bottom:${Math.random()*25}%;animation-duration:${4+Math.random()*7}s;animation-delay:${Math.random()*7}s;--d:${(Math.random()-.5)*90}px`;
+      ptcl.appendChild(p);
+    }
+
+    // SCROLL REVEAL
+    const obs=new IntersectionObserver(entries=>{
+      entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('v')});
+    },{threshold:.1,rootMargin:'0px 0px -30px 0px'});
+    document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+    // COUNTER ANIMATION
+    function animCount(el,target,suffix=''){
+      let n=0;const step=target/40;
+      const t=setInterval(()=>{
+        n=Math.min(n+step,target);
+        el.textContent=Math.round(n)+(suffix);
+        if(n>=target)clearInterval(t);
+      },30);
+    }
+    const statsObs=new IntersectionObserver(entries=>{
+      entries.forEach(e=>{
+        if(e.isIntersecting){
+          animCount(document.getElementById('s1'),50);
+          animCount(document.getElementById('s2'),0);
+          animCount(document.getElementById('s3'),20);
+          statsObs.disconnect();
+        }
+      });
+    },{threshold:.5});
+    const sb=document.querySelector('.stats-bar');
+    if(sb)statsObs.observe(sb);
+
+    // CODE SCRAMBLE
+    const cdig=document.getElementById('cdig');
+    function scramble(){
+      let n=0;
+      const iv=setInterval(()=>{
+        n++;
+        if(n>18){cdig.textContent='8 4 7 2 9 1';clearInterval(iv);setTimeout(scramble,9000);return}
+        cdig.textContent=Array.from({length:6},()=>Math.floor(Math.random()*10)).join(' ');
+      },70);
+    }
+    setTimeout(scramble,3500);
+
+    // GSAP
+    if(window.gsap&&window.ScrollTrigger){
+      gsap.registerPlugin(ScrollTrigger);
+      gsap.from('.stat-block',{scrollTrigger:{trigger:'.stats-bar',start:'top 80%'},y:20,opacity:0,duration:.7,stagger:.1,ease:'power3.out'});
+      gsap.from('.fc',{scrollTrigger:{trigger:'.feat-grid',start:'top 80%'},y:24,opacity:0,duration:.7,stagger:.07,ease:'power3.out'});
+      gsap.from('.step-num',{scrollTrigger:{trigger:'.steps',start:'top 80%'},scale:.8,opacity:0,duration:.6,stagger:.12,ease:'back.out(1.5)'});
+      gsap.from('.faq-item',{scrollTrigger:{trigger:'.faq-grid',start:'top 80%'},y:20,opacity:0,duration:.6,stagger:.06,ease:'power3.out'});
+    }
+</script>
 </body>
 </html>

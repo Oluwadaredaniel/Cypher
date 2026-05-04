@@ -25,9 +25,19 @@ imports:
  &#8226;   <a href="#collections">collections</a>
  &#8226;   <a href="#collections.abc">collections.abc</a>
  &#8226;   <a href="#copyreg">copyreg</a>
+ &#8226;   <a href="#core">core</a>
+ &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.discovery">core.discovery</a>
+ &#8226;   <a href="#core.files_panel">core.files_panel</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.pairing_screen">core.pairing_screen</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.setup_screen">core.setup_screen</a>
+ &#8226;   <a href="#core.splash_screen">core.splash_screen</a>
+ &#8226;   <a href="#core.tray">core.tray</a>
+ &#8226;   <a href="#core.ui">core.ui</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
  &#8226;   <a href="#customtkinter">customtkinter</a>
- &#8226;   <a href="#dashboard_screen">dashboard_screen</a>
- &#8226;   <a href="#discovery">discovery</a>
  &#8226;   <a href="#encodings">encodings</a>
  &#8226;   <a href="#encodings.aliases">encodings.aliases</a>
  &#8226;   <a href="#encodings.ascii">encodings.ascii</a>
@@ -159,6 +169,7 @@ imports:
  &#8226;   <a href="#keyword">keyword</a>
  &#8226;   <a href="#linecache">linecache</a>
  &#8226;   <a href="#locale">locale</a>
+ &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#ntpath">ntpath</a>
  &#8226;   <a href="#operator">operator</a>
  &#8226;   <a href="#os">os</a>
@@ -175,17 +186,14 @@ imports:
  &#8226;   <a href="#re._constants">re._constants</a>
  &#8226;   <a href="#re._parser">re._parser</a>
  &#8226;   <a href="#reprlib">reprlib</a>
- &#8226;   <a href="#server">server</a>
- &#8226;   <a href="#setup_screen">setup_screen</a>
- &#8226;   <a href="#splash_screen">splash_screen</a>
  &#8226;   <a href="#sre_compile">sre_compile</a>
  &#8226;   <a href="#sre_constants">sre_constants</a>
  &#8226;   <a href="#sre_parse">sre_parse</a>
  &#8226;   <a href="#stat">stat</a>
+ &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#threading">threading</a>
  &#8226;   <a href="#time">time</a>
  &#8226;   <a href="#traceback">traceback</a>
- &#8226;   <a href="#tray">tray</a>
  &#8226;   <a href="#types">types</a>
  &#8226;   <a href="#warnings">warnings</a>
  &#8226;   <a href="#weakref">weakref</a>
@@ -522,8 +530,7 @@ imported by:
   <a target="code" href="" type="text/plain"><tt>AppKit</tt></a>
 <span class="moduletype">MissingModule</span>  <div class="import">
 imported by:
-    <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
- &#8226;   <a href="#pyautogui._pyautogui_osx">pyautogui._pyautogui_osx</a>
+    <a href="#pyautogui._pyautogui_osx">pyautogui._pyautogui_osx</a>
  &#8226;   <a href="#pyperclip">pyperclip</a>
  &#8226;   <a href="#pystray._darwin">pystray._darwin</a>
  &#8226;   <a href="#screeninfo.enumerators.osx">screeninfo.enumerators.osx</a>
@@ -698,8 +705,11 @@ imported by:
  &#8226;   <a href="#PIL._version">PIL._version</a>
  &#8226;   <a href="#PIL._webp">PIL._webp</a>
  &#8226;   <a href="#PIL.features">PIL.features</a>
+ &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.tray">core.tray</a>
  &#8226;   <a href="#customtkinter.windows.widgets.image.ctk_image">customtkinter.windows.widgets.image.ctk_image</a>
- &#8226;   <a href="#dashboard_screen">dashboard_screen</a>
  &#8226;   <a href="#mouseinfo">mouseinfo</a>
  &#8226;   <a href="#pyscreeze">pyscreeze</a>
  &#8226;   <a href="#pystray._darwin">pystray._darwin</a>
@@ -708,8 +718,6 @@ imported by:
  &#8226;   <a href="#qrcode.image.styledpil">qrcode.image.styledpil</a>
  &#8226;   <a href="#qrcode.image.styles.colormasks">qrcode.image.styles.colormasks</a>
  &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
- &#8226;   <a href="#server">server</a>
- &#8226;   <a href="#tray">tray</a>
 
   </div>
 
@@ -1396,16 +1404,17 @@ imported by:
  &#8226;   <a href="#PIL.XbmImagePlugin">PIL.XbmImagePlugin</a>
  &#8226;   <a href="#PIL.XpmImagePlugin">PIL.XpmImagePlugin</a>
  &#8226;   <a href="#PIL.features">PIL.features</a>
+ &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.tray">core.tray</a>
  &#8226;   <a href="#customtkinter.windows.widgets.image.ctk_image">customtkinter.windows.widgets.image.ctk_image</a>
- &#8226;   <a href="#dashboard_screen">dashboard_screen</a>
  &#8226;   <a href="#mouseinfo">mouseinfo</a>
  &#8226;   <a href="#pyscreeze">pyscreeze</a>
  &#8226;   <a href="#qrcode.image.pil">qrcode.image.pil</a>
  &#8226;   <a href="#qrcode.image.styledpil">qrcode.image.styledpil</a>
  &#8226;   <a href="#qrcode.image.styles.colormasks">qrcode.image.styles.colormasks</a>
  &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
- &#8226;   <a href="#server">server</a>
- &#8226;   <a href="#tray">tray</a>
 
   </div>
 
@@ -1513,7 +1522,6 @@ imported by:
  &#8226;   <a href="#pyscreeze">pyscreeze</a>
  &#8226;   <a href="#qrcode.image.pil">qrcode.image.pil</a>
  &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
- &#8226;   <a href="#tray">tray</a>
 
   </div>
 
@@ -3100,22 +3108,8 @@ imported by:
   <a target="code" href="" type="text/plain"><tt>Quartz</tt></a>
 <span class="moduletype">MissingModule</span>  <div class="import">
 imported by:
-    <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
- &#8226;   <a href="#pyautogui._pyautogui_osx">pyautogui._pyautogui_osx</a>
+    <a href="#pyautogui._pyautogui_osx">pyautogui._pyautogui_osx</a>
  &#8226;   <a href="#pygetwindow._pygetwindow_macos">pygetwindow._pygetwindow_macos</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="Queue"></a>
-  <a target="code" href="" type="text/plain"><tt>Queue</tt></a>
-<span class="moduletype">MissingModule</span>  <div class="import">
-imported by:
-    <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._generic">keyboard._generic</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
 
   </div>
 
@@ -3304,9 +3298,6 @@ imported by:
  &#8226;   <a href="#itsdangerous.signer">itsdangerous.signer</a>
  &#8226;   <a href="#itsdangerous.timed">itsdangerous.timed</a>
  &#8226;   <a href="#itsdangerous.url_safe">itsdangerous.url_safe</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._canonical_names">keyboard._canonical_names</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
  &#8226;   <a href="#markupsafe">markupsafe</a>
  &#8226;   <a href="#packaging._elffile">packaging._elffile</a>
  &#8226;   <a href="#packaging._manylinux">packaging._manylinux</a>
@@ -5687,8 +5678,6 @@ imported by:
  &#8226;   <a href="#certifi.core">certifi.core</a>
  &#8226;   <a href="#colorama.initialise">colorama.initialise</a>
  &#8226;   <a href="#comtypes">comtypes</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#multiprocessing.util">multiprocessing.util</a>
  &#8226;   <a href="#pystray._util.gtk">pystray._util.gtk</a>
@@ -5738,6 +5727,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#PIL.ImageFont">PIL.ImageFont</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#email._encoded_words">email._encoded_words</a>
  &#8226;   <a href="#email.base64mime">email.base64mime</a>
  &#8226;   <a href="#email.encoders">email.encoders</a>
@@ -5748,7 +5738,6 @@ imported by:
  &#8226;   <a href="#pyperclip">pyperclip</a>
  &#8226;   <a href="#requests.auth">requests.auth</a>
  &#8226;   <a href="#secrets">secrets</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#setuptools._vendor.wheel.wheelfile">setuptools._vendor.wheel.wheelfile</a>
  &#8226;   <a href="#ssl">ssl</a>
  &#8226;   <a href="#urllib.request">urllib.request</a>
@@ -7099,10 +7088,6 @@ imported by:
  &#8226;   <a href="#jinja2.sandbox">jinja2.sandbox</a>
  &#8226;   <a href="#jinja2.tests">jinja2.tests</a>
  &#8226;   <a href="#jinja2.utils">jinja2.utils</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
- &#8226;   <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
  &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#multiprocessing.heap">multiprocessing.heap</a>
  &#8226;   <a href="#multiprocessing.pool">multiprocessing.pool</a>
@@ -7544,6 +7529,7 @@ imported by:
  &#8226;   <a href="#comtypes.tools.typedesc">comtypes.tools.typedesc</a>
  &#8226;   <a href="#comtypes.tools.typedesc_base">comtypes.tools.typedesc_base</a>
  &#8226;   <a href="#comtypes.typeinfo">comtypes.typeinfo</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#pycaw.api.audioclient">pycaw.api.audioclient</a>
  &#8226;   <a href="#pycaw.api.audiopolicy">pycaw.api.audiopolicy</a>
  &#8226;   <a href="#pycaw.api.endpointvolume">pycaw.api.endpointvolume</a>
@@ -7554,7 +7540,6 @@ imported by:
  &#8226;   <a href="#pycaw.api.policyconfig">pycaw.api.policyconfig</a>
  &#8226;   <a href="#pycaw.constants">pycaw.constants</a>
  &#8226;   <a href="#pycaw.utils">pycaw.utils</a>
- &#8226;   <a href="#server">server</a>
 
   </div>
 
@@ -9152,6 +9137,308 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="core"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/__init__.py" type="text/plain"><tt>core</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#core.discovery">core.discovery</a>
+ &#8226;   <a href="#core.tray">core.tray</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.discovery">core.discovery</a>
+ &#8226;   <a href="#core.files_panel">core.files_panel</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.pairing_screen">core.pairing_screen</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.setup_screen">core.setup_screen</a>
+ &#8226;   <a href="#core.splash_screen">core.splash_screen</a>
+ &#8226;   <a href="#core.tray">core.tray</a>
+ &#8226;   <a href="#core.ui">core.ui</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
+ &#8226;   <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.dashboard_screen"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/dashboard_screen.py" type="text/plain"><tt>core.dashboard_screen</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#core">core</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#requests">requests</a>
+ &#8226;   <a href="#socket">socket</a>
+ &#8226;   <a href="#threading">threading</a>
+ &#8226;   <a href="#time">time</a>
+ &#8226;   <a href="#webbrowser">webbrowser</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.discovery"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/discovery.py" type="text/plain"><tt>core.discovery</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#core">core</a>
+ &#8226;   <a href="#socket">socket</a>
+ &#8226;   <a href="#threading">threading</a>
+ &#8226;   <a href="#uuid">uuid</a>
+ &#8226;   <a href="#zeroconf">zeroconf</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core">core</a>
+ &#8226;   <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.files_panel"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/files_panel.py" type="text/plain"><tt>core.files_panel</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#core">core</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#requests">requests</a>
+ &#8226;   <a href="#threading">threading</a>
+ &#8226;   <a href="#tkinter">tkinter</a>
+ &#8226;   <a href="#tkinter.filedialog">tkinter.filedialog</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.guest_panel"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/guest_panel.py" type="text/plain"><tt>core.guest_panel</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#core">core</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
+ &#8226;   <a href="#io">io</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#requests">requests</a>
+ &#8226;   <a href="#socket">socket</a>
+ &#8226;   <a href="#threading">threading</a>
+ &#8226;   <a href="#time">time</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.pairing_screen"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/pairing_screen.py" type="text/plain"><tt>core.pairing_screen</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#core">core</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
+ &#8226;   <a href="#math">math</a>
+ &#8226;   <a href="#requests">requests</a>
+ &#8226;   <a href="#threading">threading</a>
+ &#8226;   <a href="#time">time</a>
+ &#8226;   <a href="#tkinter">tkinter</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.server"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/server.py" type="text/plain"><tt>core.server</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#base64">base64</a>
+ &#8226;   <a href="#comtypes">comtypes</a>
+ &#8226;   <a href="#core">core</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
+ &#8226;   <a href="#ctypes">ctypes</a>
+ &#8226;   <a href="#datetime">datetime</a>
+ &#8226;   <a href="#flask">flask</a>
+ &#8226;   <a href="#flask_cors">flask_cors</a>
+ &#8226;   <a href="#io">io</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#platform">platform</a>
+ &#8226;   <a href="#psutil">psutil</a>
+ &#8226;   <a href="#pyautogui">pyautogui</a>
+ &#8226;   <a href="#pycaw.pycaw">pycaw.pycaw</a>
+ &#8226;   <a href="#pygetwindow">pygetwindow</a>
+ &#8226;   <a href="#pyperclip">pyperclip</a>
+ &#8226;   <a href="#queue">queue</a>
+ &#8226;   <a href="#random">random</a>
+ &#8226;   <a href="#screeninfo">screeninfo</a>
+ &#8226;   <a href="#secrets">secrets</a>
+ &#8226;   <a href="#shutil">shutil</a>
+ &#8226;   <a href="#socket">socket</a>
+ &#8226;   <a href="#threading">threading</a>
+ &#8226;   <a href="#time">time</a>
+ &#8226;   <a href="#uuid">uuid</a>
+ &#8226;   <a href="#zipfile">zipfile</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.setup_screen"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/setup_screen.py" type="text/plain"><tt>core.setup_screen</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#core">core</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.splash_screen"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/splash_screen.py" type="text/plain"><tt>core.splash_screen</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#core">core</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
+ &#8226;   <a href="#tkinter">tkinter</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.tray"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/tray.py" type="text/plain"><tt>core.tray</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#core">core</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#pystray">pystray</a>
+ &#8226;   <a href="#sys">sys</a>
+ &#8226;   <a href="#threading">threading</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core">core</a>
+ &#8226;   <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.ui"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/ui.py" type="text/plain"><tt>core.ui</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#core">core</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#setup_screen">setup_screen</a>
+ &#8226;   <a href="#splash_screen">splash_screen</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.utils"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/utils.py" type="text/plain"><tt>core.utils</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#core">core</a>
+ &#8226;   <a href="#datetime">datetime</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#sys">sys</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.setup_screen">core.setup_screen</a>
+ &#8226;   <a href="#core.splash_screen">core.splash_screen</a>
+ &#8226;   <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="cryptography"></a>
   <a target="code" href="" type="text/plain"><tt>cryptography</tt></a>
 <span class="moduletype">MissingModule</span>  <div class="import">
@@ -9237,6 +9524,7 @@ imported by:
  &#8226;   <a href="#comtypes.tools.tlbparser">comtypes.tools.tlbparser</a>
  &#8226;   <a href="#comtypes.tools.typedesc">comtypes.tools.typedesc</a>
  &#8226;   <a href="#comtypes.typeinfo">comtypes.typeinfo</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#ctypes._aix">ctypes._aix</a>
  &#8226;   <a href="#ctypes._endian">ctypes._endian</a>
  &#8226;   <a href="#ctypes.macholib">ctypes.macholib</a>
@@ -9250,8 +9538,6 @@ imported by:
  &#8226;   <a href="#darkdetect._windows_detect">darkdetect._windows_detect</a>
  &#8226;   <a href="#ifaddr._shared">ifaddr._shared</a>
  &#8226;   <a href="#ifaddr._win32">ifaddr._win32</a>
- &#8226;   <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
  &#8226;   <a href="#mouseinfo">mouseinfo</a>
  &#8226;   <a href="#multiprocessing.sharedctypes">multiprocessing.sharedctypes</a>
  &#8226;   <a href="#packaging._manylinux">packaging._manylinux</a>
@@ -9277,7 +9563,6 @@ imported by:
  &#8226;   <a href="#screeninfo.enumerators.windows">screeninfo.enumerators.windows</a>
  &#8226;   <a href="#screeninfo.enumerators.xinerama">screeninfo.enumerators.xinerama</a>
  &#8226;   <a href="#screeninfo.enumerators.xrandr">screeninfo.enumerators.xrandr</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#setuptools._vendor.packaging._manylinux">setuptools._vendor.packaging._manylinux</a>
  &#8226;   <a href="#setuptools._vendor.wheel.macosx_libfile">setuptools._vendor.wheel.macosx_libfile</a>
  &#8226;   <a href="#setuptools.windows_support">setuptools.windows_support</a>
@@ -9471,7 +9756,6 @@ imports:
 imported by:
     <a href="#darkdetect._mac_detect">darkdetect._mac_detect</a>
  &#8226;   <a href="#ifaddr._posix">ifaddr._posix</a>
- &#8226;   <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
  &#8226;   <a href="#mouseinfo">mouseinfo</a>
  &#8226;   <a href="#screeninfo.enumerators.drm">screeninfo.enumerators.drm</a>
  &#8226;   <a href="#screeninfo.enumerators.xrandr">screeninfo.enumerators.xrandr</a>
@@ -9511,7 +9795,6 @@ imported by:
  &#8226;   <a href="#customtkinter.windows.widgets.scaling.scaling_tracker">customtkinter.windows.widgets.scaling.scaling_tracker</a>
  &#8226;   <a href="#darkdetect._windows_detect">darkdetect._windows_detect</a>
  &#8226;   <a href="#ifaddr._win32">ifaddr._win32</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
  &#8226;   <a href="#pyautogui._pyautogui_win">pyautogui._pyautogui_win</a>
  &#8226;   <a href="#pycaw.api.audioclient">pycaw.api.audioclient</a>
  &#8226;   <a href="#pycaw.api.audioclient.depend">pycaw.api.audioclient.depend</a>
@@ -9558,13 +9841,17 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#customtkinter">customtkinter</a>
+    <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.files_panel">core.files_panel</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.pairing_screen">core.pairing_screen</a>
+ &#8226;   <a href="#core.setup_screen">core.setup_screen</a>
+ &#8226;   <a href="#core.splash_screen">core.splash_screen</a>
+ &#8226;   <a href="#core.ui">core.ui</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
  &#8226;   <a href="#customtkinter.windows">customtkinter.windows</a>
  &#8226;   <a href="#customtkinter.windows.widgets.core_widget_classes.ctk_base_class">customtkinter.windows.widgets.core_widget_classes.ctk_base_class</a>
- &#8226;   <a href="#dashboard_screen">dashboard_screen</a>
  &#8226;   <a href="#main.py">main.py</a>
- &#8226;   <a href="#setup_screen">setup_screen</a>
- &#8226;   <a href="#splash_screen">splash_screen</a>
 
   </div>
 
@@ -10747,32 +11034,6 @@ imported by:
 </div>
 
 <div class="node">
-  <a name="dashboard_screen"></a>
-  <a target="code" href="///C:/Cypher/pc_app/dashboard_screen.py" type="text/plain"><tt>dashboard_screen</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#PIL">PIL</a>
- &#8226;   <a href="#PIL.Image">PIL.Image</a>
- &#8226;   <a href="#customtkinter">customtkinter</a>
- &#8226;   <a href="#json">json</a>
- &#8226;   <a href="#pathlib">pathlib</a>
- &#8226;   <a href="#qrcode">qrcode</a>
- &#8226;   <a href="#requests">requests</a>
- &#8226;   <a href="#socket">socket</a>
- &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#time">time</a>
- &#8226;   <a href="#webbrowser">webbrowser</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#main.py">main.py</a>
-
-  </div>
-
-</div>
-
-<div class="node">
   <a name="dataclasses"></a>
   <a target="code" href="///C:/Users/hp/AppData/Local/Programs/Python/Python312/Lib/dataclasses.py" type="text/plain"><tt>dataclasses</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
@@ -10824,6 +11085,8 @@ imported by:
  &#8226;   <a href="#calendar">calendar</a>
  &#8226;   <a href="#click.types">click.types</a>
  &#8226;   <a href="#comtypes.automation">comtypes.automation</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
  &#8226;   <a href="#email.utils">email.utils</a>
  &#8226;   <a href="#flask.app">flask.app</a>
  &#8226;   <a href="#flask.blueprints">flask.blueprints</a>
@@ -10843,7 +11106,6 @@ imported by:
  &#8226;   <a href="#pyscreeze">pyscreeze</a>
  &#8226;   <a href="#requests.models">requests.models</a>
  &#8226;   <a href="#requests.sessions">requests.sessions</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#setuptools._vendor.tomli._re">setuptools._vendor.tomli._re</a>
  &#8226;   <a href="#setuptools.warnings">setuptools.warnings</a>
  &#8226;   <a href="#tomllib._re">tomllib._re</a>
@@ -10940,24 +11202,6 @@ imported by:
     <a href="#inspect">inspect</a>
  &#8226;   <a href="#pdb">pdb</a>
  &#8226;   <a href="#setuptools.depends">setuptools.depends</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="discovery"></a>
-  <a target="code" href="///C:/Cypher/pc_app/discovery.py" type="text/plain"><tt>discovery</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#socket">socket</a>
- &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#zeroconf">zeroconf</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#main.py">main.py</a>
 
   </div>
 
@@ -14168,8 +14412,7 @@ imported by:
   <a target="code" href="" type="text/plain"><tt>fcntl</tt></a>
 <span class="moduletype">MissingModule</span>  <div class="import">
 imported by:
-    <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
- &#8226;   <a href="#subprocess">subprocess</a>
+    <a href="#subprocess">subprocess</a>
 
   </div>
 
@@ -14201,7 +14444,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#flask">flask</a>
+    <a href="#core.server">core.server</a>
+ &#8226;   <a href="#flask">flask</a>
  &#8226;   <a href="#flask.app">flask.app</a>
  &#8226;   <a href="#flask.blueprints">flask.blueprints</a>
  &#8226;   <a href="#flask.cli">flask.cli</a>
@@ -14225,7 +14469,6 @@ imported by:
  &#8226;   <a href="#flask_cors.core">flask_cors.core</a>
  &#8226;   <a href="#flask_cors.decorator">flask_cors.decorator</a>
  &#8226;   <a href="#flask_cors.extension">flask_cors.extension</a>
- &#8226;   <a href="#server">server</a>
 
   </div>
 
@@ -14929,11 +15172,11 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#flask_cors.core">flask_cors.core</a>
+    <a href="#core.server">core.server</a>
+ &#8226;   <a href="#flask_cors.core">flask_cors.core</a>
  &#8226;   <a href="#flask_cors.decorator">flask_cors.decorator</a>
  &#8226;   <a href="#flask_cors.extension">flask_cors.extension</a>
  &#8226;   <a href="#flask_cors.version">flask_cors.version</a>
- &#8226;   <a href="#server">server</a>
 
   </div>
 
@@ -15159,7 +15402,6 @@ imported by:
  &#8226;   <a href="#jinja2.environment">jinja2.environment</a>
  &#8226;   <a href="#jinja2.runtime">jinja2.runtime</a>
  &#8226;   <a href="#jinja2.sandbox">jinja2.sandbox</a>
- &#8226;   <a href="#keyboard._generic">keyboard._generic</a>
  &#8226;   <a href="#linecache">linecache</a>
  &#8226;   <a href="#locale">locale</a>
  &#8226;   <a href="#main.py">main.py</a>
@@ -15399,7 +15641,6 @@ imports:
   <div class="import">
 imported by:
     <a href="#click.utils">click.utils</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
  &#8226;   <a href="#pdb">pdb</a>
  &#8226;   <a href="#setuptools._distutils.command.sdist">setuptools._distutils.command.sdist</a>
  &#8226;   <a href="#setuptools.command.bdist_wheel">setuptools.command.bdist_wheel</a>
@@ -15953,6 +16194,7 @@ imports:
  &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib._bootstrap">importlib._bootstrap</a>
  &#8226;   <a href="#importlib._bootstrap_external">importlib._bootstrap_external</a>
+ &#8226;   <a href="#importlib.machinery">importlib.machinery</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#warnings">warnings</a>
 
@@ -16100,6 +16342,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#ctypes.util">ctypes.util</a>
+ &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib.abc">importlib.abc</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#packaging.tags">packaging.tags</a>
@@ -16655,6 +16898,8 @@ imported by:
  &#8226;   <a href="#comtypes.tools.codegenerator.comments">comtypes.tools.codegenerator.comments</a>
  &#8226;   <a href="#comtypes.tools.codegenerator.heads">comtypes.tools.codegenerator.heads</a>
  &#8226;   <a href="#configparser">configparser</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#csv">csv</a>
  &#8226;   <a href="#dis">dis</a>
  &#8226;   <a href="#doctest">doctest</a>
@@ -16693,7 +16938,6 @@ imported by:
  &#8226;   <a href="#requests.models">requests.models</a>
  &#8226;   <a href="#requests.utils">requests.utils</a>
  &#8226;   <a href="#runpy">runpy</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#setuptools._vendor.backports.tarfile">setuptools._vendor.backports.tarfile</a>
  &#8226;   <a href="#setuptools._vendor.wheel.macosx_libfile">setuptools._vendor.wheel.macosx_libfile</a>
  &#8226;   <a href="#setuptools._vendor.wheel.wheelfile">setuptools._vendor.wheel.wheelfile</a>
@@ -16803,7 +17047,6 @@ imported by:
  &#8226;   <a href="#jinja2.compiler">jinja2.compiler</a>
  &#8226;   <a href="#jinja2.filters">jinja2.filters</a>
  &#8226;   <a href="#jinja2.runtime">jinja2.runtime</a>
- &#8226;   <a href="#keyboard">keyboard</a>
  &#8226;   <a href="#multiprocessing.connection">multiprocessing.connection</a>
  &#8226;   <a href="#multiprocessing.pool">multiprocessing.pool</a>
  &#8226;   <a href="#multiprocessing.process">multiprocessing.process</a>
@@ -17787,8 +18030,13 @@ imports:
   <div class="import">
 imported by:
     <a href="#charset_normalizer.models">charset_normalizer.models</a>
+ &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.setup_screen">core.setup_screen</a>
+ &#8226;   <a href="#core.ui">core.ui</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
  &#8226;   <a href="#customtkinter.windows.widgets.theme.theme_manager">customtkinter.windows.widgets.theme.theme_manager</a>
- &#8226;   <a href="#dashboard_screen">dashboard_screen</a>
  &#8226;   <a href="#flask.config">flask.config</a>
  &#8226;   <a href="#flask.json">flask.json</a>
  &#8226;   <a href="#flask.json.provider">flask.json.provider</a>
@@ -17798,11 +18046,8 @@ imported by:
  &#8226;   <a href="#json.decoder">json.decoder</a>
  &#8226;   <a href="#json.encoder">json.encoder</a>
  &#8226;   <a href="#json.scanner">json.scanner</a>
- &#8226;   <a href="#keyboard._keyboard_event">keyboard._keyboard_event</a>
  &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#requests.compat">requests.compat</a>
- &#8226;   <a href="#server">server</a>
- &#8226;   <a href="#setup_screen">setup_screen</a>
  &#8226;   <a href="#setuptools._vendor.importlib_metadata">setuptools._vendor.importlib_metadata</a>
  &#8226;   <a href="#setuptools.config._validate_pyproject.error_reporting">setuptools.config._validate_pyproject.error_reporting</a>
  &#8226;   <a href="#setuptools.msvc">setuptools.msvc</a>
@@ -17871,215 +18116,6 @@ imports:
 imported by:
     <a href="#json">json</a>
  &#8226;   <a href="#json.decoder">json.decoder</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="keyboard"></a>
-  <a target="code" href="///C:/Users/hp/AppData/Local/Programs/Python/Python312/Lib/site-packages/keyboard/__init__.py" type="text/plain"><tt>keyboard</tt></a>
-<span class="moduletype">Package</span>  <div class="import">
-imports:
-    <a href="#Queue">Queue</a>
- &#8226;   <a href="#__future__">__future__</a>
- &#8226;   <a href="#collections">collections</a>
- &#8226;   <a href="#itertools">itertools</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._canonical_names">keyboard._canonical_names</a>
- &#8226;   <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
- &#8226;   <a href="#keyboard._generic">keyboard._generic</a>
- &#8226;   <a href="#keyboard._keyboard_event">keyboard._keyboard_event</a>
- &#8226;   <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
- &#8226;   <a href="#platform">platform</a>
- &#8226;   <a href="#queue">queue</a>
- &#8226;   <a href="#re">re</a>
- &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#time">time</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._canonical_names">keyboard._canonical_names</a>
- &#8226;   <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
- &#8226;   <a href="#keyboard._generic">keyboard._generic</a>
- &#8226;   <a href="#keyboard._keyboard_event">keyboard._keyboard_event</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
- &#8226;   <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
- &#8226;   <a href="#tray">tray</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="keyboard._canonical_names"></a>
-  <a target="code" href="///C:/Users/hp/AppData/Local/Programs/Python/Python312/Lib/site-packages/keyboard/_canonical_names.py" type="text/plain"><tt>keyboard._canonical_names</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#__future__">__future__</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#platform">platform</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
- &#8226;   <a href="#keyboard._keyboard_event">keyboard._keyboard_event</a>
- &#8226;   <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="keyboard._darwinkeyboard"></a>
-  <a target="code" href="///C:/Users/hp/AppData/Local/Programs/Python/Python312/Lib/site-packages/keyboard/_darwinkeyboard.py" type="text/plain"><tt>keyboard._darwinkeyboard</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#AppKit">AppKit</a>
- &#8226;   <a href="#Quartz">Quartz</a>
- &#8226;   <a href="#ctypes">ctypes</a>
- &#8226;   <a href="#ctypes.util">ctypes.util</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._canonical_names">keyboard._canonical_names</a>
- &#8226;   <a href="#keyboard._keyboard_event">keyboard._keyboard_event</a>
- &#8226;   <a href="#os">os</a>
- &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#time">time</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#keyboard">keyboard</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="keyboard._generic"></a>
-  <a target="code" href="///C:/Users/hp/AppData/Local/Programs/Python/Python312/Lib/site-packages/keyboard/_generic.py" type="text/plain"><tt>keyboard._generic</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#Queue">Queue</a>
- &#8226;   <a href="#functools">functools</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#queue">queue</a>
- &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#traceback">traceback</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#keyboard">keyboard</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="keyboard._keyboard_event"></a>
-  <a target="code" href="///C:/Users/hp/AppData/Local/Programs/Python/Python312/Lib/site-packages/keyboard/_keyboard_event.py" type="text/plain"><tt>keyboard._keyboard_event</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#json">json</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._canonical_names">keyboard._canonical_names</a>
- &#8226;   <a href="#time">time</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
- &#8226;   <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="keyboard._nixcommon"></a>
-  <a target="code" href="///C:/Users/hp/AppData/Local/Programs/Python/Python312/Lib/site-packages/keyboard/_nixcommon.py" type="text/plain"><tt>keyboard._nixcommon</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#Queue">Queue</a>
- &#8226;   <a href="#atexit">atexit</a>
- &#8226;   <a href="#collections">collections</a>
- &#8226;   <a href="#fcntl">fcntl</a>
- &#8226;   <a href="#glob">glob</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#os">os</a>
- &#8226;   <a href="#queue">queue</a>
- &#8226;   <a href="#re">re</a>
- &#8226;   <a href="#struct">struct</a>
- &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#time">time</a>
- &#8226;   <a href="#warnings">warnings</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="keyboard._nixkeyboard"></a>
-  <a target="code" href="///C:/Users/hp/AppData/Local/Programs/Python/Python312/Lib/site-packages/keyboard/_nixkeyboard.py" type="text/plain"><tt>keyboard._nixkeyboard</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#collections">collections</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._canonical_names">keyboard._canonical_names</a>
- &#8226;   <a href="#keyboard._keyboard_event">keyboard._keyboard_event</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
- &#8226;   <a href="#re">re</a>
- &#8226;   <a href="#struct">struct</a>
- &#8226;   <a href="#subprocess">subprocess</a>
- &#8226;   <a href="#time">time</a>
- &#8226;   <a href="#traceback">traceback</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#keyboard">keyboard</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="keyboard._winkeyboard"></a>
-  <a target="code" href="///C:/Users/hp/AppData/Local/Programs/Python/Python312/Lib/site-packages/keyboard/_winkeyboard.py" type="text/plain"><tt>keyboard._winkeyboard</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#__future__">__future__</a>
- &#8226;   <a href="#atexit">atexit</a>
- &#8226;   <a href="#collections">collections</a>
- &#8226;   <a href="#ctypes">ctypes</a>
- &#8226;   <a href="#ctypes.wintypes">ctypes.wintypes</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._canonical_names">keyboard._canonical_names</a>
- &#8226;   <a href="#keyboard._keyboard_event">keyboard._keyboard_event</a>
- &#8226;   <a href="#pprint">pprint</a>
- &#8226;   <a href="#re">re</a>
- &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#traceback">traceback</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#keyboard">keyboard</a>
 
   </div>
 
@@ -18222,6 +18258,7 @@ imported by:
  &#8226;   <a href="#hashlib">hashlib</a>
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#jinja2.runtime">jinja2.runtime</a>
+ &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#multiprocessing.util">multiprocessing.util</a>
  &#8226;   <a href="#packaging.tags">packaging.tags</a>
  &#8226;   <a href="#pystray._base">pystray._base</a>
@@ -18385,6 +18422,7 @@ imported by:
  &#8226;   <a href="#_pydecimal">_pydecimal</a>
  &#8226;   <a href="#asyncio.windows_events">asyncio.windows_events</a>
  &#8226;   <a href="#click._termui_impl">click._termui_impl</a>
+ &#8226;   <a href="#core.pairing_screen">core.pairing_screen</a>
  &#8226;   <a href="#customtkinter.windows.widgets.core_rendering.draw_engine">customtkinter.windows.widgets.core_rendering.draw_engine</a>
  &#8226;   <a href="#customtkinter.windows.widgets.ctk_progressbar">customtkinter.windows.widgets.ctk_progressbar</a>
  &#8226;   <a href="#fractions">fractions</a>
@@ -19615,6 +19653,11 @@ imported by:
  &#8226;   <a href="#concurrent.futures.thread">concurrent.futures.thread</a>
  &#8226;   <a href="#configparser">configparser</a>
  &#8226;   <a href="#contextlib">contextlib</a>
+ &#8226;   <a href="#core.files_panel">core.files_panel</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.tray">core.tray</a>
+ &#8226;   <a href="#core.ui">core.ui</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
  &#8226;   <a href="#ctypes">ctypes</a>
  &#8226;   <a href="#ctypes._aix">ctypes._aix</a>
  &#8226;   <a href="#ctypes.macholib.dyld">ctypes.macholib.dyld</a>
@@ -19656,8 +19699,6 @@ imported by:
  &#8226;   <a href="#jinja2.environment">jinja2.environment</a>
  &#8226;   <a href="#jinja2.loaders">jinja2.loaders</a>
  &#8226;   <a href="#jinja2.utils">jinja2.utils</a>
- &#8226;   <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
  &#8226;   <a href="#linecache">linecache</a>
  &#8226;   <a href="#locale">locale</a>
  &#8226;   <a href="#logging">logging</a>
@@ -19716,7 +19757,6 @@ imported by:
  &#8226;   <a href="#requests.utils">requests.utils</a>
  &#8226;   <a href="#runpy">runpy</a>
  &#8226;   <a href="#screeninfo.enumerators.drm">screeninfo.enumerators.drm</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#setuptools">setuptools</a>
  &#8226;   <a href="#setuptools._core_metadata">setuptools._core_metadata</a>
  &#8226;   <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
@@ -20255,9 +20295,12 @@ imports:
   <div class="import">
 imported by:
     <a href="#click._termui_impl">click._termui_impl</a>
+ &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.setup_screen">core.setup_screen</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
  &#8226;   <a href="#customtkinter.windows.widgets.theme.theme_manager">customtkinter.windows.widgets.theme.theme_manager</a>
  &#8226;   <a href="#darkdetect._mac_detect">darkdetect._mac_detect</a>
- &#8226;   <a href="#dashboard_screen">dashboard_screen</a>
  &#8226;   <a href="#flask.sansio.scaffold">flask.sansio.scaffold</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.resources._common">importlib.resources._common</a>
@@ -20265,8 +20308,6 @@ imported by:
  &#8226;   <a href="#importlib.resources.abc">importlib.resources.abc</a>
  &#8226;   <a href="#importlib.resources.readers">importlib.resources.readers</a>
  &#8226;   <a href="#main.py">main.py</a>
- &#8226;   <a href="#server">server</a>
- &#8226;   <a href="#setup_screen">setup_screen</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
  &#8226;   <a href="#setuptools._distutils.dir_util">setuptools._distutils.dir_util</a>
  &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
@@ -20413,20 +20454,18 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#customtkinter.windows.ctk_tk">customtkinter.windows.ctk_tk</a>
+    <a href="#core.server">core.server</a>
+ &#8226;   <a href="#customtkinter.windows.ctk_tk">customtkinter.windows.ctk_tk</a>
  &#8226;   <a href="#customtkinter.windows.ctk_toplevel">customtkinter.windows.ctk_toplevel</a>
  &#8226;   <a href="#darkdetect">darkdetect</a>
  &#8226;   <a href="#flask.cli">flask.cli</a>
  &#8226;   <a href="#ifaddr._shared">ifaddr._shared</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._canonical_names">keyboard._canonical_names</a>
  &#8226;   <a href="#mouseinfo">mouseinfo</a>
  &#8226;   <a href="#packaging.markers">packaging.markers</a>
  &#8226;   <a href="#packaging.tags">packaging.tags</a>
  &#8226;   <a href="#pyautogui">pyautogui</a>
  &#8226;   <a href="#pydoc">pydoc</a>
  &#8226;   <a href="#pyperclip">pyperclip</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#setuptools._distutils.compat.py39">setuptools._distutils.compat.py39</a>
  &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
  &#8226;   <a href="#setuptools._vendor.importlib_metadata._compat">setuptools._vendor.importlib_metadata._compat</a>
@@ -20525,7 +20564,6 @@ imports:
 imported by:
     <a href="#jinja2.ext">jinja2.ext</a>
  &#8226;   <a href="#jinja2.utils">jinja2.utils</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
  &#8226;   <a href="#pdb">pdb</a>
  &#8226;   <a href="#pickle">pickle</a>
  &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
@@ -20564,13 +20602,13 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#psutil">psutil</a>
+    <a href="#core.server">core.server</a>
+ &#8226;   <a href="#psutil">psutil</a>
  &#8226;   <a href="#psutil._common">psutil._common</a>
  &#8226;   <a href="#psutil._ntuples">psutil._ntuples</a>
  &#8226;   <a href="#psutil._psutil_windows">psutil._psutil_windows</a>
  &#8226;   <a href="#psutil._pswindows">psutil._pswindows</a>
  &#8226;   <a href="#pycaw.utils">pycaw.utils</a>
- &#8226;   <a href="#server">server</a>
 
   </div>
 
@@ -20747,11 +20785,11 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#pyautogui">pyautogui</a>
+    <a href="#core.server">core.server</a>
+ &#8226;   <a href="#pyautogui">pyautogui</a>
  &#8226;   <a href="#pyautogui._pyautogui_osx">pyautogui._pyautogui_osx</a>
  &#8226;   <a href="#pyautogui._pyautogui_win">pyautogui._pyautogui_win</a>
  &#8226;   <a href="#pyautogui._pyautogui_x11">pyautogui._pyautogui_x11</a>
- &#8226;   <a href="#server">server</a>
 
   </div>
 
@@ -21094,7 +21132,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#server">server</a>
+    <a href="#core.server">core.server</a>
 
   </div>
 
@@ -21228,11 +21266,11 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#pyautogui">pyautogui</a>
+    <a href="#core.server">core.server</a>
+ &#8226;   <a href="#pyautogui">pyautogui</a>
  &#8226;   <a href="#pygetwindow._pygetwindow_macos">pygetwindow._pygetwindow_macos</a>
  &#8226;   <a href="#pygetwindow._pygetwindow_win">pygetwindow._pygetwindow_win</a>
  &#8226;   <a href="#pyscreeze">pyscreeze</a>
- &#8226;   <a href="#server">server</a>
 
   </div>
 
@@ -21363,8 +21401,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#mouseinfo">mouseinfo</a>
- &#8226;   <a href="#server">server</a>
+    <a href="#core.server">core.server</a>
+ &#8226;   <a href="#mouseinfo">mouseinfo</a>
 
   </div>
 
@@ -21444,7 +21482,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#pystray">pystray</a>
+    <a href="#core.tray">core.tray</a>
+ &#8226;   <a href="#pystray">pystray</a>
  &#8226;   <a href="#pystray._appindicator">pystray._appindicator</a>
  &#8226;   <a href="#pystray._base">pystray._base</a>
  &#8226;   <a href="#pystray._darwin">pystray._darwin</a>
@@ -21455,7 +21494,6 @@ imported by:
  &#8226;   <a href="#pystray._util.gtk">pystray._util.gtk</a>
  &#8226;   <a href="#pystray._win32">pystray._win32</a>
  &#8226;   <a href="#pystray._xorg">pystray._xorg</a>
- &#8226;   <a href="#tray">tray</a>
 
   </div>
 
@@ -21775,7 +21813,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#dashboard_screen">dashboard_screen</a>
+    <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
  &#8226;   <a href="#qrcode">qrcode</a>
  &#8226;   <a href="#qrcode.LUT">qrcode.LUT</a>
  &#8226;   <a href="#qrcode.base">qrcode.base</a>
@@ -22176,9 +22215,7 @@ imported by:
     <a href="#comtypes._comobject">comtypes._comobject</a>
  &#8226;   <a href="#concurrent.futures.process">concurrent.futures.process</a>
  &#8226;   <a href="#concurrent.futures.thread">concurrent.futures.thread</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._generic">keyboard._generic</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#multiprocessing.dummy">multiprocessing.dummy</a>
  &#8226;   <a href="#multiprocessing.dummy.connection">multiprocessing.dummy.connection</a>
  &#8226;   <a href="#multiprocessing.managers">multiprocessing.managers</a>
@@ -22237,12 +22274,12 @@ imports:
 imported by:
     <a href="#PIL.ImagePalette">PIL.ImagePalette</a>
  &#8226;   <a href="#click._compat">click._compat</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#email.generator">email.generator</a>
  &#8226;   <a href="#email.utils">email.utils</a>
  &#8226;   <a href="#jinja2.filters">jinja2.filters</a>
  &#8226;   <a href="#jinja2.utils">jinja2.utils</a>
  &#8226;   <a href="#secrets">secrets</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#setuptools._vendor.more_itertools.more">setuptools._vendor.more_itertools.more</a>
  &#8226;   <a href="#setuptools._vendor.more_itertools.recipes">setuptools._vendor.more_itertools.recipes</a>
  &#8226;   <a href="#statistics">statistics</a>
@@ -22348,10 +22385,6 @@ imported by:
  &#8226;   <a href="#json.decoder">json.decoder</a>
  &#8226;   <a href="#json.encoder">json.encoder</a>
  &#8226;   <a href="#json.scanner">json.scanner</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
- &#8226;   <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
  &#8226;   <a href="#locale">locale</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#main.py">main.py</a>
@@ -22621,7 +22654,10 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#dashboard_screen">dashboard_screen</a>
+    <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.files_panel">core.files_panel</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.pairing_screen">core.pairing_screen</a>
  &#8226;   <a href="#requests">requests</a>
  &#8226;   <a href="#requests.__version__">requests.__version__</a>
  &#8226;   <a href="#requests._internal_utils">requests._internal_utils</a>
@@ -22639,7 +22675,6 @@ imported by:
  &#8226;   <a href="#requests.status_codes">requests.status_codes</a>
  &#8226;   <a href="#requests.structures">requests.structures</a>
  &#8226;   <a href="#requests.utils">requests.utils</a>
- &#8226;   <a href="#tray">tray</a>
 
   </div>
 
@@ -23132,11 +23167,11 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#screeninfo.common">screeninfo.common</a>
+    <a href="#core.server">core.server</a>
+ &#8226;   <a href="#screeninfo.common">screeninfo.common</a>
  &#8226;   <a href="#screeninfo.enumerators">screeninfo.enumerators</a>
  &#8226;   <a href="#screeninfo.screeninfo">screeninfo.screeninfo</a>
  &#8226;   <a href="#screeninfo.util">screeninfo.util</a>
- &#8226;   <a href="#server">server</a>
 
   </div>
 
@@ -23372,8 +23407,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#multiprocessing.shared_memory">multiprocessing.shared_memory</a>
- &#8226;   <a href="#server">server</a>
+    <a href="#core.server">core.server</a>
+ &#8226;   <a href="#multiprocessing.shared_memory">multiprocessing.shared_memory</a>
  &#8226;   <a href="#werkzeug.security">werkzeug.security</a>
 
   </div>
@@ -23423,60 +23458,11 @@ imported by:
 </div>
 
 <div class="node">
-  <a name="server"></a>
-  <a target="code" href="///C:/Cypher/pc_app/server.py" type="text/plain"><tt>server</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#PIL">PIL</a>
- &#8226;   <a href="#PIL.Image">PIL.Image</a>
- &#8226;   <a href="#base64">base64</a>
- &#8226;   <a href="#comtypes">comtypes</a>
- &#8226;   <a href="#ctypes">ctypes</a>
- &#8226;   <a href="#datetime">datetime</a>
- &#8226;   <a href="#flask">flask</a>
- &#8226;   <a href="#flask_cors">flask_cors</a>
- &#8226;   <a href="#io">io</a>
- &#8226;   <a href="#json">json</a>
- &#8226;   <a href="#os">os</a>
- &#8226;   <a href="#pathlib">pathlib</a>
- &#8226;   <a href="#platform">platform</a>
- &#8226;   <a href="#psutil">psutil</a>
- &#8226;   <a href="#pyautogui">pyautogui</a>
- &#8226;   <a href="#pycaw.pycaw">pycaw.pycaw</a>
- &#8226;   <a href="#pygetwindow">pygetwindow</a>
- &#8226;   <a href="#pyperclip">pyperclip</a>
- &#8226;   <a href="#random">random</a>
- &#8226;   <a href="#screeninfo">screeninfo</a>
- &#8226;   <a href="#secrets">secrets</a>
- &#8226;   <a href="#shutil">shutil</a>
- &#8226;   <a href="#socket">socket</a>
- &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#time">time</a>
- &#8226;   <a href="#uuid">uuid</a>
- &#8226;   <a href="#zipfile">zipfile</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#main.py">main.py</a>
-
-  </div>
-
-</div>
-
-<div class="node">
   <a name="setup_screen"></a>
-  <a target="code" href="///C:/Cypher/pc_app/setup_screen.py" type="text/plain"><tt>setup_screen</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#customtkinter">customtkinter</a>
- &#8226;   <a href="#json">json</a>
- &#8226;   <a href="#pathlib">pathlib</a>
-
-  </div>
-  <div class="import">
+  <a target="code" href="" type="text/plain"><tt>setup_screen</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
 imported by:
-    <a href="#main.py">main.py</a>
+    <a href="#core.ui">core.ui</a>
 
   </div>
 
@@ -27320,13 +27306,13 @@ imported by:
  &#8226;   <a href="#click.formatting">click.formatting</a>
  &#8226;   <a href="#click.shell_completion">click.shell_completion</a>
  &#8226;   <a href="#click.testing">click.testing</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#ctypes.util">ctypes.util</a>
  &#8226;   <a href="#customtkinter.windows.widgets.font.font_manager">customtkinter.windows.widgets.font.font_manager</a>
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#multiprocessing.util">multiprocessing.util</a>
  &#8226;   <a href="#pyperclip">pyperclip</a>
  &#8226;   <a href="#pystray._util.notify_dbus">pystray._util.notify_dbus</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
  &#8226;   <a href="#setuptools._vendor.backports.tarfile">setuptools._vendor.backports.tarfile</a>
  &#8226;   <a href="#setuptools._vendor.jaraco.context">setuptools._vendor.jaraco.context</a>
@@ -27521,8 +27507,10 @@ imported by:
  &#8226;   <a href="#asyncio.trsock">asyncio.trsock</a>
  &#8226;   <a href="#asyncio.unix_events">asyncio.unix_events</a>
  &#8226;   <a href="#asyncio.windows_events">asyncio.windows_events</a>
- &#8226;   <a href="#dashboard_screen">dashboard_screen</a>
- &#8226;   <a href="#discovery">discovery</a>
+ &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.discovery">core.discovery</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#email.utils">email.utils</a>
  &#8226;   <a href="#ftplib">ftplib</a>
  &#8226;   <a href="#http.client">http.client</a>
@@ -27538,7 +27526,6 @@ imported by:
  &#8226;   <a href="#psutil._common">psutil._common</a>
  &#8226;   <a href="#requests.adapters">requests.adapters</a>
  &#8226;   <a href="#requests.utils">requests.utils</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#socketserver">socketserver</a>
  &#8226;   <a href="#ssl">ssl</a>
  &#8226;   <a href="#urllib.request">urllib.request</a>
@@ -27602,16 +27589,10 @@ imported by:
 
 <div class="node">
   <a name="splash_screen"></a>
-  <a target="code" href="///C:/Cypher/pc_app/splash_screen.py" type="text/plain"><tt>splash_screen</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#customtkinter">customtkinter</a>
- &#8226;   <a href="#tkinter">tkinter</a>
-
-  </div>
-  <div class="import">
+  <a target="code" href="" type="text/plain"><tt>splash_screen</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
 imported by:
-    <a href="#main.py">main.py</a>
+    <a href="#core.ui">core.ui</a>
 
   </div>
 
@@ -27866,8 +27847,6 @@ imported by:
  &#8226;   <a href="#gettext">gettext</a>
  &#8226;   <a href="#gzip">gzip</a>
  &#8226;   <a href="#itsdangerous.encoding">itsdangerous.encoding</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
- &#8226;   <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
  &#8226;   <a href="#multiprocessing.connection">multiprocessing.connection</a>
  &#8226;   <a href="#multiprocessing.forkserver">multiprocessing.forkserver</a>
  &#8226;   <a href="#multiprocessing.shared_memory">multiprocessing.shared_memory</a>
@@ -27940,7 +27919,6 @@ imported by:
  &#8226;   <a href="#darkdetect._linux_detect">darkdetect._linux_detect</a>
  &#8226;   <a href="#darkdetect._mac_detect">darkdetect._mac_detect</a>
  &#8226;   <a href="#http.server">http.server</a>
- &#8226;   <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
  &#8226;   <a href="#mouseinfo">mouseinfo</a>
  &#8226;   <a href="#multiprocessing.util">multiprocessing.util</a>
  &#8226;   <a href="#os">os</a>
@@ -28042,6 +28020,8 @@ imported by:
  &#8226;   <a href="#concurrent.futures.process">concurrent.futures.process</a>
  &#8226;   <a href="#configparser">configparser</a>
  &#8226;   <a href="#contextlib">contextlib</a>
+ &#8226;   <a href="#core.tray">core.tray</a>
+ &#8226;   <a href="#core.utils">core.utils</a>
  &#8226;   <a href="#ctypes">ctypes</a>
  &#8226;   <a href="#ctypes._aix">ctypes._aix</a>
  &#8226;   <a href="#ctypes._endian">ctypes._endian</a>
@@ -28111,6 +28091,7 @@ imported by:
  &#8226;   <a href="#linecache">linecache</a>
  &#8226;   <a href="#locale">locale</a>
  &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#mimetypes">mimetypes</a>
  &#8226;   <a href="#mouseinfo">mouseinfo</a>
  &#8226;   <a href="#multiprocessing">multiprocessing</a>
@@ -28493,16 +28474,16 @@ imported by:
  &#8226;   <a href="#concurrent.futures._base">concurrent.futures._base</a>
  &#8226;   <a href="#concurrent.futures.process">concurrent.futures.process</a>
  &#8226;   <a href="#concurrent.futures.thread">concurrent.futures.thread</a>
- &#8226;   <a href="#dashboard_screen">dashboard_screen</a>
- &#8226;   <a href="#discovery">discovery</a>
+ &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.discovery">core.discovery</a>
+ &#8226;   <a href="#core.files_panel">core.files_panel</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.pairing_screen">core.pairing_screen</a>
+ &#8226;   <a href="#core.server">core.server</a>
+ &#8226;   <a href="#core.tray">core.tray</a>
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#importlib.util">importlib.util</a>
  &#8226;   <a href="#jinja2.utils">jinja2.utils</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
- &#8226;   <a href="#keyboard._generic">keyboard._generic</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#multiprocessing.context">multiprocessing.context</a>
@@ -28527,11 +28508,9 @@ imported by:
  &#8226;   <a href="#queue">queue</a>
  &#8226;   <a href="#requests.auth">requests.auth</a>
  &#8226;   <a href="#requests.cookies">requests.cookies</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#socketserver">socketserver</a>
  &#8226;   <a href="#subprocess">subprocess</a>
  &#8226;   <a href="#sysconfig">sysconfig</a>
- &#8226;   <a href="#tray">tray</a>
  &#8226;   <a href="#unittest.mock">unittest.mock</a>
  &#8226;   <a href="#urllib3._collections">urllib3._collections</a>
  &#8226;   <a href="#urllib3.connection">urllib3.connection</a>
@@ -28568,7 +28547,10 @@ imported by:
  &#8226;   <a href="#click._termui_impl">click._termui_impl</a>
  &#8226;   <a href="#click._winconsole">click._winconsole</a>
  &#8226;   <a href="#concurrent.futures._base">concurrent.futures._base</a>
- &#8226;   <a href="#dashboard_screen">dashboard_screen</a>
+ &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
+ &#8226;   <a href="#core.pairing_screen">core.pairing_screen</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#datetime">datetime</a>
  &#8226;   <a href="#email._parseaddr">email._parseaddr</a>
  &#8226;   <a href="#email.generator">email.generator</a>
@@ -28579,11 +28561,6 @@ imported by:
  &#8226;   <a href="#http.cookies">http.cookies</a>
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#itsdangerous.timed">itsdangerous.timed</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#keyboard._darwinkeyboard">keyboard._darwinkeyboard</a>
- &#8226;   <a href="#keyboard._keyboard_event">keyboard._keyboard_event</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
- &#8226;   <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#multiprocessing.connection">multiprocessing.connection</a>
@@ -28603,7 +28580,6 @@ imported by:
  &#8226;   <a href="#requests.auth">requests.auth</a>
  &#8226;   <a href="#requests.cookies">requests.cookies</a>
  &#8226;   <a href="#requests.sessions">requests.sessions</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#setuptools._vendor.backports.tarfile">setuptools._vendor.backports.tarfile</a>
  &#8226;   <a href="#setuptools._vendor.jaraco.functools">setuptools._vendor.jaraco.functools</a>
  &#8226;   <a href="#setuptools._vendor.more_itertools.more">setuptools._vendor.more_itertools.more</a>
@@ -28657,7 +28633,10 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#customtkinter">customtkinter</a>
+    <a href="#core.files_panel">core.files_panel</a>
+ &#8226;   <a href="#core.pairing_screen">core.pairing_screen</a>
+ &#8226;   <a href="#core.splash_screen">core.splash_screen</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
  &#8226;   <a href="#customtkinter.windows.ctk_tk">customtkinter.windows.ctk_tk</a>
  &#8226;   <a href="#customtkinter.windows.ctk_toplevel">customtkinter.windows.ctk_toplevel</a>
  &#8226;   <a href="#customtkinter.windows.widgets.appearance_mode.appearance_mode_tracker">customtkinter.windows.widgets.appearance_mode.appearance_mode_tracker</a>
@@ -28682,7 +28661,6 @@ imported by:
  &#8226;   <a href="#customtkinter.windows.widgets.scaling.scaling_tracker">customtkinter.windows.widgets.scaling.scaling_tracker</a>
  &#8226;   <a href="#mouseinfo">mouseinfo</a>
  &#8226;   <a href="#pymsgbox">pymsgbox</a>
- &#8226;   <a href="#splash_screen">splash_screen</a>
  &#8226;   <a href="#tkinter.commondialog">tkinter.commondialog</a>
  &#8226;   <a href="#tkinter.constants">tkinter.constants</a>
  &#8226;   <a href="#tkinter.dialog">tkinter.dialog</a>
@@ -28763,7 +28741,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#customtkinter">customtkinter</a>
+    <a href="#core.files_panel">core.files_panel</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
 
   </div>
 
@@ -29008,9 +28987,6 @@ imported by:
  &#8226;   <a href="#doctest">doctest</a>
  &#8226;   <a href="#flask.cli">flask.cli</a>
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
- &#8226;   <a href="#keyboard._generic">keyboard._generic</a>
- &#8226;   <a href="#keyboard._nixkeyboard">keyboard._nixkeyboard</a>
- &#8226;   <a href="#keyboard._winkeyboard">keyboard._winkeyboard</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#multiprocessing.managers">multiprocessing.managers</a>
@@ -29053,29 +29029,6 @@ imports:
   <div class="import">
 imported by:
     <a href="#warnings">warnings</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="tray"></a>
-  <a target="code" href="///C:/Cypher/pc_app/tray.py" type="text/plain"><tt>tray</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#PIL">PIL</a>
- &#8226;   <a href="#PIL.Image">PIL.Image</a>
- &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
- &#8226;   <a href="#keyboard">keyboard</a>
- &#8226;   <a href="#pystray">pystray</a>
- &#8226;   <a href="#requests">requests</a>
- &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#webbrowser">webbrowser</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#main.py">main.py</a>
 
   </div>
 
@@ -31324,9 +31277,10 @@ imports:
   <div class="import">
 imported by:
     <a href="#click.types">click.types</a>
+ &#8226;   <a href="#core.discovery">core.discovery</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#flask.json.provider">flask.json.provider</a>
  &#8226;   <a href="#flask.json.tag">flask.json.tag</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#werkzeug.debug">werkzeug.debug</a>
  &#8226;   <a href="#werkzeug.routing.converters">werkzeug.routing.converters</a>
 
@@ -31412,7 +31366,6 @@ imported by:
  &#8226;   <a href="#importlib.resources._common">importlib.resources._common</a>
  &#8226;   <a href="#importlib.resources._legacy">importlib.resources._legacy</a>
  &#8226;   <a href="#itsdangerous">itsdangerous</a>
- &#8226;   <a href="#keyboard._nixcommon">keyboard._nixcommon</a>
  &#8226;   <a href="#locale">locale</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#main.py">main.py</a>
@@ -31579,10 +31532,9 @@ imports:
   <div class="import">
 imported by:
     <a href="#click._termui_impl">click._termui_impl</a>
- &#8226;   <a href="#dashboard_screen">dashboard_screen</a>
+ &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
  &#8226;   <a href="#mouseinfo">mouseinfo</a>
  &#8226;   <a href="#pydoc">pydoc</a>
- &#8226;   <a href="#tray">tray</a>
 
   </div>
 
@@ -33431,7 +33383,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#discovery">discovery</a>
+    <a href="#core.discovery">core.discovery</a>
  &#8226;   <a href="#zeroconf._cache">zeroconf._cache</a>
  &#8226;   <a href="#zeroconf._core">zeroconf._core</a>
  &#8226;   <a href="#zeroconf._dns">zeroconf._dns</a>
@@ -34318,12 +34270,12 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#importlib.metadata">importlib.metadata</a>
+    <a href="#core.server">core.server</a>
+ &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.resources.readers">importlib.resources.readers</a>
  &#8226;   <a href="#jinja2.environment">jinja2.environment</a>
  &#8226;   <a href="#pyi_rth_inspect.py">pyi_rth_inspect.py</a>
  &#8226;   <a href="#requests.utils">requests.utils</a>
- &#8226;   <a href="#server">server</a>
  &#8226;   <a href="#setuptools._distutils.archive_util">setuptools._distutils.archive_util</a>
  &#8226;   <a href="#setuptools._vendor.wheel.wheelfile">setuptools._vendor.wheel.wheelfile</a>
  &#8226;   <a href="#setuptools._vendor.zipp">setuptools._vendor.zipp</a>

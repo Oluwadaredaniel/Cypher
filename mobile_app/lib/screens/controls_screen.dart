@@ -100,7 +100,6 @@ class _ControlsScreenState extends State<ControlsScreen> {
     HapticFeedback.mediumImpact();
     setState(() => _isTakingScreenshot = true);
     try {
-      // Logic fix: Fetching raw bytes directly from the endpoint
       final resp = await http.get(Uri.parse('$_baseUrl/screenshot'), headers: _headers).timeout(const Duration(seconds: 15));
       
       if (resp.statusCode == 200) {
@@ -109,7 +108,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
           _screenshotTime = DateFormat('h:mm a').format(DateTime.now());
           _isTakingScreenshot = false;
         });
-        _showToast("Screenshot updated");
+        _showToast("Screenshot captured");
       } else {
         throw Exception();
       }

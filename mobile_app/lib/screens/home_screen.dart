@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import '../services/central_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -205,8 +206,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           children: [
             Text("MASTER COMMAND", style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontWeight: FontWeight.w900, letterSpacing: 2)),
             const SizedBox(height: 30),
-            _buildMasterAction(Icons.analytics_rounded, "View Live Installs", () => launchUrl(Uri.parse("https://your-hub-url.com/master"))),
-            _buildMasterAction(Icons.campaign_rounded, "Push Global Broadcast", () => launchUrl(Uri.parse("https://your-hub-url.com/master"))),
+            _buildMasterAction(Icons.analytics_rounded, "View Live Installs", () => launchUrlString("https://cypher-3ctq.onrender.com/master")),
+            _buildMasterAction(Icons.campaign_rounded, "Push Global Broadcast", () => launchUrlString("https://cypher-3ctq.onrender.com/master")),
             _buildMasterAction(Icons.settings_suggest_rounded, "System Settings", () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken});
@@ -237,6 +238,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Future<void> _verifyMasterLogin(String input, BuildContext ctx) async {
+    try {
+      final response = await http.get(Uri.parse('https://cypher-3ctq.onrender.com/api/metadata'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final correctPass = data['master_password'] ?? "emerald-admin";
+        
+        if (input == correctPass) {
+          Navigator.pop(ctx);
+          Navigator.pushNamed(context, '/master_control');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Invalid Master Key"), backgroundColor: Colors.redAccent),
+          );
+        }
+      }
+    } catch (e) {
+      // Offline fallback
+      if (input == "emerald-admin") {
+        Navigator.pop(ctx);
+        Navigator.pushNamed(context, '/master_control');
+      }
+    }
+  }
+
   void _showMasterLogin() {
     HapticFeedback.heavyImpact();
     final controller = TextEditingController();
@@ -255,12 +281,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("CANCEL")),
           TextButton(
-            onPressed: () {
-              if (controller.text == "emerald-admin") {
-                Navigator.pop(ctx);
-                Navigator.pushNamed(context, '/master_control');
-              }
-            }, 
+            onPressed: () => _verifyMasterLogin(controller.text, ctx),
             child: const Text("LOGIN", style: TextStyle(color: Color(0xFF6C63FF)))
           ),
         ],
@@ -450,7 +471,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           children: [
             Text("Designed by ", style: GoogleFonts.outfit(color: Colors.white, fontSize: 12)),
             GestureDetector(
-              onTap: () => launchUrl(Uri.parse("https://www.tiktok.com/@emerald_dev1")),
+              onTap: () => launchUrlString("https://www.tiktok.com/@emerald_dev1"),
               child: Text("Emerald", style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontSize: 12, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
             ),
           ],
@@ -672,7 +693,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           if (_broadcast?['link'] != null)
             GestureDetector(
-              onTap: () => launchUrl(Uri.parse(_broadcast!['link'])),
+              onTap: () => launchUrlString(_broadcast!['link']),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(

@@ -83,8 +83,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
       if (results[0].statusCode == 200) {
         final history = jsonDecode(results[0].body) as List;
         for (final item in history) {
+          String action = _translateAction(item['endpoint'] ?? '');
+          if (item['details'] != null && item['details'].toString().isNotEmpty) {
+            action = "${item['details']}";
+          }
           merged.add({
-            'action': _translateAction(item['endpoint'] ?? ''),
+            'action': action,
             'timestamp': _formatTimestamp(item['timestamp'] ?? ''),
             'success': item['success'] ?? true,
             'category': _filterCategory(item['endpoint'] ?? ''),
