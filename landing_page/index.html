@@ -3,234 +3,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CYPHER — Beyond Connection.</title>
+    <title>CYPHER — The Future of Device Connection.</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700;800&family=Syne:wght@800&display=swap" rel="stylesheet">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
     <style>
         :root {
-            --bg: #030305;
-            --surface: #0A0A0F;
+            --bg: #000000;
+            --surface: #0A0A0A;
+            --surface-accent: #141414;
             --accent: #6C63FF;
-            --accent-glow: rgba(108, 99, 255, 0.2);
-            --text-primary: #FFFFFF;
-            --text-secondary: rgba(255, 255, 255, 0.6);
-            --border: rgba(255, 255, 255, 0.05);
-            --glass: rgba(255, 255, 255, 0.03);
+            --accent-soft: rgba(108, 99, 255, 0.15);
+            --text-p: #FFFFFF;
+            --text-s: #888888;
+            --border: rgba(255, 255, 255, 0.06);
+            --ease: cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { scroll-behavior: smooth; background: var(--bg); color: var(--text-primary); }
+        html { scroll-behavior: smooth; background: var(--bg); }
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
             background: var(--bg);
+            color: var(--text-p);
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
         }
 
-        /* --- BACKGROUND ELEMENTS --- */
+        /* --- BACKGROUND EFFECTS --- */
         .noise {
-            fixed: inset 0;
-            width: 100%; height: 100%;
+            position: fixed; inset: 0; width: 100%; height: 100%;
             background: url('https://grainy-gradients.vercel.app/noise.svg');
-            opacity: 0.05; pointer-events: none; z-index: 50;
-            position: fixed;
+            opacity: 0.03; pointer-events: none; z-index: 1000;
         }
         .glow {
-            position: fixed; width: 60vw; height: 60vw;
-            background: radial-gradient(circle, var(--accent-glow), transparent 70%);
-            border-radius: 50%; filter: blur(120px); z-index: -1;
-            pointer-events: none;
+            position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+            width: 80vw; height: 60vh;
+            background: radial-gradient(ellipse at center, var(--accent-soft), transparent 70%);
+            filter: blur(100px); pointer-events: none; z-index: -1;
         }
-
-        /* --- TYPOGRAPHY --- */
-        h1, h2, h3, .logo { font-family: 'Syne', sans-serif; text-transform: uppercase; letter-spacing: -0.02em; }
-        p { font-weight: 300; letter-spacing: 0.01em; }
 
         /* --- NAVIGATION --- */
         nav {
-            position: fixed; top: 0; width: 100%; z-index: 1000;
-            padding: 30px 0; transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            position: fixed; top: 0; width: 100%; z-index: 100;
+            padding: 32px 0; transition: all 0.6s var(--ease);
         }
         nav.scrolled {
-            padding: 15px 0; background: rgba(3, 3, 5, 0.8); backdrop-filter: blur(20px);
+            padding: 16px 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
         }
         .nav-inner { max-width: 1200px; margin: 0 auto; padding: 0 40px; display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-size: 24px; font-weight: 800; }
+        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; letter-spacing: -0.04em; }
         .logo span { color: var(--accent); }
-        .nav-link { color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 500; transition: color 0.3s; }
-        .nav-link:hover { color: var(--text-primary); }
+
+        .download-pill {
+            background: #fff; color: #000; text-decoration: none;
+            padding: 10px 24px; border-radius: 100px; font-weight: 700; font-size: 13px;
+            transition: all 0.3s var(--ease);
+        }
+        .download-pill:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(255,255,255,0.2); }
 
         /* --- HERO --- */
         .hero {
-            height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;
-            text-align: center; padding: 0 20px;
+            height: 100vh; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center;
+            position: relative; padding: 0 20px;
         }
-        .hero-title { font-size: clamp(48px, 12vw, 120px); line-height: 0.9; margin-bottom: 30px; font-weight: 800; }
-        .hero-sub { font-size: clamp(16px, 2vw, 20px); color: var(--text-secondary); max-width: 600px; margin-bottom: 50px; }
+        .hero-badge {
+            background: var(--surface-accent); border: 1px solid var(--border);
+            padding: 8px 16px; border-radius: 100px; font-size: 11px; font-weight: 600;
+            letter-spacing: 0.1em; color: var(--text-s); margin-bottom: 32px;
+            text-transform: uppercase;
+        }
+        .hero h1 {
+            font-size: clamp(48px, 12vw, 110px); line-height: 0.95; font-weight: 800;
+            letter-spacing: -0.05em; margin-bottom: 24px;
+        }
+        .hero p {
+            font-size: clamp(16px, 1.8vw, 20px); color: var(--text-s);
+            max-width: 540px; margin-bottom: 48px; font-weight: 400; line-height: 1.5;
+        }
 
+        .btn-group { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
         .btn {
-            padding: 20px 45px; border-radius: 100px; text-decoration: none; font-weight: 600; font-size: 15px;
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden;
-            display: inline-block;
+            padding: 18px 40px; border-radius: 12px; font-weight: 700; font-size: 15px;
+            text-decoration: none; transition: all 0.4s var(--ease);
         }
-        .btn-primary { background: var(--accent); color: white; box-shadow: 0 20px 40px rgba(108, 99, 255, 0.2); }
-        .btn-primary:hover { transform: translateY(-5px) scale(1.02); box-shadow: 0 30px 60px rgba(108, 99, 255, 0.3); }
+        .btn-main { background: var(--accent); color: white; box-shadow: 0 10px 40px var(--accent-soft); }
+        .btn-main:hover { transform: translateY(-4px); box-shadow: 0 20px 60px var(--accent-soft); }
+        .btn-ghost { background: transparent; color: white; border: 1px solid var(--border); }
+        .btn-ghost:hover { background: var(--surface-accent); border-color: #fff; }
 
-        /* --- SECTIONS --- */
+        /* --- BENTO GRID SECTION --- */
         .container { max-width: 1200px; margin: 0 auto; padding: 0 40px; }
-        .section-header { margin-bottom: 80px; text-align: center; }
-        .section-header h2 { font-size: clamp(32px, 6vw, 64px); line-height: 1; margin-bottom: 20px; }
-        .section-header p { color: var(--text-secondary); max-width: 500px; margin: 0 auto; }
+        .section-tag { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.2em; display: block; margin-bottom: 16px; }
 
-        /* --- PROBLEM/SOLUTION CARDS --- */
-        .grid-split { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 150px; }
-        .glass-card {
-            background: var(--glass); border: 1px solid var(--border); border-radius: 40px;
-            padding: 60px; backdrop-filter: blur(10px); transition: transform 0.3s;
+        .bento-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 350px); gap: 24px;
+            margin-top: 60px;
         }
-        .glass-card:hover { transform: translateY(-10px); background: rgba(255,255,255,0.05); }
-        .card-icon { font-size: 40px; margin-bottom: 30px; display: block; }
-        .card-tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--accent); margin-bottom: 15px; font-weight: 700; display: block; }
+        .bento-item {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 32px; padding: 48px; position: relative;
+            overflow: hidden; transition: border-color 0.4s var(--ease);
+        }
+        .bento-item:hover { border-color: rgba(255,255,255,0.2); }
+        .bento-item h3 { font-size: 24px; margin-bottom: 16px; font-weight: 700; }
+        .bento-item p { color: var(--text-s); font-size: 15px; line-height: 1.6; }
 
-        /* --- FEATURES --- */
-        .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-        .f-item {
-            padding: 40px; background: var(--surface); border: 1px solid var(--border); border-radius: 30px;
-            transition: all 0.3s;
-        }
-        .f-item:hover { border-color: var(--accent); transform: translateY(-5px); }
-        .f-item h3 { font-size: 18px; margin-bottom: 15px; }
-        .f-item p { font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
+        .span-2 { grid-column: span 2; }
+        .span-v2 { grid-row: span 2; }
 
-        /* --- CTA --- */
-        .cta { padding: 150px 0; text-align: center; }
-        .cta-inner {
-            background: linear-gradient(135deg, #0A0A14 0%, #030305 100%);
-            padding: 100px 40px; border-radius: 60px; border: 1px solid var(--border);
-            position: relative; overflow: hidden;
+        /* --- PROBLEM AREA --- */
+        .confrontation {
+            padding: 160px 0; text-align: center;
         }
+        .confrontation h2 { font-size: clamp(32px, 6vw, 72px); letter-spacing: -0.04em; margin-bottom: 24px; }
+        .confrontation p { color: var(--text-s); max-width: 600px; margin: 0 auto; font-size: 18px; }
+
+        /* --- ICONOGRAPHY --- */
+        .icon-box { width: 48px; height: 48px; background: var(--surface-accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; }
+        .icon-box svg { width: 24px; height: 24px; color: var(--accent); }
 
         /* --- FOOTER --- */
-        footer { padding: 80px 0; border-top: 1px solid var(--border); }
-        .footer-flex { display: flex; justify-content: space-between; align-items: center; }
-        .credit { font-size: 14px; color: var(--text-secondary); }
-        .credit a { color: var(--accent); text-decoration: none; font-weight: 700; }
+        footer { padding: 100px 0; border-top: 1px solid var(--border); }
+        .footer-inner { display: flex; justify-content: space-between; align-items: flex-end; }
+        .footer-logo { margin-bottom: 20px; }
+        .emerald-credit { text-align: right; }
+        .emerald-credit p { font-size: 12px; color: var(--text-s); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.1em; }
+        .emerald-link {
+            font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800;
+            color: #fff; text-decoration: none; transition: color 0.3s;
+        }
+        .emerald-link:hover { color: var(--accent); }
 
         /* --- RESPONSIVE --- */
-        @media (max-width: 992px) {
-            .grid-split, .features-grid { grid-template-columns: 1fr; }
-            .hero-title { font-size: 64px; }
+        @media (max-width: 1024px) {
+            .bento-grid { grid-template-columns: 1fr; grid-template-rows: auto; }
+            .span-2, .span-v2 { grid-column: span 1; grid-row: span 1; }
+            .hero h1 { font-size: 64px; }
             .container { padding: 0 24px; }
-            .glass-card { padding: 40px; }
+            .footer-inner { flex-direction: column; align-items: center; text-align: center; gap: 40px; }
         }
 
         /* --- ANIMATIONS --- */
-        .reveal { opacity: 0; transform: translateY(50px); }
+        .reveal { opacity: 0; transform: translateY(40px); }
     </style>
 </head>
 <body>
 
     <div class="noise"></div>
-    <div class="glow" style="top: -20%; left: -20%;"></div>
-    <div class="glow" style="bottom: -20%; right: -20%; background: radial-gradient(circle, rgba(48, 209, 88, 0.1), transparent 70%);"></div>
+    <div class="glow"></div>
 
-    <nav id="navbar">
+    <nav id="nav">
         <div class="nav-inner">
             <div class="logo">C<span>Y</span>PHER</div>
-            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="nav-link">RELEASES</a>
+            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="download-pill">DOWNLOAD NOW</a>
         </div>
     </nav>
 
-    <main>
-        <section class="hero">
-            <h1 class="hero-title reveal">UNLINKED.<br>UNLIMITED.</h1>
-            <p class="hero-sub reveal">The definitive bridge between your PC and Phone. No cables, no accounts—just raw, private speed.</p>
-            <div class="reveal">
-                <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn btn-primary">DOWNLOAD V1.0</a>
-            </div>
-        </section>
+    <header class="hero">
+        <div class="hero-badge reveal">V1.0.0 IS LIVE</div>
+        <h1 class="reveal">PHONES AND PC.<br>NO BARRIERS.</h1>
+        <p class="reveal">The most direct way to move files and control your machine. 100% Private. Built for those who value their time and data.</p>
+        <div class="btn-group reveal">
+            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn btn-main">Windows Setup</a>
+            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn btn-ghost">Android APK</a>
+        </div>
+    </header>
 
-        <section class="container">
-            <div class="grid-split">
-                <div class="glass-card reveal">
-                    <span class="card-tag">THE PROBLEM</span>
-                    <span class="card-icon">🌪️</span>
-                    <h2>Cloud bloat is slow.</h2>
-                    <p style="color: var(--text-secondary);">Stop emailing files to yourself. Stop trusting 3rd party servers with your private photos. The internet was never meant for local transfers.</p>
-                </div>
-                <div class="glass-card reveal" style="border-color: var(--accent);">
-                    <span class="card-tag" style="color: #30D158;">THE CURE</span>
-                    <span class="card-icon">⚡</span>
-                    <h2>Direct is faster.</h2>
-                    <p style="color: var(--text-secondary);">CYPHER creates a high-speed tunnel between your devices. It’s private, it’s encrypted, and it’s up to 50x faster than Bluetooth.</p>
-                </div>
-            </div>
-        </section>
+    <section class="confrontation container">
+        <span class="section-tag reveal">The Observation</span>
+        <h2 class="reveal">The Cloud was never<br>the answer.</h2>
+        <p class="reveal">Why send your private files to a data center 1,000 miles away just to get them to your PC sitting 1 foot away? Bluetooth is a joke. Cables are a tether. CYPHER is the bridge.</p>
+    </section>
 
-        <section class="container" id="tech">
-            <div class="section-header">
-                <h2 class="reveal">BUILT FOR POWER.</h2>
-                <p class="reveal">Every feature is designed to give you total mastery over your hardware from the palm of your hand.</p>
+    <section class="container" style="padding-bottom: 150px;">
+        <span class="section-tag reveal">Capabilities</span>
+        <div class="bento-grid">
+            <!-- FEATURE 1: SPEED -->
+            <div class="bento-item span-2 reveal">
+                <div class="icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                <h3>Warp Speed Transfers</h3>
+                <p>Move high-res 4K videos and massive photo galleries in seconds. We use your local WiFi bandwidth, reaching speeds up to 50x faster than Bluetooth. No compression, no cloud, no limits.</p>
+                <div style="position: absolute; bottom: -20px; right: -20px; font-size: 150px; opacity: 0.03; font-weight: 900;">50MB/s</div>
             </div>
 
-            <div class="features-grid">
-                <div class="f-item reveal">
-                    <h3>⚡ WARP TRANSFERS</h3>
-                    <p>Move 4K videos and massive photo batches in seconds. No quality loss, no compression.</p>
+            <!-- FEATURE 2: REMOTE -->
+            <div class="bento-item span-v2 reveal" style="background: linear-gradient(to bottom, #0A0A0A, #111118);">
+                <div class="icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                 </div>
-                <div class="f-item reveal">
-                    <h3>🎮 COMMAND CENTER</h3>
-                    <p>Shut down, restart, or lock your PC remotely. Perfect for when you're already in bed.</p>
-                </div>
-                <div class="f-item reveal">
-                    <h3>📊 SYSTEM VITALS</h3>
-                    <p>Monitor your PC's CPU, RAM, and Storage in real-time. Know exactly how your machine is performing.</p>
-                </div>
-                <div class="f-item reveal">
-                    <h3>📋 MAGIC CLIPBOARD</h3>
-                    <p>Copy text on your phone and it appears on your PC instantly. The ultimate productivity hack.</p>
-                </div>
-                <div class="f-item reveal">
-                    <h3>🔒 ZERO ACCOUNTS</h3>
-                    <p>No sign-ups. No data collection. Your devices talk only to each other. Your privacy is non-negotiable.</p>
-                </div>
-                <div class="f-item reveal">
-                    <h3>📁 FILE EXPLORER</h3>
-                    <p>Browse your entire PC file system from your phone. Download anything you forgot, anywhere in the house.</p>
-                </div>
+                <h3>Total PC Command</h3>
+                <p>From the bed, from the couch, or from the other room. Shut down, restart, or lock your PC with one tap. Access your entire file system as if you were sitting at the desk.</p>
+                <div style="margin-top: 40px; background: rgba(255,255,255,0.02); border-radius: 20px; height: 180px; border: 1px dashed var(--border);"></div>
             </div>
-        </section>
 
-        <section class="cta container">
-            <div class="cta-inner reveal">
-                <h2>READY TO SYNC?</h2>
-                <p style="color: var(--text-secondary); margin-bottom: 40px; margin-top: 20px;">Download the v1.0.0 suite for Windows and Android.</p>
-                <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-                    <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn btn-primary">WINDOWS EXE</a>
-                    <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn" style="border: 1px solid var(--border); color: white;">ANDROID APK</a>
+            <!-- FEATURE 3: STATS -->
+            <div class="bento-item reveal">
+                <div class="icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
                 </div>
+                <h3>Live System Vitals</h3>
+                <p>Monitor your PC health in real-time. CPU, RAM, and Storage stats delivered straight to your mobile screen.</p>
             </div>
-        </section>
-    </main>
+
+            <!-- FEATURE 4: PRIVACY -->
+            <div class="bento-item reveal">
+                <div class="icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <h3>Zero Cloud. Zero Data.</h3>
+                <p>No accounts to create. No data collected. Your devices communicate only with each other. Your files never touch our servers—because we don't have any.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="container" style="text-align: center; padding: 150px 0;">
+        <h2 class="reveal" style="font-size: clamp(32px, 6vw, 64px); letter-spacing: -0.04em; margin-bottom: 40px;">Ready to link your life?</h2>
+        <div class="btn-group reveal">
+            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn btn-main">Get Windows .exe</a>
+            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn btn-ghost">Get Android .apk</a>
+        </div>
+    </section>
 
     <footer>
-        <div class="container footer-flex">
-            <div class="logo">C<span>Y</span>PHER</div>
-            <div class="credit">
-                Designed by <a href="https://www.tiktok.com/@emerald_dev1" target="_blank">EMERALD</a>
+        <div class="container footer-inner">
+            <div class="footer-left">
+                <div class="logo footer-logo">C<span>Y</span>PHER</div>
+                <p style="color: var(--text-s); font-size: 14px;">© 2026 CYPHER. All rights reserved.<br>Encrypted. Local. Private.</p>
+            </div>
+            <div class="emerald-credit reveal">
+                <p>Curated & Designed by</p>
+                <a href="https://www.tiktok.com/@emerald_dev1" target="_blank" class="emerald-link">EMERALD</a>
             </div>
         </div>
     </footer>
 
     <script>
-        // GSAP Animations
         gsap.registerPlugin(ScrollTrigger);
 
-        // Hero Parallax/Reveal
-        gsap.to(".hero-title", {
+        // --- SMOOTH REVEAL ANIMATIONS ---
+        const reveals = document.querySelectorAll('.reveal');
+        reveals.forEach((el, i) => {
+            gsap.to(el, {
+                scrollTrigger: {
+                    trigger: el,
+                    start: "top 90%",
+                    toggleActions: "play none none none"
+                },
+                opacity: 1,
+                y: 0,
+                duration: 1.4,
+                delay: i * 0.05,
+                ease: "power4.out"
+            });
+        });
+
+        // --- NAVBAR SCROLL ---
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('nav');
+            if (window.scrollY > 100) nav.classList.add('scrolled');
+            else nav.classList.remove('scrolled');
+        });
+
+        // --- HERO PARALLAX ---
+        gsap.to(".hero h1", {
             scrollTrigger: {
                 trigger: ".hero",
                 start: "top top",
@@ -238,29 +283,8 @@
                 scrub: true
             },
             y: 100,
-            opacity: 0
-        });
-
-        // Universal Reveal
-        document.querySelectorAll('.reveal').forEach((el) => {
-            gsap.to(el, {
-                scrollTrigger: {
-                    trigger: el,
-                    start: "top 85%",
-                    toggleActions: "play none none none"
-                },
-                opacity: 1,
-                y: 0,
-                duration: 1.2,
-                ease: "power4.out"
-            });
-        });
-
-        // Navbar scroll
-        window.addEventListener('scroll', () => {
-            const nav = document.getElementById('navbar');
-            if (window.scrollY > 50) nav.classList.add('scrolled');
-            else nav.classList.remove('scrolled');
+            opacity: 0.2,
+            scale: 0.9
         });
     </script>
 </body>
