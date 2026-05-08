@@ -54,6 +54,31 @@ def get_metadata():
         "app_publisher": "Emerald Dev"
     }
 
+# --- OTA UPDATE LOGIC ---
+GITHUB_USER = "Oluwadaredaniel"
+GITHUB_REPO = "Cypher"
+
+def check_for_updates():
+    """Checks GitHub for a newer version of metadata.json."""
+    import requests
+    try:
+        current_version = get_metadata().get("app_version", "1.0.0")
+        url = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/pc_app/metadata.json"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            remote_metadata = response.json()
+            remote_version = remote_metadata.get("app_version", "1.0.0")
+
+            if remote_version > current_version:
+                return {
+                    "update_available": True,
+                    "version": remote_version,
+                    "url": remote_metadata.get("app_updates_url", "")
+                }
+    except Exception as e:
+        print(f"Update check failed: {e}")
+    return {"update_available": False}
+
 def log_event(event_type, details):
     """Industry Standard local analytics/event logging."""
     from datetime import datetime

@@ -139,7 +139,18 @@ class DashboardScreen(ctk.CTkFrame):
 
         meta = get_metadata()
         version_text = f"v{meta.get('app_version', '1.0.0')}"
-        ctk.CTkLabel(footer, text=version_text, font=("Helvetica Neue", 10), text_color="#333").pack(anchor="w")
+        self.version_lbl = ctk.CTkLabel(footer, text=version_text, font=("Helvetica Neue", 10), text_color="#333")
+        self.version_lbl.pack(anchor="w")
+
+        self.update_btn = ctk.CTkButton(footer, text="✨ Check for Updates",
+                                        font=("Helvetica Neue", 10, "bold"),
+                                        fg_color="transparent",
+                                        text_color=COLORS["accent"],
+                                        height=24,
+                                        anchor="w",
+                                        hover_color=COLORS["hover"],
+                                        command=self.trigger_update_check)
+        self.update_btn.pack(anchor="w", pady=(2, 0))
 
         self.device_info = ctk.CTkLabel(footer, text="No device linked",
                                         font=("Helvetica Neue", 11),
@@ -179,6 +190,27 @@ class DashboardScreen(ctk.CTkFrame):
         self.parent.withdraw()
         # tray.py is already running in background
         self.show_toast("Running in background", "System")
+
+    def trigger_update_check(self):
+        from core.utils import check_for_updates
+        self.update_btn.configure(text="Checking...", state="disabled")
+
+        def do_check():
+            result = check_for_updates()
+            def update_ui():
+                if result.get("update_available"):
+                    self.show_toast(f"Update Available: v{result['version']}", "System")
+                    self.update_btn.configure(text=f"🎁 Update to v{result['version']}",
+                                               fg_color=COLORS["accent"],
+                                               text_color="#FFF",
+                                               state="normal",
+                                               command=lambda: webbrowser.open(result["url"]))
+                else:
+                    self.show_toast("App is up to date", "System")
+                    self.update_btn.configure(text="✨ Check for Updates", state="normal")
+            self.after(0, update_ui)
+
+        threading.Thread(target=do_check, daemon=True).start()
 
     def switch_panel(self, name):
         # Update Nav UI
