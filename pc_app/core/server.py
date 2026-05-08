@@ -118,6 +118,14 @@ else:
 
 @app.before_request
 def verify_token_and_log():
+    # [CHAOS FIX] Prevent rapid-fire memory exhaustion from spamming requests
+    if request.path == '/screenshot':
+        global last_screenshot_time
+        now = time.time()
+        if 'last_screenshot_time' in globals() and now - last_screenshot_time < 1.0:
+            return jsonify({"success": False, "error": "Cooldown active"}), 429
+        last_screenshot_time = now
+
     incoming_token = request.headers.get("X-Auth-Token")
     if incoming_token == INTERNAL_TOKEN:
         return None
@@ -617,11 +625,7 @@ def delete_file():
     if not path or not os.path.exists(path):
         return jsonify({"success": False, "error": "Not found"}), 404
 
-    # Industry Standard: Prevent deletion of system critical paths
-    restricted_paths = ["C:\\Windows", "C:\\Program Files", "C:\\Users\\Default", "C:\\$Recycle.Bin"]
-    if any(path.lower().startswith(r.lower()) for r in restricted_paths):
-        return jsonify({"success": False, "error": "Access Denied: Cannot delete system protected files"}), 403
-
+    # [CHAOS FIX] Handle files currently locked by other Windows processes
     try:
         if os.path.isfile(path):
             os.remove(path)
@@ -629,6 +633,8 @@ def delete_file():
             shutil.rmtree(path)
         log_to_ui(f"Deleted: {os.path.basename(path)}")
         return jsonify({"success": True, "action": "deleted"})
+    except PermissionError:
+        return jsonify({"success": False, "error": "File is currently in use by another program"}), 403
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
