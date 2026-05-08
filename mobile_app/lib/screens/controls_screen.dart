@@ -431,7 +431,15 @@ class _ControlsScreenState extends State<ControlsScreen> {
   Widget _buildScreenshotSection() {
     return Column(
       children: [
-        _buildPillBtn("Capture Screen", const Color(0xFF6C63FF), _takeScreenshot),
+        Row(
+          children: [
+            Expanded(child: _buildPillBtn("Capture Screen", const Color(0xFF6C63FF), _takeScreenshot)),
+            if (_screenshotBytes != null) ...[
+              const SizedBox(width: 12),
+              Expanded(child: _buildPillBtn("Save to Phone", Colors.transparent, _saveScreenshotToGallery, isGhost: true)),
+            ]
+          ],
+        ),
         const SizedBox(height: 16),
         Container(
           width: double.infinity,
@@ -466,6 +474,19 @@ class _ControlsScreenState extends State<ControlsScreen> {
           ),
       ],
     );
+  }
+
+  Future<void> _saveScreenshotToGallery() async {
+    if (_screenshotBytes == null) return;
+    try {
+      final dir = Directory('/storage/emulated/0/Download');
+      final name = "CYPHER_Screenshot_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      final file = File("${dir.path}/$name");
+      await file.writeAsBytes(_screenshotBytes!);
+      _showToast("Saved to Downloads");
+    } catch (e) {
+      _showToast("Failed to save", isError: true);
+    }
   }
 
   Widget _buildPillBtn(String label, Color color, VoidCallback tap, {bool isGhost = false}) {

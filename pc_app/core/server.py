@@ -378,6 +378,12 @@ def sleep():
     os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
     return jsonify({"success": True, "action": "sleep"})
 
+@app.route('/power/hibernate', methods=['POST'])
+def hibernate():
+    log_to_ui("Hibernation Requested")
+    os.system("shutdown /h")
+    return jsonify({"success": True, "action": "hibernate"})
+
 @app.route('/power/lock', methods=['POST'])
 def lock():
     log_to_ui("Locking Workstation")

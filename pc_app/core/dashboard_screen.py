@@ -212,7 +212,15 @@ class DashboardScreen(ctk.CTkFrame):
     # --- PANEL RENDERING ---
 
     def render_home(self):
-        header = ctk.CTkLabel(self.main_content, text="Dashboard", font=("Helvetica Neue", 32, "bold"), text_color="#FFF")
+        settings = {}
+        try:
+            with open(get_config_path("settings.json"), 'r') as f:
+                settings = json.load(f)
+        except: pass
+
+        pc_display_name = settings.get("device_name", "My PC")
+
+        header = ctk.CTkLabel(self.main_content, text=pc_display_name, font=("Helvetica Neue", 32, "bold"), text_color="#FFF")
         header.pack(anchor="w", pady=(0, 30))
 
         if not self.connected_device:
