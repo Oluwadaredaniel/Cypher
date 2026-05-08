@@ -370,6 +370,11 @@ def log_to_ui(action, device="Phone"):
 
 @app.route('/power/shutdown', methods=['POST'])
 def shutdown():
+    # [CENTURY CHAOS FIX] Prevent shutdown during active transfers to avoid file corruption
+    active = [t for t in active_transfers.values() if t["status"] == "receiving"]
+    if active:
+        return jsonify({"success": False, "error": "Cannot shutdown while transfers are active"}), 409
+
     log_to_ui("Shutdown Requested")
     os.system("shutdown /s /t 5")
     return jsonify({"success": True, "action": "shutdown"})
@@ -657,7 +662,12 @@ def get_screenshot():
 def handle_pc_clipboard():
     if request.method == 'GET':
         return jsonify({"success": True, "content": pyperclip.paste()})
+
+    # [CENTURY CHAOS FIX] Prevent memory exhaustion from massive clipboard payloads
     text = request.json.get("text", "")
+    if len(text) > 1024 * 1024: # 1MB Limit
+        return jsonify({"success": False, "error": "Clipboard content too large"}), 413
+
     log_to_ui("Clipboard Updated")
     pyperclip.copy(text)
     return jsonify({"success": True, "action": "clipboard_set"})
