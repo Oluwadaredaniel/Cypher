@@ -60,6 +60,9 @@ class DashboardScreen(ctk.CTkFrame):
         self.start_data_sync()
         self.process_ui_queue()
 
+        # [NEW] Automatic Update Check on Startup
+        self.after(5000, self.trigger_update_check)
+
     def process_ui_queue(self):
         """Checks for events from the server and shows toast notifications."""
         try:
@@ -199,18 +202,63 @@ class DashboardScreen(ctk.CTkFrame):
             result = check_for_updates()
             def update_ui():
                 if result.get("update_available"):
-                    self.show_toast(f"Update Available: v{result['version']}", "System")
+                    # High Visibility Broadcast on PC
+                    self.show_toast(f"Critical Update: v{result['version']}", "System")
                     self.update_btn.configure(text=f"🎁 Update to v{result['version']}",
                                                fg_color=COLORS["accent"],
                                                text_color="#FFF",
                                                state="normal",
-                                               command=lambda: webbrowser.open(result["url"]))
+                                               command=lambda: self.start_auto_update(result["url"]))
+
+                    # Also show a banner if on Home screen
+                    if self.active_panel_name == "Home":
+                        self.render_update_banner(result['version'], result['url'])
                 else:
                     self.show_toast("App is up to date", "System")
                     self.update_btn.configure(text="✨ Check for Updates", state="normal")
             self.after(0, update_ui)
 
         threading.Thread(target=do_check, daemon=True).start()
+
+    def render_update_banner(self, version, url):
+        banner = ctk.CTkFrame(self.main_content, fg_color=COLORS["accent"], corner_radius=16, height=50)
+        banner.pack(fill="x", pady=(0, 20), before=self.main_content.winfo_children()[0])
+
+        ctk.CTkLabel(banner, text=f"🚀 A new version (v{version}) is available! Upgrade now for the latest features.",
+                     font=("Helvetica Neue", 12, "bold"), text_color="#FFF").pack(side="left", padx=20)
+
+        ctk.CTkButton(banner, text="Install Now", width=100, height=30, corner_radius=8,
+                      fg_color="#FFF", text_color=COLORS["accent"], font=("Helvetica Neue", 11, "bold"),
+                      command=lambda: self.start_auto_update(url)).pack(side="right", padx=10)
+
+    def start_auto_update(self, url):
+        """Downloads the new installer and runs it."""
+        import os
+        import subprocess
+        self.show_toast("Starting Update Download...", "System")
+
+        def download():
+            try:
+                import requests
+                from core.utils import get_app_data_dir
+
+                installer_path = get_app_data_dir() / "cypher_upgrade.exe"
+
+                r = requests.get(url, stream=True)
+                with open(installer_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+                # Launch the installer and exit
+                self.after(0, lambda: self.show_toast("Launching Installer...", "System"))
+                time.sleep(1)
+                subprocess.Popen([str(installer_path), "/SILENT"])
+                os._exit(0)
+            except Exception as e:
+                self.after(0, lambda: self.show_toast("Update Failed", "System"))
+                print(f"Update error: {e}")
+
+        threading.Thread(target=download, daemon=True).start()
 
     def switch_panel(self, name):
         # Update Nav UI
