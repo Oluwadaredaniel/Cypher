@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:nsd/nsd.dart';
 
 class DisconnectedScreen extends StatefulWidget {
   final String pcIpAddress;
@@ -29,6 +30,10 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with TickerProv
   Timer? _autoRetryTimer;
   Timer? _countdownTimer;
 
+  // Discovery State
+  Discovery? _discovery;
+  bool _isSearching = false;
+
   // Animation Controllers
   late AnimationController _dashController;
 
@@ -48,8 +53,15 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with TickerProv
   void dispose() {
     _autoRetryTimer?.cancel();
     _countdownTimer?.cancel();
+    _stopDiscovery();
     _dashController.dispose();
     super.dispose();
+  }
+
+  Future<void> _stopDiscovery() async {
+    if (_discovery != null) {
+      await stopDiscovery(_discovery!);
+    }
   }
 
   void _startAutoRetryLogic() {
@@ -70,15 +82,55 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with TickerProv
     try {
       final response = await http
           .get(Uri.parse('http://${widget.pcIpAddress}:5000/ping'))
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         _handleSuccess();
       } else {
-        _handleFailure(silent);
+        _tryAutoDiscovery();
       }
     } catch (e) {
-      _handleFailure(silent);
+      _tryAutoDiscovery();
+    }
+  }
+
+  Future<void> _tryAutoDiscovery() async {
+    if (_isSearching) return;
+    setState(() => _isSearching = true);
+
+    try {
+      _discovery = await startDiscovery('_cypher._tcp');
+      _discovery!.addListener(() async {
+        for (var service in _discovery!.services) {
+          final String? newIp = service.host;
+          if (newIp != null && newIp != widget.pcIpAddress) {
+            // Try the new IP
+            try {
+              final resp = await http.get(Uri.parse('http://$newIp:5000/ping'))
+                  .timeout(const Duration(seconds: 3));
+              if (resp.statusCode == 200) {
+                // FOUND! Update storage
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('pc_ip_address', newIp);
+                
+                if (mounted) {
+                   _handleSuccess();
+                   await _stopDiscovery();
+                   return;
+                }
+              }
+            } catch (_) {}
+          }
+        }
+      });
+
+      // Stop searching after 5 seconds to save battery
+      await Future.delayed(const Duration(seconds: 5));
+      await _stopDiscovery();
+    } catch (e) {
+      debugPrint("Discovery error: $e");
+    } finally {
+      if (mounted) setState(() { _isSearching = false; _isRetrying = false; _retryCountdown = 10; });
     }
   }
 
@@ -92,18 +144,6 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with TickerProv
 
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) widget.onReconnected();
-    });
-  }
-
-  void _handleFailure(bool silent) {
-    if (!silent) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Still can't connect")),
-      );
-    }
-    setState(() {
-      _isRetrying = false;
-      _retryCountdown = 10;
     });
   }
 

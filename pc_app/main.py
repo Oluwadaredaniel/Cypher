@@ -58,11 +58,12 @@ def start_server():
 # ----------------------------
 def get_pc_name():
     try:
-        if CONFIG_FILE.exists():
-            with open(CONFIG_FILE, "r") as f:
-                return json.load(f).get("pc_name", "Cypher PC")
+        settings_path = get_config_path("settings.json")
+        if settings_path.exists():
+            with open(settings_path, "r") as f:
+                return json.load(f).get("device_name", "Cypher PC")
     except Exception as e:
-        log.warning(f"Config error: {e}")
+        log.warning(f"Settings error: {e}")
     return "Cypher PC"
 
 # ----------------------------
