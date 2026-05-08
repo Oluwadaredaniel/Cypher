@@ -56,6 +56,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _initFetch();
     _startConnectionMonitor();
     _fetchBroadcast();
+    _checkMobileUpdate();
+  }
+
+  Future<void> _checkMobileUpdate() async {
+    final update = await CentralService.checkForUpdates();
+    if (mounted && update != null && update['update_available'] == true) {
+      _showUpdateBanner(update['version'], update['url']);
+    }
+  }
+
+  void _showUpdateBanner(String version, String url) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("✨ New Version v$version available!", style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF6C63FF),
+        duration: const Duration(seconds: 10),
+        action: SnackBarAction(
+          label: "GET APK",
+          textColor: Colors.white,
+          onPressed: () => launchUrlString(url),
+        ),
+      ),
+    );
   }
 
   Future<void> _fetchBroadcast() async {

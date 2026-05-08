@@ -154,6 +154,11 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
           }
         },
         onDone: () async {
+          if (bytes.length < total && total > 0) {
+            _showError("Transfer incomplete: Connection interrupted.");
+            _resetDownloadState();
+            return;
+          }
           try {
             // Save to device storage
             final directory = Platform.isAndroid 

@@ -557,7 +557,11 @@ def get_transfers():
 def download_file():
     path = request.args.get('path')
     if path and os.path.isfile(path):
-        return send_file(path, as_attachment=True)
+        try:
+            return send_file(path, as_attachment=True)
+        except Exception as e:
+            log_event("DOWNLOAD_ERROR", {"path": path, "error": str(e)})
+            return jsonify({"error": "Failed to stream file", "details": str(e)}), 500
     return jsonify({"error": "File not found"}), 404
 
 @app.route('/files/download/chunked', methods=['GET'])
@@ -566,16 +570,28 @@ def download_chunked():
     global cancel_all_transfers
     cancel_all_transfers = False # Reset on new download
     path = request.args.get('path')
+
     if not path or not os.path.isfile(path):
         return jsonify({"error": "File not found"}), 404
 
+    # Chaos Tester: Handle file permission or lock issues
+    try:
+        f_test = open(path, "rb")
+        f_test.close()
+    except Exception as e:
+        return jsonify({"error": "File is locked or inaccessible", "details": str(e)}), 403
+
     def generate():
-        with open(path, "rb") as f:
-            while not cancel_all_transfers:
-                # Increased buffer size from 4KB to 64KB for maximum WiFi throughput
-                chunk = f.read(1024 * 64)
-                if not chunk: break
-                yield chunk
+        try:
+            with open(path, "rb") as f:
+                while not cancel_all_transfers:
+                    chunk = f.read(1024 * 64)
+                    if not chunk: break
+                    yield chunk
+        except Exception as e:
+            log_event("STREAM_INTERRUPTED", {"path": path, "error": str(e)})
+            # Stream will naturally terminate on error
+
     return Response(stream_with_context(generate()), mimetype="application/octet-stream")
 
 @app.route('/files/download/cancel', methods=['POST'])

@@ -37,4 +37,28 @@ class CentralService {
     } catch (_) {}
     return null;
   }
+
+  static Future<Map<String, dynamic>?> checkForUpdates() async {
+    const String githubMetaUrl = "https://raw.githubusercontent.com/Oluwadaredaniel/Cypher/main/pc_app/metadata.json";
+    const String currentVersion = "1.0.0"; // Local version
+
+    try {
+      final response = await http.get(Uri.parse(githubMetaUrl))
+          .timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final remoteVersion = data['app_version'] ?? "1.0.0";
+        
+        if (remoteVersion != currentVersion) {
+          return {
+            "update_available": true,
+            "version": remoteVersion,
+            "url": data['app_updates_url'] ?? "https://github.com/Oluwadaredaniel/Cypher/releases"
+          };
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
 }
