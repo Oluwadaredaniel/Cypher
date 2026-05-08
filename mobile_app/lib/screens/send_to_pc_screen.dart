@@ -39,16 +39,60 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
 
   // Upload Tracking
   double _uploadProgress = 0.0;
-  String _uploadSpeed = "0 MB/s";
-  String _timeLeft = "Calculating...";
   int _currentFileIndex = 0;
 
-  // ... (existing initState/dispose) ...
+  // Animations
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(_pulseController);
+
+    if (widget.preSelectedFile != null) {
+      _directFile = widget.preSelectedFile;
+    }
+    _loadFolders();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  String get _baseUrl => "http://${widget.pcIpAddress}:5000";
+  Map<String, String> get _headers => {"X-Auth-Token": widget.authToken};
+
+  Future<void> _loadFolders() async {
+    setState(() => _isLoadingFolders = true);
+    try {
+      final response = await http.get(
+        Uri.parse("$_baseUrl/files/list?path=$_currentPath"),
+        headers: _headers,
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _folders = data['contents'].where((item) => item['is_dir'] == true).toList();
+          _isLoadingFolders = false;
+        });
+      }
+    } catch (e) {
+      setState(() => _isLoadingFolders = false);
+    }
+  }
 
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result != null) {
-      setState(() => _selectedFiles = result.files);
+      setState(() {
+        _selectedFiles = result.files;
+        _directFile = null;
+      });
     }
   }
 
@@ -86,6 +130,141 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
 
     final response = await request.send();
     if (response.statusCode != 200) throw Exception("Failed");
+  }
+
+  void _triggerSuccess() {
+    setState(() => _currentState = UploadState.success);
+  }
+
+  void _showDestinationSheet() {
+    _loadFolders();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0C0C10),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.5,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(2))),
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
+                        children: [
+                          Text("Choose Destination", style: GoogleFonts.outfit(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                          const Spacer(),
+                          if (_currentPath != "")
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                              onPressed: () {
+                                final parts = _currentPath.split(Platform.pathSeparator);
+                                parts.removeLast();
+                                setModalState(() {
+                                  _currentPath = parts.join(Platform.pathSeparator);
+                                  _loadFolders().then((_) => setModalState(() {}));
+                                });
+                              },
+                            )
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: _isLoadingFolders 
+                          ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
+                          : ListView.builder(
+                              controller: scrollController,
+                              itemCount: _folders.length + 1,
+                              itemBuilder: (context, index) {
+                                if (index == 0) {
+                                  return ListTile(
+                                    leading: const Icon(Icons.check_circle_outline, color: Color(0xFF6C63FF)),
+                                    title: Text("Select current: ${_currentPath == "" ? "Root" : p.basename(_currentPath)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                    onTap: () {
+                                      setState(() => _selectedDestination = _currentPath);
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                }
+                                final folder = _folders[index - 1];
+                                return ListTile(
+                                  leading: const Icon(Icons.folder_rounded, color: Color(0xFF86868B)),
+                                  title: Text(folder['name'], style: const TextStyle(color: Colors.white)),
+                                  trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white24),
+                                  onTap: () {
+                                    setModalState(() {
+                                      _currentPath = folder['path'];
+                                      _loadFolders().then((_) => setModalState(() {}));
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF050507),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text("Send to PC", style: GoogleFonts.syne(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: _buildMainContent(),
+      ),
+    );
+  }
+
+  Widget _buildMainContent() {
+    switch (_currentState) {
+      case UploadState.picking:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("1. Select Content", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 16),
+            _buildUploadArea(),
+            const SizedBox(height: 32),
+            Text("2. Choose Folder", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 16),
+            _buildDestinationSelector(),
+            const Spacer(),
+            _buildSendButton(),
+          ],
+        );
+      case UploadState.uploading:
+        return _buildUploadingState();
+      case UploadState.success:
+        return _buildSuccessState();
+      case UploadState.error:
+        return _buildErrorState();
+    }
   }
 
   Widget _buildUploadArea() {

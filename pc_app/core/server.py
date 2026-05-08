@@ -303,7 +303,18 @@ def unpair_device():
 
 @app.route('/status', methods=['GET'])
 def get_status():
-    return jsonify({"pc_name": socket.gethostname(), "status": "online", "platform": platform.system().lower()})
+    try:
+        with open(SETTINGS_FILE, 'r') as f:
+            settings = json.load(f)
+            display_name = settings.get("device_name", socket.gethostname())
+    except:
+        display_name = socket.gethostname()
+
+    return jsonify({
+        "pc_name": display_name,
+        "status": "online",
+        "platform": platform.system().lower()
+    })
 
 @app.route('/system-stats', methods=['GET'])
 def get_system_stats():
