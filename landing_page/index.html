@@ -3,249 +3,265 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CYPHER — Send Files. Control Your PC. Zero Stress.</title>
+    <title>CYPHER — Beyond Connection.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
     <style>
         :root {
-            --bg: #050507;
+            --bg: #030305;
+            --surface: #0A0A0F;
             --accent: #6C63FF;
-            --accent-glow: rgba(108, 99, 255, 0.3);
-            --text-main: #FFFFFF;
-            --text-dim: #86868B;
-            --card-bg: #0C0C12;
-            --border: rgba(255, 255, 255, 0.08);
+            --accent-glow: rgba(108, 99, 255, 0.2);
+            --text-primary: #FFFFFF;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --border: rgba(255, 255, 255, 0.05);
+            --glass: rgba(255, 255, 255, 0.03);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { scroll-behavior: smooth; background: var(--bg); }
+        html { scroll-behavior: smooth; background: var(--bg); color: var(--text-primary); }
         body {
             font-family: 'Inter', sans-serif;
             background: var(--bg);
-            color: var(--text-main);
-            line-height: 1.6;
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
         }
 
-        /* --- BACKGROUND --- */
-        .grid-bg {
-            position: fixed; inset: 0;
-            background-image: linear-gradient(rgba(255,255,255,.01) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(255,255,255,.01) 1px, transparent 1px);
-            background-size: 60px 60px;
-            z-index: -1;
+        /* --- BACKGROUND ELEMENTS --- */
+        .noise {
+            fixed: inset 0;
+            width: 100%; height: 100%;
+            background: url('https://grainy-gradients.vercel.app/noise.svg');
+            opacity: 0.05; pointer-events: none; z-index: 50;
+            position: fixed;
         }
-        .orb {
-            position: absolute; width: 40vw; height: 40vw;
+        .glow {
+            position: fixed; width: 60vw; height: 60vw;
             background: radial-gradient(circle, var(--accent-glow), transparent 70%);
-            border-radius: 50%; filter: blur(80px); z-index: -1;
+            border-radius: 50%; filter: blur(120px); z-index: -1;
+            pointer-events: none;
         }
 
-        /* --- LAYOUT --- */
-        .container { max-width: 1100px; margin: 0 auto; padding: 0 6%; }
-        section { padding: 100px 0; }
+        /* --- TYPOGRAPHY --- */
+        h1, h2, h3, .logo { font-family: 'Syne', sans-serif; text-transform: uppercase; letter-spacing: -0.02em; }
+        p { font-weight: 300; letter-spacing: 0.01em; }
 
         /* --- NAVIGATION --- */
         nav {
-            position: fixed; top: 0; width: 100%; z-index: 100;
-            padding: 20px 0; transition: all 0.3s;
+            position: fixed; top: 0; width: 100%; z-index: 1000;
+            padding: 30px 0; transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
         nav.scrolled {
-            background: rgba(5, 5, 7, 0.8);
-            backdrop-filter: blur(20px);
+            padding: 15px 0; background: rgba(3, 3, 5, 0.8); backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
-            padding: 12px 0;
         }
-        .nav-inner { display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 24px; letter-spacing: 2px; }
+        .nav-inner { max-width: 1200px; margin: 0 auto; padding: 0 40px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 24px; font-weight: 800; }
         .logo span { color: var(--accent); }
-        .nav-btn {
-            background: var(--accent); color: white; text-decoration: none;
-            padding: 10px 24px; border-radius: 100px; font-weight: 600; font-size: 14px;
-            transition: transform 0.2s;
-        }
-        .nav-btn:hover { transform: translateY(-2px); }
+        .nav-link { color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 500; transition: color 0.3s; }
+        .nav-link:hover { color: var(--text-primary); }
 
         /* --- HERO --- */
         .hero {
-            min-height: 90vh; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; text-align: center;
-            position: relative;
+            height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; padding: 0 20px;
         }
-        .hero h1 {
-            font-family: 'Syne', sans-serif; font-size: clamp(40px, 8vw, 84px);
-            line-height: 1.1; margin-bottom: 24px; font-weight: 800;
-        }
-        .hero p {
-            font-size: clamp(16px, 2vw, 20px); color: var(--text-dim);
-            max-width: 600px; margin-bottom: 40px; font-weight: 300;
-        }
-        .hero-btns { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
-        .btn-p {
-            background: var(--accent); color: white; text-decoration: none;
-            padding: 18px 40px; border-radius: 100px; font-weight: 600; font-size: 16px;
-            box-shadow: 0 10px 30px var(--accent-glow); transition: all 0.3s;
-        }
-        .btn-p:hover { transform: translateY(-4px); box-shadow: 0 15px 40px var(--accent-glow); }
+        .hero-title { font-size: clamp(48px, 12vw, 120px); line-height: 0.9; margin-bottom: 30px; font-weight: 800; }
+        .hero-sub { font-size: clamp(16px, 2vw, 20px); color: var(--text-secondary); max-width: 600px; margin-bottom: 50px; }
 
-        /* --- PROBLEM / SOLUTION --- */
-        .split-box {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
-            align-items: center;
+        .btn {
+            padding: 20px 45px; border-radius: 100px; text-decoration: none; font-weight: 600; font-size: 15px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden;
+            display: inline-block;
         }
-        .problem-card {
-            background: rgba(255, 69, 58, 0.05); border: 1px solid rgba(255, 69, 58, 0.1);
-            padding: 40px; border-radius: 32px;
+        .btn-primary { background: var(--accent); color: white; box-shadow: 0 20px 40px rgba(108, 99, 255, 0.2); }
+        .btn-primary:hover { transform: translateY(-5px) scale(1.02); box-shadow: 0 30px 60px rgba(108, 99, 255, 0.3); }
+
+        /* --- SECTIONS --- */
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 40px; }
+        .section-header { margin-bottom: 80px; text-align: center; }
+        .section-header h2 { font-size: clamp(32px, 6vw, 64px); line-height: 1; margin-bottom: 20px; }
+        .section-header p { color: var(--text-secondary); max-width: 500px; margin: 0 auto; }
+
+        /* --- PROBLEM/SOLUTION CARDS --- */
+        .grid-split { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 150px; }
+        .glass-card {
+            background: var(--glass); border: 1px solid var(--border); border-radius: 40px;
+            padding: 60px; backdrop-filter: blur(10px); transition: transform 0.3s;
         }
-        .solution-card {
-            background: rgba(108, 99, 255, 0.05); border: 1px solid rgba(108, 99, 255, 0.1);
-            padding: 40px; border-radius: 32px;
-        }
-        h2 { font-family: 'Syne', sans-serif; font-size: 32px; margin-bottom: 20px; }
-        .list-item { display: flex; gap: 12px; margin-bottom: 16px; align-items: flex-start; }
-        .list-item span { font-size: 20px; }
+        .glass-card:hover { transform: translateY(-10px); background: rgba(255,255,255,0.05); }
+        .card-icon { font-size: 40px; margin-bottom: 30px; display: block; }
+        .card-tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--accent); margin-bottom: 15px; font-weight: 700; display: block; }
 
         /* --- FEATURES --- */
-        .feature-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;
+        .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .f-item {
+            padding: 40px; background: var(--surface); border: 1px solid var(--border); border-radius: 30px;
+            transition: all 0.3s;
         }
-        .feature-card {
-            background: var(--card-bg); border: 1px solid var(--border);
-            padding: 32px; border-radius: 24px; transition: border-color 0.3s;
-        }
-        .feature-card:hover { border-color: var(--accent); }
-        .f-icon { font-size: 32px; margin-bottom: 20px; display: block; }
-        .feature-card h3 { font-family: 'Syne', sans-serif; margin-bottom: 12px; font-size: 20px; }
-        .feature-card p { color: var(--text-dim); font-size: 15px; }
+        .f-item:hover { border-color: var(--accent); transform: translateY(-5px); }
+        .f-item h3 { font-size: 18px; margin-bottom: 15px; }
+        .f-item p { font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
 
-        /* --- RESPONSIVE --- */
-        @media (max-width: 768px) {
-            .split-box { grid-template-columns: 1fr; }
-            .hero h1 { font-size: 48px; }
-            section { padding: 60px 0; }
+        /* --- CTA --- */
+        .cta { padding: 150px 0; text-align: center; }
+        .cta-inner {
+            background: linear-gradient(135deg, #0A0A14 0%, #030305 100%);
+            padding: 100px 40px; border-radius: 60px; border: 1px solid var(--border);
+            position: relative; overflow: hidden;
         }
 
         /* --- FOOTER --- */
-        footer { padding: 60px 0; border-top: 1px solid var(--border); text-align: center; }
-        .footer-logo { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 12px; }
-        .copyright { color: var(--text-dim); font-size: 13px; }
+        footer { padding: 80px 0; border-top: 1px solid var(--border); }
+        .footer-flex { display: flex; justify-content: space-between; align-items: center; }
+        .credit { font-size: 14px; color: var(--text-secondary); }
+        .credit a { color: var(--accent); text-decoration: none; font-weight: 700; }
 
-        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s ease-out; }
-        .reveal.active { opacity: 1; transform: translateY(0); }
+        /* --- RESPONSIVE --- */
+        @media (max-width: 992px) {
+            .grid-split, .features-grid { grid-template-columns: 1fr; }
+            .hero-title { font-size: 64px; }
+            .container { padding: 0 24px; }
+            .glass-card { padding: 40px; }
+        }
+
+        /* --- ANIMATIONS --- */
+        .reveal { opacity: 0; transform: translateY(50px); }
     </style>
 </head>
 <body>
 
-    <div class="grid-bg"></div>
-    <div class="orb" style="top: -10%; left: -10%;"></div>
-    <div class="orb" style="bottom: 10%; right: -10%; background: radial-gradient(circle, rgba(48, 209, 88, 0.1), transparent 70%);"></div>
+    <div class="noise"></div>
+    <div class="glow" style="top: -20%; left: -20%;"></div>
+    <div class="glow" style="bottom: -20%; right: -20%; background: radial-gradient(circle, rgba(48, 209, 88, 0.1), transparent 70%);"></div>
 
     <nav id="navbar">
-        <div class="container nav-inner">
+        <div class="nav-inner">
             <div class="logo">C<span>Y</span>PHER</div>
-            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="nav-btn">Download Now</a>
+            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="nav-link">RELEASES</a>
         </div>
     </nav>
 
-    <header class="hero container">
-        <h1 class="reveal">Your PC and Phone,<br>Finally connected.</h1>
-        <p class="reveal">Move files in seconds, see your PC stats, and control your computer from your phone. No cables, no accounts, no cloud—just a direct, private link.</p>
-        <div class="hero-btns reveal">
-            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn-p">Get Started Free</a>
-        </div>
-    </header>
+    <main>
+        <section class="hero">
+            <h1 class="hero-title reveal">UNLINKED.<br>UNLIMITED.</h1>
+            <p class="hero-sub reveal">The definitive bridge between your PC and Phone. No cables, no accounts—just raw, private speed.</p>
+            <div class="reveal">
+                <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn btn-primary">DOWNLOAD V1.0</a>
+            </div>
+        </section>
 
-    <section class="container">
-        <div class="split-box">
-            <div class="problem-card reveal">
-                <h2>The Problem</h2>
-                <div class="list-item"><span>❌</span><p>Emailing files to yourself is slow and annoying.</p></div>
-                <div class="list-item"><span>❌</span><p>USB cables are always missing when you need them.</p></div>
-                <div class="list-item"><span>❌</span><p>Cloud apps (like Drive) track your data and need internet.</p></div>
+        <section class="container">
+            <div class="grid-split">
+                <div class="glass-card reveal">
+                    <span class="card-tag">THE PROBLEM</span>
+                    <span class="card-icon">🌪️</span>
+                    <h2>Cloud bloat is slow.</h2>
+                    <p style="color: var(--text-secondary);">Stop emailing files to yourself. Stop trusting 3rd party servers with your private photos. The internet was never meant for local transfers.</p>
+                </div>
+                <div class="glass-card reveal" style="border-color: var(--accent);">
+                    <span class="card-tag" style="color: #30D158;">THE CURE</span>
+                    <span class="card-icon">⚡</span>
+                    <h2>Direct is faster.</h2>
+                    <p style="color: var(--text-secondary);">CYPHER creates a high-speed tunnel between your devices. It’s private, it’s encrypted, and it’s up to 50x faster than Bluetooth.</p>
+                </div>
             </div>
-            <div class="solution-card reveal">
-                <h2>The CYPHER Solution</h2>
-                <div class="list-item"><span>✅</span><p>Instant transfers that work as fast as your WiFi.</p></div>
-                <div class="list-item"><span>✅</span><p>100% Private. Your files never leave your room.</p></div>
-                <div class="list-item"><span>✅</span><p>Total Control. Turn off or lock your PC from your bed.</p></div>
-            </div>
-        </div>
-    </section>
+        </section>
 
-    <section class="container" id="features">
-        <h2 style="text-align: center; margin-bottom: 60px;" class="reveal">Simple Features. Powerful Results.</h2>
-        <div class="feature-grid">
-            <div class="feature-card reveal">
-                <span class="f-icon">🚀</span>
-                <h3>Lightning Fast Files</h3>
-                <p>Move big videos or 100s of photos instantly. It uses your local network, so it’s much faster than Bluetooth.</p>
+        <section class="container" id="tech">
+            <div class="section-header">
+                <h2 class="reveal">BUILT FOR POWER.</h2>
+                <p class="reveal">Every feature is designed to give you total mastery over your hardware from the palm of your hand.</p>
             </div>
-            <div class="feature-card reveal">
-                <span class="f-icon">🎮</span>
-                <h3>Remote Control</h3>
-                <p>Did you leave your PC on? Shut it down, lock it, or put it to sleep directly from your phone app.</p>
-            </div>
-            <div class="feature-card reveal">
-                <span class="f-icon">📊</span>
-                <h3>PC Health Check</h3>
-                <p>See how hard your PC is working. Check your RAM, CPU, and Storage levels in real-time on your mobile screen.</p>
-            </div>
-            <div class="feature-card reveal">
-                <span class="f-icon">📋</span>
-                <h3>Smart Clipboard</h3>
-                <p>Copy a link on your phone and send it straight to your PC. No more typing out long URLs by hand.</p>
-            </div>
-            <div class="feature-card reveal">
-                <span class="f-icon">🛡️</span>
-                <h3>Privacy First</h3>
-                <p>No accounts. No passwords stored online. You connect your devices once, and they talk only to each other.</p>
-            </div>
-            <div class="feature-card reveal">
-                <span class="f-icon">📂</span>
-                <h3>Browse your PC</h3>
-                <p>Forgot a document? Browse your entire computer from your phone and download exactly what you need.</p>
-            </div>
-        </div>
-    </section>
 
-    <section class="container" style="text-align: center;">
-        <h2 class="reveal">Ready to link up?</h2>
-        <p class="reveal" style="color: var(--text-dim); margin-bottom: 40px;">Download the PC app and the Mobile app to get started in under 60 seconds.</p>
-        <div class="hero-btns reveal">
-            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn-p">Download Windows (.exe)</a>
-            <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn-p" style="background: #111;">Download Android (.apk)</a>
-        </div>
-    </section>
+            <div class="features-grid">
+                <div class="f-item reveal">
+                    <h3>⚡ WARP TRANSFERS</h3>
+                    <p>Move 4K videos and massive photo batches in seconds. No quality loss, no compression.</p>
+                </div>
+                <div class="f-item reveal">
+                    <h3>🎮 COMMAND CENTER</h3>
+                    <p>Shut down, restart, or lock your PC remotely. Perfect for when you're already in bed.</p>
+                </div>
+                <div class="f-item reveal">
+                    <h3>📊 SYSTEM VITALS</h3>
+                    <p>Monitor your PC's CPU, RAM, and Storage in real-time. Know exactly how your machine is performing.</p>
+                </div>
+                <div class="f-item reveal">
+                    <h3>📋 MAGIC CLIPBOARD</h3>
+                    <p>Copy text on your phone and it appears on your PC instantly. The ultimate productivity hack.</p>
+                </div>
+                <div class="f-item reveal">
+                    <h3>🔒 ZERO ACCOUNTS</h3>
+                    <p>No sign-ups. No data collection. Your devices talk only to each other. Your privacy is non-negotiable.</p>
+                </div>
+                <div class="f-item reveal">
+                    <h3>📁 FILE EXPLORER</h3>
+                    <p>Browse your entire PC file system from your phone. Download anything you forgot, anywhere in the house.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta container">
+            <div class="cta-inner reveal">
+                <h2>READY TO SYNC?</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 40px; margin-top: 20px;">Download the v1.0.0 suite for Windows and Android.</p>
+                <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+                    <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn btn-primary">WINDOWS EXE</a>
+                    <a href="https://github.com/Oluwadaredaniel/Cypher/releases/tag/v1.0.0" class="btn" style="border: 1px solid var(--border); color: white;">ANDROID APK</a>
+                </div>
+            </div>
+        </section>
+    </main>
 
     <footer>
-        <div class="container">
-            <div class="footer-logo">C<span>Y</span>PHER</div>
-            <p class="copyright">© 2026 CYPHER · Built for Privacy · Designed by <a href="https://www.tiktok.com/@emerald_dev1" target="_blank" style="color: var(--accent); text-decoration: none; font-weight: 600;">Emerald</a></p>
+        <div class="container footer-flex">
+            <div class="logo">C<span>Y</span>PHER</div>
+            <div class="credit">
+                Designed by <a href="https://www.tiktok.com/@emerald_dev1" target="_blank">EMERALD</a>
+            </div>
         </div>
     </footer>
 
     <script>
-        // Navbar scroll effect
+        // GSAP Animations
+        gsap.registerPlugin(ScrollTrigger);
+
+        // Hero Parallax/Reveal
+        gsap.to(".hero-title", {
+            scrollTrigger: {
+                trigger: ".hero",
+                start: "top top",
+                end: "bottom top",
+                scrub: true
+            },
+            y: 100,
+            opacity: 0
+        });
+
+        // Universal Reveal
+        document.querySelectorAll('.reveal').forEach((el) => {
+            gsap.to(el, {
+                scrollTrigger: {
+                    trigger: el,
+                    start: "top 85%",
+                    toggleActions: "play none none none"
+                },
+                opacity: 1,
+                y: 0,
+                duration: 1.2,
+                ease: "power4.out"
+            });
+        });
+
+        // Navbar scroll
         window.addEventListener('scroll', () => {
             const nav = document.getElementById('navbar');
             if (window.scrollY > 50) nav.classList.add('scrolled');
             else nav.classList.remove('scrolled');
         });
-
-        // Reveal animations on scroll
-        const observerOptions = { threshold: 0.1 };
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('active');
-                }
-            });
-        }, observerOptions);
-
-        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
     </script>
 </body>
 </html>
