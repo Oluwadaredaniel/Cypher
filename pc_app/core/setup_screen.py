@@ -141,4 +141,20 @@ class SetupScreen(ctk.CTkFrame):
         }
         with open(CONFIG_FILE, "w") as f:
             json.dump(config, f)
+
+        # [UPDATE] Sync onboarding name to global settings.json for mDNS and server
+        try:
+            settings_path = get_config_path("settings.json")
+            settings = {}
+            if settings_path.exists():
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+
+            settings["device_name"] = self.pc_name.get()
+
+            with open(settings_path, 'w') as f:
+                json.dump(settings, f, indent=4)
+        except Exception as e:
+            print(f"Error syncing onboarding name: {e}")
+
         self.on_complete()

@@ -47,3 +47,8 @@ Name: "{userstartup}\CYPHER"; Filename: "{app}\cypher.exe"; Tasks: startup; Icon
 
 [Run]
 Filename: "{app}\cypher.exe"; Description: "{cm:LaunchProgram,CYPHER}"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+; Clean removal: Delete the entire app folder and all its persistent data (settings, logs, paired devices)
+Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{localappdata}\CYPHER"
