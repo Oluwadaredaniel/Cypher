@@ -3,282 +3,968 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CYPHER — The end of the "cable hunt."</title>
-
+    <title>CYPHER — Your Files. Your Phone. No Limits.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-
+    <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Cabinet+Grotesk:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #FFFFFF;
-            --fg: #000000;
-            --accent: #6C63FF;
-            --subtle: #F2F2F7;
-            --border: rgba(0, 0, 0, 0.06);
-            --text-s: #636366;
+          --ink: #0A0A0F;
+          --ink2: #12121A;
+          --ink3: #1C1C28;
+          --surface: #1E1E2E;
+          --border: rgba(255,255,255,0.07);
+          --border2: rgba(255,255,255,0.12);
+          --txt: #F0F0F8;
+          --txt2: #8888A8;
+          --txt3: #5555778;
+          --accent: #7B6FFF;
+          --accent2: #A89CFF;
+          --accent-dim: rgba(123,111,255,0.15);
+          --green: #34D17A;
+          --amber: #F0A429;
+          --red: #FF5E5E;
+          --glow: rgba(123,111,255,0.2);
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box }
+        html { scroll-behavior:smooth; background:var(--ink) }
+
         body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background: var(--bg);
-            color: var(--fg);
-            line-height: 1.5;
-            -webkit-font-smoothing: antialiased;
+          font-family:'Space Grotesk', sans-serif;
+          background:var(--ink);
+          color:var(--txt);
+          overflow-x:hidden;
+          -webkit-font-smoothing:antialiased;
+          cursor:none;
         }
 
-        .container { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+        /* ── CUSTOM CURSOR ───────────────────────── */
+        #cur { position:fixed; width:8px; height:8px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .1s; mix-blend-mode:screen }
+        #ring { position:fixed; width:32px; height:32px; border:1.5px solid rgba(123,111,255,0.5); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); transition:transform .12s ease-out }
+        body.hov #cur { transform:translate(-50%,-50%) scale(2.5) }
+        body.hov #ring { transform:translate(-50%,-50%) scale(1.6); border-color:rgba(123,111,255,0.2) }
 
-        /* --- NAV --- */
+        /* ── NAV ─────────────────────────────────── */
         nav {
-            position: fixed; top: 0; width: 100%; z-index: 1000;
-            padding: 30px 0; transition: all 0.4s;
+          position:fixed; top:0; width:100%; z-index:100;
+          padding:22px 0; transition:padding .4s, background .4s;
         }
-        nav.scrolled {
-            padding: 15px 0; background: rgba(255,255,255,0.8); backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-        }
-        .nav-inner { display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-weight: 800; font-size: 22px; letter-spacing: -0.04em; }
-        .logo span { color: var(--accent); }
+        nav.stuck { padding:14px 0; background:rgba(10,10,15,.9); backdrop-filter:blur(20px); border-bottom:1px solid var(--border) }
+        .wrap { max-width:1160px; margin:0 auto; padding:0 40px }
+        .nav-row { display:flex; justify-content:space-between; align-items:center }
+        .logo { font-family:'Familjen Grotesk', sans-serif; font-size:21px; font-weight:700; letter-spacing:.05em; color:var(--txt); text-decoration:none }
+        .logo em { font-style:normal; color:var(--accent) }
+        .nav-right { display:flex; align-items:center; gap:32px }
+        .nav-link { font-size:13px; font-weight:500; color:var(--txt2); text-decoration:none; letter-spacing:.04em; transition:color .2s }
+        .nav-link:hover { color:var(--txt) }
+        .pill-btn { padding:10px 22px; background:var(--accent); border-radius:100px; font-size:13px; font-weight:700; color:#fff; text-decoration:none; letter-spacing:.03em; transition:transform .2s, box-shadow .2s }
+        .pill-btn:hover { transform:translateY(-2px); box-shadow:0 8px 24px var(--glow) }
 
-        /* --- HERO --- */
+        /* ── HERO ────────────────────────────────── */
         .hero {
-            padding-top: 200px; padding-bottom: 100px; text-align: center;
+          min-height:100vh; display:flex; align-items:center;
+          padding:120px 0 80px; position:relative; overflow:hidden;
         }
+        .hero-bg {
+          position:absolute; inset:0; z-index:0;
+          background:
+            radial-gradient(ellipse 80% 60% at 60% 40%, rgba(123,111,255,.08) 0%, transparent 70%),
+            radial-gradient(ellipse 40% 40% at 20% 70%, rgba(52,209,122,.05) 0%, transparent 60%);
+        }
+        .hero-grid-lines {
+          position:absolute; inset:0; z-index:0;
+          background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+          background-size: 72px 72px;
+          mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 80%);
+        }
+        .hero-inner { position:relative; z-index:1; display:grid; grid-template-columns:1fr 1fr; gap:80px; align-items:center }
+        .hero-left {}
+        .hero-kicker { display:inline-flex; align-items:center; gap:8px; padding:6px 14px; background:rgba(123,111,255,.1); border:1px solid rgba(123,111,255,.2); border-radius:100px; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent2); margin-bottom:28px }
+        .kicker-dot { width:5px; height:5px; background:var(--green); border-radius:50%; animation:blink 2s infinite }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
         .hero h1 {
-            font-size: clamp(48px, 10vw, 84px); line-height: 0.95; font-weight: 800;
-            letter-spacing: -0.05em; margin-bottom: 32px;
+          font-family:'Familjen Grotesk', sans-serif;
+          font-size:clamp(44px, 5.5vw, 76px);
+          font-weight:700; line-height:.95;
+          letter-spacing:-.025em; margin-bottom:24px;
         }
-        .hero p {
-            font-size: clamp(18px, 2.2vw, 24px); color: var(--text-s);
-            max-width: 700px; margin: 0 auto 50px; font-weight: 400;
+        .hero h1 .outline {
+          color:transparent;
+          -webkit-text-stroke:1.5px rgba(255,255,255,.3);
+          display:block;
         }
+        .hero-sub { font-size:17px; color:var(--txt2); line-height:1.65; max-width:480px; margin-bottom:40px; font-weight:400 }
+        .hero-actions { display:flex; gap:14px; align-items:center; flex-wrap:wrap }
+        .hero-cta { padding:15px 32px; background:var(--accent); border-radius:100px; font-size:15px; font-weight:700; color:#fff; text-decoration:none; transition:transform .25s, box-shadow .25s; letter-spacing:.01em }
+        .hero-cta:hover { transform:translateY(-3px); box-shadow:0 16px 40px rgba(123,111,255,.35) }
+        .hero-ghost { padding:15px 32px; border:1.5px solid var(--border2); border-radius:100px; font-size:15px; font-weight:500; color:var(--txt2); text-decoration:none; transition:border-color .2s, color .2s }
+        .hero-ghost:hover { border-color:rgba(255,255,255,.3); color:var(--txt) }
+        .hero-right { display:flex; justify-content:center; align-items:center }
 
-        /* --- MOCKUP WRAPPER --- */
-        .mockup-scene {
-            position: relative; height: 600px; background: var(--subtle);
-            border-radius: 40px; margin: 40px 0 150px; overflow: hidden;
-            display: flex; align-items: center; justify-content: center;
-            border: 1px solid var(--border);
+        /* ── HERO SVG ILLUSTRATION ───────────────── */
+        .hero-illustration { width:100%; max-width:520px }
+
+        /* ── TICKER ──────────────────────────────── */
+        .ticker { padding:18px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); overflow:hidden; position:relative; z-index:2 }
+        .ticker-track { display:flex; animation:tick 24s linear infinite; width:max-content }
+        @keyframes tick { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+        .ticker-item { display:flex; align-items:center; gap:10px; padding:0 36px; font-size:12px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--txt2); white-space:nowrap }
+        .ticker-sep { color:var(--accent); font-size:8px }
+
+        /* ── SECTIONS ────────────────────────────── */
+        .section { padding:120px 0 }
+        .section-sm { padding:80px 0 }
+        .s-label { font-size:11px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:20px; display:flex; align-items:center; gap:12px }
+        .s-label::after { content:''; flex:1; height:1px; background:var(--border); max-width:60px }
+        .s-title { font-family:'Familjen Grotesk', sans-serif; font-size:clamp(34px,4vw,56px); font-weight:700; letter-spacing:-.025em; line-height:1; margin-bottom:20px }
+        .s-body { font-size:16px; color:var(--txt2); line-height:1.7; font-weight:400 }
+        .reveal { opacity:0; transform:translateY(24px); transition:opacity .7s cubic-bezier(.2,1,.3,1), transform .7s cubic-bezier(.2,1,.3,1) }
+        .reveal.vis { opacity:1; transform:none }
+        .d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}.d4{transition-delay:.4s}
+
+        /* ── PROBLEM / SOLUTION ──────────────────── */
+        .ps-grid { display:grid; grid-template-columns:1fr 1fr; gap:100px; align-items:center }
+        .pain-list { list-style:none; display:flex; flex-direction:column; gap:16px; margin-top:32px }
+        .pain-list li { display:flex; align-items:flex-start; gap:14px; padding:18px; background:var(--ink2); border:1px solid var(--border); border-radius:16px; font-size:15px; color:var(--txt2) }
+        .pain-list li .x { width:22px; height:22px; background:rgba(255,94,94,.12); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--red); font-size:12px; font-weight:800; margin-top:1px }
+        .solution-card { background:var(--ink2); border:1px solid var(--border); border-radius:28px; padding:40px; position:relative; overflow:hidden }
+        .solution-card::before { content:''; position:absolute; top:-60px; right:-60px; width:200px; height:200px; background:radial-gradient(circle, var(--accent-dim), transparent 70%); border-radius:50% }
+        .sol-check { width:28px; height:28px; background:rgba(52,209,122,.12); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--green); font-size:14px; margin-top:2px }
+        .sol-row { display:flex; align-items:flex-start; gap:14px; padding:16px 0; border-bottom:1px solid var(--border) }
+        .sol-row:last-child { border-bottom:none }
+        .sol-row h4 { font-size:15px; font-weight:600; margin-bottom:3px }
+        .sol-row p { font-size:13px; color:var(--txt2) }
+
+        /* ── FEATURE DEEP DIVES ──────────────────── */
+        .feature-dive { display:grid; grid-template-columns:1fr 1fr; gap:80px; align-items:center; margin-bottom:140px }
+        .feature-dive.flip { direction:rtl }
+        .feature-dive.flip > * { direction:ltr }
+        .dive-text {}
+        .dive-label { font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); margin-bottom:16px }
+        .dive-title { font-family:'Familjen Grotesk', sans-serif; font-size:clamp(28px,3vw,42px); font-weight:700; letter-spacing:-.02em; line-height:1.05; margin-bottom:18px }
+        .dive-body { font-size:16px; color:var(--txt2); line-height:1.7; margin-bottom:28px }
+        .dive-bullets { list-style:none; display:flex; flex-direction:column; gap:10px }
+        .dive-bullets li { display:flex; align-items:flex-start; gap:10px; font-size:14px; color:var(--txt2) }
+        .dive-bullets li::before { content:'→'; color:var(--accent); font-weight:700; margin-top:1px; flex-shrink:0 }
+        .dive-bullets li strong { color:var(--txt); font-weight:600 }
+
+        /* ── SVG SCREEN CARDS ────────────────────── */
+        .screen-showcase { background:var(--ink2); border:1px solid var(--border); border-radius:28px; padding:8px; box-shadow:0 40px 80px rgba(0,0,0,.5) }
+        .screen-topbar { background:var(--ink3); border-radius:20px 20px 0 0; padding:10px 16px; display:flex; align-items:center; gap:6px }
+        .dot-r { width:9px; height:9px; background:#FF5F57; border-radius:50% }
+        .dot-y { width:9px; height:9px; background:#FEBC2E; border-radius:50% }
+        .dot-g { width:9px; height:9px; background:#28C840; border-radius:50% }
+        .screen-inner { padding:0; border-radius:0 0 20px 20px; overflow:hidden }
+
+        /* ── FEATURE GRID ────────────────────────── */
+        .f-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; margin-bottom:140px }
+        .f-block { background:var(--ink2); padding:36px; transition:background .2s }
+        .f-block:hover { background:var(--ink3) }
+        .f-block:first-child { border-radius:24px 0 0 0 }
+        .f-block:nth-child(3) { border-radius:0 24px 0 0 }
+        .f-block:nth-child(4) { border-radius:0 0 0 24px }
+        .f-block:last-child { border-radius:0 0 24px 0 }
+        .f-ico { margin-bottom:20px }
+        .f-ico svg { width:36px; height:36px }
+        .f-block h3 { font-family:'Familjen Grotesk', sans-serif; font-size:18px; font-weight:700; margin-bottom:10px; letter-spacing:-.01em }
+        .f-block p { font-size:14px; color:var(--txt2); line-height:1.6 }
+        .f-block .tag { display:inline-block; margin-top:14px; padding:3px 10px; background:var(--accent-dim); border-radius:100px; font-size:11px; font-weight:700; color:var(--accent2); letter-spacing:.06em }
+
+        /* ── COMPARISON ──────────────────────────── */
+        .compare-wrap { background:var(--ink2); border:1px solid var(--border); border-radius:32px; overflow:hidden; margin-bottom:140px }
+        .compare-table { width:100%; border-collapse:collapse }
+        .compare-table th { padding:18px 24px; text-align:left; font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--txt2); border-bottom:1px solid var(--border); background:var(--ink3) }
+        .compare-table th.hl { color:var(--accent); background:rgba(123,111,255,.07) }
+        .compare-table td { padding:16px 24px; font-size:14px; border-bottom:1px solid var(--border); color:var(--txt2) }
+        .compare-table td:first-child { color:var(--txt); font-weight:500 }
+        .compare-table td.hl { background:rgba(123,111,255,.04) }
+        .compare-table tr:last-child td { border-bottom:none }
+        .ck { color:var(--green); font-size:16px; font-weight:700 }
+        .cx { color:var(--red); font-size:16px }
+        .cm { color:var(--amber); font-size:13px; font-weight:500 }
+
+        /* ── STATS ───────────────────────────────── */
+        .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:24px; overflow:hidden; margin-bottom:140px }
+        .stat-block { background:var(--ink); padding:40px 32px; text-align:center }
+        .stat-num { font-family:'Familjen Grotesk', sans-serif; font-size:clamp(36px,4vw,56px); font-weight:700; letter-spacing:-.03em; color:var(--txt); margin-bottom:8px }
+        .stat-num span { color:var(--accent) }
+        .stat-desc { font-size:13px; color:var(--txt2) }
+
+        /* ── PRIVACY SECTION ─────────────────────── */
+        .privacy-inner { display:grid; grid-template-columns:1fr 1fr; gap:80px; align-items:center }
+        .p-card { background:var(--ink2); border:1px solid var(--border); border-radius:20px; padding:24px; display:flex; gap:16px; align-items:flex-start; transition:border-color .2s }
+        .p-card:hover { border-color:rgba(52,209,122,.2) }
+        .p-icon { width:40px; height:40px; background:rgba(52,209,122,.08); border:1px solid rgba(52,209,122,.15); border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0 }
+        .p-card h4 { font-size:15px; font-weight:600; margin-bottom:4px }
+        .p-card p { font-size:13px; color:var(--txt2); line-height:1.55 }
+        .privacy-cards { display:flex; flex-direction:column; gap:12px }
+
+        /* ── INSTALL STEPS ───────────────────────── */
+        .steps-row { display:grid; grid-template-columns:repeat(4,1fr); gap:24px; margin-bottom:140px; position:relative }
+        .steps-row::before { content:''; position:absolute; top:28px; left:10%; right:10%; height:1px; background:linear-gradient(to right, transparent, var(--border), var(--border), transparent); z-index:0 }
+        .step { text-align:center; position:relative; z-index:1 }
+        .step-n { width:56px; height:56px; background:var(--ink2); border:1px solid var(--border); border-radius:16px; margin:0 auto 20px; display:flex; align-items:center; justify-content:center; font-family:'Familjen Grotesk', sans-serif; font-size:20px; font-weight:700; color:var(--accent); transition:border-color .2s, transform .2s }
+        .step:hover .step-n { border-color:var(--accent); transform:translateY(-4px) }
+        .step h4 { font-size:15px; font-weight:700; margin-bottom:8px }
+        .step p { font-size:13px; color:var(--txt2); line-height:1.55 }
+
+        /* ── FAQ ─────────────────────────────────── */
+        .faq-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:140px }
+        .faq-card { background:var(--ink2); border:1px solid var(--border); border-radius:20px; padding:28px; transition:border-color .25s }
+        .faq-card:hover { border-color:rgba(123,111,255,.2) }
+        .faq-card h4 { font-family:'Familjen Grotesk', sans-serif; font-size:16px; font-weight:700; margin-bottom:10px; letter-spacing:-.01em }
+        .faq-card p { font-size:14px; color:var(--txt2); line-height:1.65 }
+        .faq-card strong { color:var(--txt); font-weight:600 }
+
+        /* ── CTA ─────────────────────────────────── */
+        .cta-box { position:relative; overflow:hidden; border-radius:40px; padding:120px 80px; text-align:center; border:1px solid rgba(123,111,255,.2) }
+        .cta-box::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 70% 80% at 50% 0%, rgba(123,111,255,.18), transparent 60%); z-index:0 }
+        .cta-box::after { content:''; position:absolute; inset:0; background:var(--ink2); z-index:-1 }
+        .cta-label { font-size:11px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:20px; position:relative; z-index:1 }
+        .cta-box h2 { font-family:'Familjen Grotesk', sans-serif; font-size:clamp(44px,6vw,88px); font-weight:700; letter-spacing:-.035em; line-height:.9; margin-bottom:24px; position:relative; z-index:1 }
+        .cta-box p { font-size:17px; color:var(--txt2); margin-bottom:48px; position:relative; z-index:1 }
+        .cta-btns { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; position:relative; z-index:1 }
+        .cta-primary { padding:18px 44px; background:#fff; color:var(--ink); border-radius:100px; font-size:15px; font-weight:700; text-decoration:none; transition:transform .25s, box-shadow .25s }
+        .cta-primary:hover { transform:translateY(-3px); box-shadow:0 16px 40px rgba(255,255,255,.15) }
+        .cta-secondary { padding:18px 44px; border:1.5px solid rgba(255,255,255,.15); border-radius:100px; font-size:15px; font-weight:500; color:rgba(255,255,255,.6); text-decoration:none; transition:border-color .2s, color .2s }
+        .cta-secondary:hover { border-color:rgba(255,255,255,.35); color:#fff }
+
+        /* ── FOOTER ──────────────────────────────── */
+        footer { padding:60px 0; border-top:1px solid var(--border) }
+        .footer-row { display:flex; justify-content:space-between; align-items:center }
+        .footer-copy { font-size:13px; color:var(--txt2) }
+        .footer-link { color:var(--accent); text-decoration:none; font-weight:600 }
+        .footer-link:hover { text-decoration:underline }
+
+        /* ── RESPONSIVE ──────────────────────────── */
+        @media(max-width:900px) {
+          .hero-inner,.ps-grid,.feature-dive,.privacy-inner { grid-template-columns:1fr }
+          .feature-dive.flip { direction:ltr }
+          .f-grid { grid-template-columns:1fr }
+          .f-block:first-child,.f-block:nth-child(3),.f-block:nth-child(4),.f-block:last-child { border-radius:0 }
+          .stats-row { grid-template-columns:1fr 1fr }
+          .steps-row { grid-template-columns:1fr 1fr }
+          .steps-row::before { display:none }
+          .faq-grid { grid-template-columns:1fr }
+          .nav-right .nav-link { display:none }
+          .cta-box { padding:80px 32px }
+          .footer-row { flex-direction:column; gap:16px; text-align:center }
+          .compare-wrap { overflow-x:auto }
         }
-
-        /* MOCKUP 1: PC DASHBOARD (Floating) */
-        .pc-mock {
-            width: 500px; background: #fff; border-radius: 20px;
-            box-shadow: 0 40px 80px rgba(0,0,0,0.1); border: 1px solid var(--border);
-            padding: 24px; position: absolute; left: 10%; top: 15%;
-            z-index: 2; transform: rotate(-2deg);
-        }
-        .pc-header { display: flex; gap: 8px; margin-bottom: 20px; }
-        .dot { width: 10px; height: 10px; border-radius: 50%; background: #ddd; }
-
-        /* MOCKUP 2: PHONE (Floating) */
-        .phone-mock {
-            width: 240px; background: #000; border-radius: 40px;
-            padding: 10px; box-shadow: 0 50px 100px rgba(0,0,0,0.15);
-            position: absolute; right: 15%; bottom: 10%; z-index: 3;
-            transform: rotate(5deg); border: 4px solid #333;
-        }
-        .phone-inner { background: #000; border-radius: 32px; height: 450px; padding: 20px; overflow: hidden; }
-
-        /* --- PAIN POINT SECTION --- */
-        .story-section { padding: 120px 0; }
-        .story-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 80px; align-items: center; }
-        .tag { font-size: 13px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 20px; display: block; }
-        .story-content h2 { font-size: clamp(36px, 6vw, 56px); line-height: 1; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 30px; }
-        .story-content p { font-size: 20px; color: var(--text-s); margin-bottom: 24px; }
-
-        /* --- FEATURE BLOCKS --- */
-        .features { background: var(--subtle); padding: 120px 0; border-radius: 60px; margin-bottom: 120px; }
-        .f-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 60px; }
-        .f-card { padding: 20px; }
-        .f-card h3 { font-size: 22px; margin-bottom: 16px; font-weight: 700; letter-spacing: -0.02em; }
-        .f-card p { color: var(--text-s); font-size: 16px; }
-
-        /* --- CTA --- */
-        .cta { text-align: center; padding: 150px 0; }
-        .btn {
-            padding: 22px 48px; border-radius: 100px; font-weight: 700; font-size: 18px;
-            text-decoration: none; display: inline-block; transition: all 0.3s;
-        }
-        .btn-black { background: #000; color: #fff; }
-        .btn-black:hover { transform: scale(1.05); }
-
-        /* --- FOOTER --- */
-        footer { padding: 60px 0; border-top: 1px solid var(--border); }
-        .footer-inner { display: flex; justify-content: space-between; align-items: center; }
-        .emerald { font-size: 14px; color: var(--text-s); }
-        .emerald a { color: #000; text-decoration: none; font-weight: 700; border-bottom: 2px solid var(--accent); }
-
-        @media (max-width: 900px) {
-            .story-grid { grid-template-columns: 1fr; }
-            .f-grid { grid-template-columns: 1fr; }
-            .mockup-scene { height: 400px; }
-            .pc-mock { width: 300px; left: 5%; }
-            .phone-mock { width: 160px; right: 5%; }
-            .hero h1 { font-size: 48px; }
-        }
-
-        .reveal { opacity: 0; transform: translateY(40px); }
     </style>
 </head>
 <body>
+<div id="cur"></div>
+<div id="ring"></div>
 
-    <nav id="nav">
-        <div class="container nav-inner">
-            <div class="logo">C<span>Y</span>PHER</div>
-            <a href="#download" class="nav-btn" style="text-decoration: none; color: #000; font-weight: 700; font-size: 14px;">Download</a>
+<!-- ── NAV ────────────────────────────────── -->
+<nav id="nav">
+    <div class="wrap nav-row">
+        <a href="#" class="logo">C<em>Y</em>PHER</a>
+        <div class="nav-right">
+            <a href="#features" class="nav-link">Features</a>
+            <a href="#compare" class="nav-link">vs Others</a>
+            <a href="#install" class="nav-link">Install</a>
+            <a href="#download" class="pill-btn">Download Free</a>
         </div>
-    </nav>
+    </div>
+</nav>
 
-    <header class="container hero">
-        <h1 class="reveal">Stop hunting for cables.</h1>
-        <p class="reveal">Transfer files, see your PC health, and take total control—all through your own private WiFi. No middleman. No headache.</p>
-        <div class="reveal">
-            <a href="#download" class="btn btn-black">Get started now</a>
-        </div>
-    </header>
-
-    <div class="container">
-        <div class="mockup-scene reveal">
-            <!-- PC MOCKUP -->
-            <div class="pc-mock">
-                <div class="pc-header"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-                <div style="font-weight: 800; font-size: 18px; margin-bottom: 20px;">CYPHER <span>DASHBOARD</span></div>
-                <div style="background: #F8F8F8; border-radius: 12px; padding: 20px; text-align: center;">
-                    <div style="font-size: 12px; color: #888;">Connect Code</div>
-                    <div style="font-size: 32px; font-weight: 800; color: #6C63FF; letter-spacing: 4px;">847 291</div>
-                </div>
+<!-- ── HERO ───────────────────────────────── -->
+<header class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-grid-lines"></div>
+    <div class="wrap hero-inner">
+        <div class="hero-left">
+            <div class="hero-kicker"><span class="kicker-dot"></span>No cloud. No cables. Just speed.</div>
+            <h1>
+                Your whole PC<br>
+                <span class="outline">in your pocket.</span>
+            </h1>
+            <p class="hero-sub">Browse every file, send anything instantly, and control your computer from across the room — all over your own WiFi. Zero internet. Zero compromise.</p>
+            <div class="hero-actions">
+                <a href="https://github.com/Oluwadaredaniel/Cypher/releases" class="hero-cta">Download Free</a>
+                <a href="#features" class="hero-ghost">See what it does</a>
             </div>
-            <!-- PHONE MOCKUP -->
-            <div class="phone-mock">
-                <div class="phone-inner">
-                    <div style="font-size: 10px; font-weight: 800; color: #6C63FF; margin-bottom: 20px;">CYPHER MOBILE</div>
-                    <div style="background: #111; border-radius: 12px; height: 60px; margin-bottom: 12px; display: flex; align-items: center; padding: 15px;">
-                        <span style="font-size: 20px;">📤</span>
-                        <div style="margin-left: 10px;"><div style="width: 80px; height: 8px; background: #333; border-radius: 4px;"></div></div>
-                    </div>
-                    <div style="background: #111; border-radius: 12px; height: 60px; display: flex; align-items: center; padding: 15px;">
-                        <span style="font-size: 20px;">🎮</span>
-                        <div style="margin-left: 10px;"><div style="width: 100px; height: 8px; background: #333; border-radius: 4px;"></div></div>
-                    </div>
+        </div>
+        <div class="hero-right">
+            <!-- HERO SVG: Person at desk with phone and PC connected -->
+            <svg class="hero-illustration" viewBox="0 0 520 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7B6FFF" stop-opacity=".9"/><stop offset="100%" stop-color="#5548CC" stop-opacity=".6"/></linearGradient>
+                    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1E1E2E"/><stop offset="100%" stop-color="#12121A"/></linearGradient>
+                    <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2A2A40"/><stop offset="100%" stop-color="#1C1C28"/></linearGradient>
+                    <filter id="glow"><feGaussianBlur stdDeviation="8" result="blur"/><feComposite in="SourceGraphic" in2="blur" operator="over"/></filter>
+                    <radialGradient id="accent-glow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#7B6FFF" stop-opacity=".4"/><stop offset="100%" stop-color="#7B6FFF" stop-opacity="0"/></radialGradient>
+                </defs>
+
+                <!-- Background glow -->
+                <ellipse cx="260" cy="240" rx="200" ry="180" fill="url(#accent-glow)" opacity=".5"/>
+
+                <!-- DESK -->
+                <rect x="60" y="340" width="340" height="14" rx="7" fill="#1E1E28"/>
+                <rect x="100" y="354" width="8" height="50" rx="4" fill="#181820"/>
+                <rect x="352" y="354" width="8" height="50" rx="4" fill="#181820"/>
+
+                <!-- LAPTOP BASE -->
+                <rect x="90" y="290" width="280" height="52" rx="8" fill="#1C1C28"/>
+                <rect x="90" y="290" width="280" height="52" rx="8" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+                <!-- laptop hinge -->
+                <rect x="88" y="288" width="284" height="6" rx="3" fill="#14141E"/>
+
+                <!-- LAPTOP SCREEN -->
+                <rect x="110" y="100" width="240" height="192" rx="12" fill="url(#g2)"/>
+                <rect x="110" y="100" width="240" height="192" rx="12" stroke="rgba(255,255,255,.1)" stroke-width="1"/>
+                <!-- screen content -->
+                <rect x="122" y="112" width="216" height="168" rx="8" fill="#0A0A12"/>
+                <!-- PC app UI -->
+                <rect x="122" y="112" width="52" height="168" rx="8" fill="#0E0E18"/>
+                <!-- sidebar items -->
+                <rect x="130" y="128" width="36" height="6" rx="3" fill="rgba(123,111,255,.6)"/>
+                <rect x="130" y="142" width="28" height="4" rx="2" fill="rgba(255,255,255,.12)"/>
+                <rect x="130" y="154" width="32" height="4" rx="2" fill="rgba(255,255,255,.08)"/>
+                <rect x="130" y="166" width="24" height="4" rx="2" fill="rgba(255,255,255,.08)"/>
+                <rect x="130" y="178" width="30" height="4" rx="2" fill="rgba(255,255,255,.08)"/>
+                <!-- nav active indicator -->
+                <rect x="122" y="124" width="3" height="16" rx="1.5" fill="#7B6FFF"/>
+                <!-- main content area -->
+                <rect x="182" y="120" width="148" height="24" rx="6" fill="rgba(123,111,255,.12)" stroke="rgba(123,111,255,.2)" stroke-width="1"/>
+                <!-- code display -->
+                <text x="256" y="135" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#7B6FFF" letter-spacing="4">8 4 7 2 9 1</text>
+                <!-- stat pills -->
+                <rect x="182" y="152" width="44" height="16" rx="8" fill="#1A1A28"/>
+                <rect x="230" y="152" width="44" height="16" rx="8" fill="#1A1A28"/>
+                <rect x="278" y="152" width="44" height="16" rx="8" fill="#1A1A28"/>
+                <text x="204" y="163" text-anchor="middle" font-family="sans-serif" font-size="7" fill="#34D17A">CPU 12%</text>
+                <text x="252" y="163" text-anchor="middle" font-family="sans-serif" font-size="7" fill="#F0A429">RAM 67%</text>
+                <text x="300" y="163" text-anchor="middle" font-family="sans-serif" font-size="7" fill="rgba(255,255,255,.5)">DISK 46%</text>
+                <!-- file rows -->
+                <rect x="182" y="176" width="148" height="10" rx="5" fill="rgba(255,255,255,.04)"/>
+                <rect x="182" y="192" width="120" height="10" rx="5" fill="rgba(255,255,255,.04)"/>
+                <rect x="182" y="208" width="136" height="10" rx="5" fill="rgba(255,255,255,.04)"/>
+                <rect x="182" y="224" width="100" height="10" rx="5" fill="rgba(255,255,255,.04)"/>
+                <rect x="182" y="240" width="148" height="10" rx="5" fill="rgba(255,255,255,.04)"/>
+                <!-- laptop camera dot -->
+                <circle cx="230" cy="105" r="3" fill="#0E0E18"/>
+                <circle cx="230" cy="105" r="1.5" fill="#1A1A28"/>
+
+                <!-- CONNECTION BEAM animated -->
+                <path d="M380 200 Q 430 200 430 280 Q 430 360 390 360" stroke="url(#g1)" stroke-width="2" stroke-dasharray="8 5" fill="none" opacity=".7">
+                    <animate attributeName="stroke-dashoffset" from="0" to="-100" dur="3s" repeatCount="indefinite"/>
+                </path>
+                <!-- moving dot on beam -->
+                <circle r="5" fill="#7B6FFF" opacity=".9" filter="url(#glow)">
+                    <animateMotion dur="3s" repeatCount="indefinite" path="M380 200 Q 430 200 430 280 Q 430 360 390 360"/>
+                </circle>
+
+                <!-- PHONE -->
+                <rect x="368" y="240" width="88" height="160" rx="18" fill="url(#g2)" stroke="rgba(255,255,255,.1)" stroke-width="1.5"/>
+                <!-- phone screen -->
+                <rect x="374" y="258" width="76" height="128" rx="10" fill="#080810"/>
+                <!-- phone notch -->
+                <rect x="396" y="247" width="32" height="8" rx="4" fill="#0E0E18"/>
+                <!-- phone ui -->
+                <!-- header -->
+                <text x="412" y="271" text-anchor="middle" font-family="sans-serif" font-size="5" font-weight="800" fill="#7B6FFF" letter-spacing="2">CYPHER</text>
+                <text x="412" y="280" text-anchor="middle" font-family="sans-serif" font-size="6" font-weight="700" fill="white">My PC</text>
+                <circle cx="426" cy="278" r="3" fill="#34D17A" opacity=".9"/>
+                <!-- quick action cards -->
+                <rect x="378" y="285" width="33" height="32" rx="8" fill="#1A1A28"/>
+                <text x="394" y="304" text-anchor="middle" font-size="12">📥</text>
+                <rect x="415" y="285" width="33" height="32" rx="8" fill="#1A1A28"/>
+                <text x="431" y="304" text-anchor="middle" font-size="12">📤</text>
+                <!-- file list -->
+                <rect x="378" y="322" width="70" height="8" rx="4" fill="rgba(255,255,255,.06)"/>
+                <rect x="378" y="334" width="55" height="8" rx="4" fill="rgba(255,255,255,.06)"/>
+                <rect x="378" y="346" width="63" height="8" rx="4" fill="rgba(255,255,255,.06)"/>
+                <rect x="378" y="358" width="48" height="8" rx="4" fill="rgba(255,255,255,.06)"/>
+                <!-- bottom nav -->
+                <rect x="374" y="372" width="76" height="1" fill="rgba(255,255,255,.06)"/>
+                <text x="391" y="381" text-anchor="middle" font-size="8" fill="#7B6FFF">📁</text>
+                <text x="411" y="381" text-anchor="middle" font-size="8" fill="rgba(255,255,255,.3)">📤</text>
+                <text x="433" y="381" text-anchor="middle" font-size="8" fill="rgba(255,255,255,.3)">🎮</text>
+
+                <!-- Floating badges -->
+                <!-- Transfer speed badge -->
+                <g transform="translate(40, 160)">
+                    <rect width="110" height="36" rx="18" fill="#1E1E2E" stroke="rgba(123,111,255,.3)" stroke-width="1"/>
+                    <circle cx="22" cy="18" r="8" fill="rgba(123,111,255,.15)"/>
+                    <text x="22" y="22" text-anchor="middle" font-size="9">⚡</text>
+                    <text x="38" y="14" font-family="sans-serif" font-size="9" font-weight="700" fill="white">50 MB/s</text>
+                    <text x="38" y="25" font-family="sans-serif" font-size="7" fill="rgba(255,255,255,.4)">Transfer speed</text>
+                </g>
+
+                <!-- Privacy badge -->
+                <g transform="translate(370, 120)">
+                    <rect width="100" height="36" rx="18" fill="#1E1E2E" stroke="rgba(52,209,122,.3)" stroke-width="1"/>
+                    <circle cx="22" cy="18" r="8" fill="rgba(52,209,122,.1)"/>
+                    <text x="22" y="22" text-anchor="middle" font-size="9">🛡️</text>
+                    <text x="38" y="14" font-family="sans-serif" font-size="9" font-weight="700" fill="white">Zero Cloud</text>
+                    <text x="38" y="25" font-family="sans-serif" font-size="7" fill="rgba(255,255,255,.4)">Always private</text>
+                </g>
+            </svg>
+        </div>
+    </div>
+</header>
+
+<!-- ── TICKER ──────────────────────────────── -->
+<div class="ticker">
+    <div class="ticker-track">
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Bi-Directional File Transfer</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>50 MB/s Local Speed</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Zero Cloud Storage</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Full Remote Control</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>In-App File Preview</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Clipboard Sync</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Guest QR Access</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Auto PC Discovery</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Process Manager</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Media Controls</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Power Management</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Free Forever</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Bi-Directional File Transfer</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>50 MB/s Local Speed</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Zero Cloud Storage</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Full Remote Control</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>In-App File Preview</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Clipboard Sync</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Guest QR Access</span>
+        <span class="ticker-item"><span class="ticker-sep">✦</span>Auto PC Discovery</span>
+    </div>
+</div>
+
+<!-- ── STATS ───────────────────────────────── -->
+<section class="section-sm">
+    <div class="wrap">
+        <div class="stats-row reveal">
+            <div class="stat-block">
+                <div class="stat-num"><span id="n1">0</span> MB/s</div>
+                <div class="stat-desc">Peak local transfer speed</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-num"><span>0</span></div>
+                <div class="stat-desc">External servers. Ever.</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-num"><span id="n3">0</span><span>+</span></div>
+                <div class="stat-desc">Features built for real use</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-num">100<span>%</span></div>
+                <div class="stat-desc">Free. No limits. No catch.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── PROBLEM / SOLUTION ─────────────────── -->
+<section class="section">
+    <div class="wrap ps-grid">
+        <div class="reveal">
+            <div class="s-label">The Problem</div>
+            <h2 class="s-title">Moving files between<br>devices is still broken.</h2>
+            <p class="s-body">In 2026, getting a file from your PC to your phone still feels like it was designed to frustrate you.</p>
+            <ul class="pain-list">
+                <li><span class="x">✕</span>Bluetooth maxes out at 3 MB/s — a 1GB file takes 6 minutes</li>
+                <li><span class="x">✕</span>USB cables are never where you need them</li>
+                <li><span class="x">✕</span>Cloud drives store your private files on someone else's server</li>
+                <li><span class="x">✕</span>Emailing files to yourself is embarrassing and slow</li>
+                <li><span class="x">✕</span>AirDrop doesn't work if you're not in the Apple ecosystem</li>
+            </ul>
+        </div>
+        <div class="reveal d2">
+            <div class="s-label">The Fix</div>
+            <h2 class="s-title">CYPHER solves all of it.</h2>
+            <div class="solution-card">
+                <div class="sol-row">
+                    <span class="sol-check">✓</span>
+                    <div><h4>Up to 50 MB/s</h4><p>Direct TCP connection over your own WiFi — no internet hop, no throttle</p></div>
+                </div>
+                <div class="sol-row">
+                    <span class="sol-check">✓</span>
+                    <div><h4>No cables ever</h4><p>Your phone hotspot becomes the bridge. Connect once, stay connected</p></div>
+                </div>
+                <div class="sol-row">
+                    <span class="sol-check">✓</span>
+                    <div><h4>Zero cloud</h4><p>Your files stay in your room. Nothing touches an external server</p></div>
+                </div>
+                <div class="sol-row">
+                    <span class="sol-check">✓</span>
+                    <div><h4>Android + Windows</h4><p>Built specifically for the most common combo in the world</p></div>
                 </div>
             </div>
         </div>
     </div>
+</section>
 
-    <section id="story" class="container story-section">
-        <div class="story-grid">
-            <div class="story-content">
-                <span class="tag reveal">The Struggle</span>
-                <h2 class="reveal">Cables are a tether. Bluetooth is a joke.</h2>
-                <p class="reveal">We’ve all been there: digging through a drawer for a USB cord that isn't there, or waiting 10 minutes for Bluetooth to "fail to connect."</p>
-                <p class="reveal" style="font-weight: 600; color: #000;">It's frustrating. It's slow. And it should be easier.</p>
+<!-- ── FEATURE DEEP DIVES ─────────────────── -->
+<section id="features" class="section">
+    <div class="wrap">
+
+        <!-- DIVE 1: File Browser -->
+        <div class="feature-dive reveal">
+            <div class="dive-text">
+                <div class="dive-label">File Freedom</div>
+                <h2 class="dive-title">Your entire PC drive.<br>Right on your screen.</h2>
+                <p class="dive-body">Browse every folder on your PC from your phone — Desktop, Downloads, Documents, all of it. Preview photos before downloading, watch videos inline, read PDFs without saving them first.</p>
+                <ul class="dive-bullets">
+                    <li><strong>Image thumbnails</strong> so you can find the right photo instantly</li>
+                    <li><strong>Date grouping</strong> — Today, Yesterday, Earlier</li>
+                    <li><strong>Search & filter</strong> by name or file type</li>
+                    <li><strong>Grid or list</strong> view — your preference</li>
+                    <li><strong>In-app preview</strong> for images, video, PDF, and audio</li>
+                </ul>
             </div>
-            <div style="background: #000; border-radius: 40px; height: 400px; padding: 60px; display: flex; flex-direction: column; justify-content: center;" class="reveal">
-                <div style="font-size: 32px; color: #fff; font-weight: 700; line-height: 1.2;">"Why send your data to a cloud server 1,000 miles away just to move it 1 foot?"</div>
-                <div style="color: var(--accent); margin-top: 20px; font-weight: 800;">— CYPHER PHILOSOPHY</div>
+            <div>
+                <!-- FILE BROWSER SVG -->
+                <div class="screen-showcase">
+                    <div class="screen-topbar"><div class="dot-r"></div><div class="dot-y"></div><div class="dot-g"></div></div>
+                    <div class="screen-inner">
+                        <svg viewBox="0 0 400 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="400" height="320" fill="#080810"/>
+                            <!-- header -->
+                            <rect x="0" y="0" width="400" height="48" fill="#0E0E18"/>
+                            <text x="20" y="28" font-family="sans-serif" font-size="14" font-weight="700" fill="white">My PC</text>
+                            <text x="20" y="40" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.3)">Downloads › Photos</text>
+                            <!-- search bar -->
+                            <rect x="280" y="12" width="100" height="24" rx="12" fill="rgba(255,255,255,.06)"/>
+                            <text x="310" y="27" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.3)">Search...</text>
+                            <!-- section label -->
+                            <text x="20" y="74" font-family="sans-serif" font-size="10" font-weight="700" fill="rgba(255,255,255,.3)" letter-spacing="1">TODAY</text>
+                            <!-- grid of image thumbnails -->
+                            <rect x="20" y="82" width="84" height="84" rx="12" fill="#1A1A2E"/>
+                            <text x="62" y="132" text-anchor="middle" font-size="28">🖼️</text>
+                            <rect x="114" y="82" width="84" height="84" rx="12" fill="#1E1828"/>
+                            <text x="156" y="132" text-anchor="middle" font-size="28">📸</text>
+                            <rect x="208" y="82" width="84" height="84" rx="12" fill="#181E28"/>
+                            <text x="250" y="132" text-anchor="middle" font-size="28">🎬</text>
+                            <rect x="302" y="82" width="84" height="84" rx="12" fill="#1A2818"/>
+                            <text x="344" y="132" text-anchor="middle" font-size="28">📄</text>
+                            <!-- section label -->
+                            <text x="20" y="186" font-family="sans-serif" font-size="10" font-weight="700" fill="rgba(255,255,255,.3)" letter-spacing="1">YESTERDAY</text>
+                            <!-- list rows -->
+                            <rect x="20" y="196" width="360" height="1" fill="rgba(255,255,255,.05)"/>
+                            <rect x="20" y="204" width="32" height="32" rx="8" fill="#1A1A28"/>
+                            <text x="36" y="224" text-anchor="middle" font-size="14">🎵</text>
+                            <text x="64" y="217" font-family="sans-serif" font-size="12" font-weight="600" fill="white">playlist_final.mp3</text>
+                            <text x="64" y="230" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.3)">12.4 MB · 2:34 PM</text>
+                            <rect x="356" y="210" width="20" height="20" rx="10" fill="rgba(123,111,255,.15)"/>
+                            <text x="366" y="223" text-anchor="middle" font-size="10">⬇</text>
+
+                            <rect x="20" y="244" width="1" fill="rgba(255,255,255,.05)"/>
+                            <rect x="20" y="244" width="32" height="32" rx="8" fill="#1A2818"/>
+                            <text x="36" y="264" text-anchor="middle" font-size="14">📑</text>
+                            <text x="64" y="257" font-family="sans-serif" font-size="12" font-weight="600" fill="white">Project_Proposal.pdf</text>
+                            <text x="64" y="270" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.3)">2.1 MB · Yesterday</text>
+                            <rect x="356" y="250" width="20" height="20" rx="10" fill="rgba(123,111,255,.15)"/>
+                            <text x="366" y="263" text-anchor="middle" font-size="10">⬇</text>
+
+                            <rect x="20" y="284" width="32" height="32" rx="8" fill="#281828"/>
+                            <text x="36" y="304" text-anchor="middle" font-size="14">🎬</text>
+                            <text x="64" y="297" font-family="sans-serif" font-size="12" font-weight="600" fill="white">vacation_edit_v3.mp4</text>
+                            <text x="64" y="310" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.3)">1.2 GB · Yesterday</text>
+                            <rect x="356" y="290" width="20" height="20" rx="10" fill="rgba(123,111,255,.15)"/>
+                            <text x="366" y="303" text-anchor="middle" font-size="10">⬇</text>
+                        </svg>
+                    </div>
+                </div>
             </div>
         </div>
-    </section>
 
-    <section class="features container">
-        <div class="story-content" style="text-align: center; margin-bottom: 80px;">
-            <span class="tag reveal">The Solution</span>
-            <h2 class="reveal">A direct link, no cables required.</h2>
+        <!-- DIVE 2: Transfer -->
+        <div class="feature-dive flip reveal">
+            <div class="dive-text">
+                <div class="dive-label">Two-Way Transfer</div>
+                <h2 class="dive-title">Files move both ways.<br>Always at full speed.</h2>
+                <p class="dive-body">Download anything from your PC to your phone in seconds. Push photos, documents, or anything else from your phone to any specific folder on your PC — you even pick the destination.</p>
+                <ul class="dive-bullets">
+                    <li><strong>Real-time progress</strong> with speed in MB/s and time remaining</li>
+                    <li><strong>Destination picker</strong> — choose exactly where it lands on your PC</li>
+                    <li><strong>Multiple transfers</strong> running at the same time</li>
+                    <li><strong>No file size limits</strong> — move 4K videos, entire folders</li>
+                </ul>
+            </div>
+            <div>
+                <!-- TRANSFER SVG -->
+                <div class="screen-showcase">
+                    <div class="screen-topbar"><div class="dot-r"></div><div class="dot-y"></div><div class="dot-g"></div></div>
+                    <div class="screen-inner">
+                        <svg viewBox="0 0 400 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="400" height="320" fill="#080810"/>
+                            <!-- header -->
+                            <rect x="0" y="0" width="400" height="48" fill="#0E0E18"/>
+                            <text x="20" y="30" font-family="sans-serif" font-size="14" font-weight="700" fill="white">Transfers</text>
+
+                            <!-- Active transfer card -->
+                            <rect x="20" y="62" width="360" height="96" rx="16" fill="#1A1A28" stroke="rgba(123,111,255,.2)" stroke-width="1"/>
+                            <rect x="36" y="78" width="36" height="36" rx="10" fill="rgba(123,111,255,.15)"/>
+                            <text x="54" y="100" text-anchor="middle" font-size="18">🎬</text>
+                            <text x="84" y="90" font-family="sans-serif" font-size="12" font-weight="700" fill="white">vacation_edit_v3.mp4</text>
+                            <text x="84" y="104" font-family="sans-serif" font-size="10" fill="rgba(255,255,255,.3)">Downloading to Gallery</text>
+
+                            <!-- progress -->
+                            <text x="36" y="132" font-family="sans-serif" font-size="11" fill="rgba(255,255,255,.4)">Progress</text>
+                            <text x="346" y="132" text-anchor="end" font-family="sans-serif" font-size="13" font-weight="800" fill="#7B6FFF">72%</text>
+                            <rect x="36" y="136" width="328" height="6" rx="3" fill="#1E1E2E"/>
+                            <rect x="36" y="136" width="236" height="6" rx="3" fill="#7B6FFF"/>
+                            <!-- animated pulse -->
+                            <rect x="36" y="136" width="236" height="6" rx="3" fill="url(#g1)" opacity=".5">
+                                <animate attributeName="width" values="236;256;236" dur="2s" repeatCount="indefinite"/>
+                            </rect>
+                            <text x="36" y="156" font-family="sans-serif" font-size="9" fill="#34D17A">⚡ 48.2 MB/s</text>
+                            <text x="346" y="156" text-anchor="end" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.3)">About 18s left</text>
+
+                            <!-- Second completed transfer -->
+                            <rect x="20" y="170" width="360" height="64" rx="16" fill="rgba(52,209,122,.05)" stroke="rgba(52,209,122,.15)" stroke-width="1"/>
+                            <rect x="36" y="186" width="36" height="32" rx="8" fill="rgba(52,209,122,.1)"/>
+                            <text x="54" y="205" text-anchor="middle" font-size="16">🖼️</text>
+                            <text x="84" y="199" font-family="sans-serif" font-size="12" font-weight="700" fill="white">family_photos.zip</text>
+                            <text x="84" y="213" font-family="sans-serif" font-size="10" fill="#34D17A">✓ Saved to Gallery</text>
+                            <text x="364" y="205" text-anchor="end" font-family="sans-serif" font-size="22" fill="#34D17A">✓</text>
+
+                            <!-- Send to PC section -->
+                            <text x="20" y="256" font-family="sans-serif" font-size="11" font-weight="700" fill="rgba(255,255,255,.3)" letter-spacing="1">SEND TO PC</text>
+                            <rect x="20" y="264" width="360" height="44" rx="16" fill="#1A1A28" stroke="rgba(255,255,255,.07)" stroke-width="1" stroke-dasharray="6 4"/>
+                            <text x="200" y="290" text-anchor="middle" font-family="sans-serif" font-size="11" fill="rgba(255,255,255,.3)">📤  Tap to choose a file</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="f-grid">
-            <div class="f-card reveal">
-                <h3>🚀 Warp Speed</h3>
-                <p>Move big videos or 100s of photos in seconds. If your WiFi is fast, CYPHER is faster. No compression, just raw speed.</p>
+
+        <!-- DIVE 3: Remote Control -->
+        <div class="feature-dive reveal">
+            <div class="dive-text">
+                <div class="dive-label">Remote Control</div>
+                <h2 class="dive-title">Your PC does what<br>your phone says.</h2>
+                <p class="dive-body">From your sofa, shut down your PC after a long render. Skip the track without standing up. Type a note into a PC window from your phone's keyboard. Total control, zero effort.</p>
+                <ul class="dive-bullets">
+                    <li><strong>Media center</strong> — play, pause, skip, volume on Spotify/VLC/YouTube</li>
+                    <li><strong>Power management</strong> — shutdown, sleep, restart, lock</li>
+                    <li><strong>Remote keyboard</strong> — type directly into any PC window</li>
+                    <li><strong>PC screenshot</strong> — see what's on your screen from anywhere</li>
+                    <li><strong>Process manager</strong> — see and kill frozen apps</li>
+                </ul>
             </div>
-            <div class="f-card reveal">
-                <h3>🎮 Remote Control</h3>
-                <p>Did you leave your PC on? Lock it, restart it, or shut it down from your bed. Total control in your pocket.</p>
-            </div>
-            <div class="f-card reveal">
-                <h3>🛡️ 100% Private</h3>
-                <p>No accounts. No sign-ups. Your files stay in your room. Your devices talk only to each other, period.</p>
+            <div>
+                <!-- CONTROLS SVG -->
+                <div class="screen-showcase">
+                    <div class="screen-topbar"><div class="dot-r"></div><div class="dot-y"></div><div class="dot-g"></div></div>
+                    <div class="screen-inner">
+                        <svg viewBox="0 0 400 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="400" height="320" fill="#080810"/>
+                            <rect x="0" y="0" width="400" height="48" fill="#0E0E18"/>
+                            <text x="20" y="30" font-family="sans-serif" font-size="14" font-weight="700" fill="white">Controls</text>
+                            <text x="380" y="30" text-anchor="end" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.3)">Chrome · active</text>
+
+                            <!-- power section -->
+                            <text x="20" y="66" font-family="sans-serif" font-size="9" font-weight="700" fill="rgba(255,255,255,.3)" letter-spacing="1.5">POWER</text>
+                            <rect x="20" y="72" width="68" height="64" rx="14" fill="#1A0A0A"/>
+                            <text x="54" y="102" text-anchor="middle" font-size="20">🔴</text>
+                            <text x="54" y="126" text-anchor="middle" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.6)">Shut Down</text>
+                            <rect x="96" y="72" width="68" height="64" rx="14" fill="#1A1400"/>
+                            <text x="130" y="102" text-anchor="middle" font-size="20">🔄</text>
+                            <text x="130" y="126" text-anchor="middle" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.6)">Restart</text>
+                            <rect x="172" y="72" width="68" height="64" rx="14" fill="#001020"/>
+                            <text x="206" y="102" text-anchor="middle" font-size="20">😴</text>
+                            <text x="206" y="126" text-anchor="middle" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.6)">Sleep</text>
+                            <rect x="248" y="72" width="68" height="64" rx="14" fill="#1A001A"/>
+                            <text x="282" y="102" text-anchor="middle" font-size="20">🌙</text>
+                            <text x="282" y="126" text-anchor="middle" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.6)">Hibernate</text>
+                            <rect x="324" y="72" width="56" height="64" rx="14" fill="#1A1A1A"/>
+                            <text x="352" y="102" text-anchor="middle" font-size="20">🔒</text>
+                            <text x="352" y="126" text-anchor="middle" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.6)">Lock</text>
+
+                            <!-- media section -->
+                            <text x="20" y="158" font-family="sans-serif" font-size="9" font-weight="700" fill="rgba(255,255,255,.3)" letter-spacing="1.5">MEDIA</text>
+                            <rect x="20" y="164" width="360" height="72" rx="16" fill="#1A1A28"/>
+                            <text x="40" y="193" font-family="sans-serif" font-size="11" font-weight="700" fill="white">Now Playing · Spotify</text>
+                            <text x="40" y="207" font-family="sans-serif" font-size="10" fill="rgba(255,255,255,.35)">Blinding Lights — The Weeknd</text>
+                            <!-- controls -->
+                            <circle cx="280" cy="196" r="14" fill="rgba(255,255,255,.06)"/>
+                            <text x="280" y="201" text-anchor="middle" font-size="14">⏮</text>
+                            <circle cx="316" cy="196" r="18" fill="#7B6FFF"/>
+                            <text x="316" y="201" text-anchor="middle" font-size="16">⏯</text>
+                            <circle cx="352" cy="196" r="14" fill="rgba(255,255,255,.06)"/>
+                            <text x="352" y="201" text-anchor="middle" font-size="14">⏭</text>
+                            <!-- volume bar -->
+                            <rect x="40" y="220" width="320" height="6" rx="3" fill="#1E1E2E"/>
+                            <rect x="40" y="220" width="210" height="6" rx="3" fill="#7B6FFF"/>
+                            <text x="364" y="228" text-anchor="end" font-family="sans-serif" font-size="9" fill="rgba(255,255,255,.4)">65%</text>
+
+                            <!-- keyboard section -->
+                            <text x="20" y="256" font-family="sans-serif" font-size="9" font-weight="700" fill="rgba(255,255,255,.3)" letter-spacing="1.5">REMOTE KEYBOARD</text>
+                            <rect x="20" y="262" width="280" height="44" rx="12" fill="#1A1A28"/>
+                            <text x="36" y="287" font-family="sans-serif" font-size="11" fill="rgba(255,255,255,.25)">Type and it appears on your PC...</text>
+                            <rect x="312" y="262" width="68" height="44" rx="12" fill="#7B6FFF"/>
+                            <text x="346" y="289" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="700" fill="white">Send</text>
+                        </svg>
+                    </div>
+                </div>
             </div>
         </div>
-    </section>
 
-    <section id="download" class="container cta">
-        <h2 class="reveal" style="font-size: clamp(32px, 6vw, 64px); font-weight: 800; margin-bottom: 20px;">Get Started in 2 Steps</h2>
-        <p class="reveal" style="color: var(--text-s); margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto;">To use CYPHER, you must install the app on <b>both</b> your PC and your Phone. They work together as one team.</p>
+    </div>
+</section>
 
-        <div class="reveal" style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-            <div style="text-align: center;">
-                <div style="font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 12px; text-transform: uppercase;">Step 1: The PC App</div>
-                <a href="https://github.com/Oluwadaredaniel/Cypher/releases/download/v1.0.0/Cypher_Setup_v1.0.0.exe" class="btn btn-black">Download for Windows</a>
+<!-- ── FULL FEATURE GRID ───────────────────── -->
+<section class="section-sm">
+    <div class="wrap">
+        <div style="text-align:center; margin-bottom:60px">
+            <div class="s-label" style="justify-content:center; margin-bottom:16px">Everything Included</div>
+            <h2 class="s-title reveal">The complete toolkit.</h2>
+            <p class="s-body reveal d1" style="max-width:520px; margin:0 auto">One app. No tiers. No upsells. Every feature, every user, free forever.</p>
+        </div>
+        <div class="f-grid reveal">
+            <div class="f-block">
+                <div class="f-ico"><svg viewBox="0 0 36 36" fill="none"><rect x="4" y="8" width="28" height="20" rx="4" stroke="#7B6FFF" stroke-width="1.5"/><path d="M12 8V6M24 8V6M4 14h28" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round"/><rect x="9" y="17" width="5" height="5" rx="1" fill="#7B6FFF" opacity=".4"/><rect x="16" y="17" width="5" height="5" rx="1" fill="#7B6FFF" opacity=".4"/><rect x="9" y="24" width="5" height="3" rx="1" fill="#7B6FFF" opacity=".2"/><rect x="16" y="24" width="10" height="3" rx="1" fill="#7B6FFF" opacity=".2"/></svg></div>
+                <h3>Full Drive Browser</h3>
+                <p>Every folder on your PC — Desktop, Downloads, Documents — browseable from your phone with search and filtering.</p>
+                <span class="tag">Core feature</span>
             </div>
-            <div style="text-align: center;">
-                <div style="font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 12px; text-transform: uppercase;">Step 2: The Mobile App</div>
-                <a href="https://github.com/Oluwadaredaniel/Cypher/releases/download/v1.0.0/Cypher.apk" class="btn btn-black" style="background: #6C63FF;">Download for Android</a>
+            <div class="f-block">
+                <div class="f-ico"><svg viewBox="0 0 36 36" fill="none"><path d="M18 6v16M10 16l8 8 8-8" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 28h24" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+                <h3>Bi-Directional Transfer</h3>
+                <p>Download from PC to phone or push from phone to PC, with a destination picker so you choose exactly where files land.</p>
+            </div>
+            <div class="f-block">
+                <div class="f-ico"><svg viewBox="0 0 36 36" fill="none"><rect x="8" y="6" width="14" height="20" rx="3" stroke="#7B6FFF" stroke-width="1.5"/><path d="M11 10h8M11 14h8M11 18h5" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round"/><path d="M20 22l6 6M24 22h6v6" stroke="#34D17A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <h3>In-App File Preview</h3>
+                <p>View images, watch videos, read PDFs, and listen to audio directly in the app — no download needed.</p>
+                <span class="tag">New</span>
+            </div>
+            <div class="f-block">
+                <div class="f-ico"><svg viewBox="0 0 36 36" fill="none"><path d="M8 22H5a1 1 0 01-1-1v-2a1 1 0 011-1h3" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round"/><path d="M28 22h3a1 1 0 001-1v-2a1 1 0 00-1-1h-3" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round"/><rect x="8" y="14" width="20" height="10" rx="3" stroke="#7B6FFF" stroke-width="1.5"/><path d="M14 19h8M18 17v4" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round"/><path d="M18 6v6M14 8l4-4 4 4" stroke="#34D17A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <h3>Clipboard Sync</h3>
+                <p>Copy on phone, paste on PC. Copy on PC, fetch to phone. Two separate buffers so nothing gets overwritten by accident.</p>
+            </div>
+            <div class="f-block">
+                <div class="f-ico"><svg viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="10" stroke="#7B6FFF" stroke-width="1.5"/><path d="M18 14v4l3 2" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round"/><path d="M18 6V4M30 18h2M18 30v2M6 18H4" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+                <h3>Guest QR Access</h3>
+                <p>Generate a QR code. Your guest scans it on any browser and downloads from your PC — no app install needed, auto-expires.</p>
+            </div>
+            <div class="f-block">
+                <div class="f-ico"><svg viewBox="0 0 36 36" fill="none"><rect x="4" y="10" width="28" height="18" rx="4" stroke="#7B6FFF" stroke-width="1.5"/><path d="M12 28h12M18 28v2" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round"/><path d="M9 16h6M9 20h4M21 16l4 4-4 4" stroke="#7B6FFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <h3>Remote Keyboard</h3>
+                <p>Type from your phone into any active window on your PC. One-tap hotkeys for Alt+Tab, Task Manager, and more.</p>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <footer>
-        <div class="container footer-inner">
-            <div class="logo">C<span>Y</span>PHER</div>
-            <div class="emerald">
-                Designed by <a href="https://www.tiktok.com/@emerald_dev1" target="_blank">Emerald</a>
+<!-- ── COMPARISON ──────────────────────────── -->
+<section id="compare" class="section-sm">
+    <div class="wrap">
+        <div style="text-align:center; margin-bottom:60px">
+            <div class="s-label" style="justify-content:center">vs The Alternatives</div>
+            <h2 class="s-title reveal">Why CYPHER wins.</h2>
+        </div>
+        <div class="compare-wrap reveal">
+            <table class="compare-table">
+                <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th class="hl">CYPHER</th>
+                    <th>Google Drive</th>
+                    <th>Bluetooth</th>
+                    <th>USB Cable</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td>Transfer speed</td><td class="hl"><strong style="color:#fff">~50 MB/s</strong></td><td><span class="cm">~5 MB/s</span></td><td><span class="cx">~3 MB/s</span></td><td><span class="cm">~40 MB/s</span></td></tr>
+                <tr><td>Needs internet</td><td class="hl"><span class="ck">✓ Never</span></td><td><span class="cx">✗ Always</span></td><td><span class="ck">✓ Never</span></td><td><span class="ck">✓ Never</span></td></tr>
+                <tr><td>Files stored in cloud</td><td class="hl"><span class="ck">✓ Never</span></td><td><span class="cx">✗ Always</span></td><td><span class="ck">✓ Never</span></td><td><span class="ck">✓ Never</span></td></tr>
+                <tr><td>Physical cable needed</td><td class="hl"><span class="ck">✓ Never</span></td><td><span class="ck">✓ Never</span></td><td><span class="ck">✓ Never</span></td><td><span class="cx">✗ Always</span></td></tr>
+                <tr><td>Remote PC control</td><td class="hl"><span class="ck">✓ Full</span></td><td><span class="cx">✗ No</span></td><td><span class="cx">✗ No</span></td><td><span class="cx">✗ No</span></td></tr>
+                <tr><td>In-app file preview</td><td class="hl"><span class="ck">✓ Yes</span></td><td><span class="ck">✓ Yes</span></td><td><span class="cx">✗ No</span></td><td><span class="cx">✗ No</span></td></tr>
+                <tr><td>Guest sharing</td><td class="hl"><span class="ck">✓ QR + timed</span></td><td><span class="cm">Link only</span></td><td><span class="cx">✗ No</span></td><td><span class="cx">✗ No</span></td></tr>
+                <tr><td>Cost</td><td class="hl"><span class="ck">✓ Free forever</span></td><td><span class="cx">✗ 15GB cap</span></td><td><span class="ck">✓ Free</span></td><td><span class="ck">✓ Free</span></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ── PRIVACY ─────────────────────────────── -->
+<section class="section">
+    <div class="wrap privacy-inner">
+        <div class="reveal">
+            <div class="s-label">Privacy Promise</div>
+            <h2 class="s-title">What CYPHER collects<br>about you.</h2>
+            <p class="s-body" style="margin-bottom:20px">Short answer: nothing. CYPHER runs entirely on your local WiFi network. Your files, your clipboard, your PC data — none of it ever reaches an external server.</p>
+            <p class="s-body">There is no account. No sign-up. No analytics beacon. Uninstall CYPHER and it's like it never existed.</p>
+        </div>
+        <div class="privacy-cards reveal d2">
+            <div class="p-card">
+                <div class="p-icon">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2L4 5v5c0 3.55 2.55 6.89 6 7.73 3.45-.84 6-4.18 6-7.73V5l-6-3z" stroke="#34D17A" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                </div>
+                <div><h4>No external servers</h4><p>All traffic stays on your local network. CYPHER has no backend to send your data to.</p></div>
+            </div>
+            <div class="p-card">
+                <div class="p-icon">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="8" r="4" stroke="#34D17A" stroke-width="1.5"/><path d="M4 17c0-3.31 2.69-6 6-6s6 2.69 6 6" stroke="#34D17A" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <div><h4>No account required</h4><p>No email, no profile, no database entry. You are anonymous by default.</p></div>
+            </div>
+            <div class="p-card">
+                <div class="p-icon">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 3l14 14M8.5 4H16v7.5" stroke="#34D17A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 4L4 16" stroke="#34D17A" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <div><h4>Zero telemetry</h4><p>No crash reports, no usage stats, no pings home. CYPHER does not know you exist.</p></div>
+            </div>
+            <div class="p-card">
+                <div class="p-icon">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 6l8 8M14 6l-8 8" stroke="#34D17A" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="7" stroke="#34D17A" stroke-width="1.5"/></svg>
+                </div>
+                <div><h4>Uninstall = gone</h4><p>Nothing persists externally. Delete the app and there is no trace of you anywhere.</p></div>
             </div>
         </div>
-    </footer>
+    </div>
+</section>
 
-    <script>
-        gsap.registerPlugin(ScrollTrigger);
+<!-- ── INSTALL ─────────────────────────────── -->
+<section id="install" class="section-sm">
+    <div class="wrap">
+        <div style="text-align:center; margin-bottom:80px">
+            <div class="s-label" style="justify-content:center">Getting Started</div>
+            <h2 class="s-title reveal">Up and running in 4 steps.</h2>
+            <p class="s-body reveal d1" style="max-width:480px; margin:0 auto">No accounts. No drivers. No configuration files. Just download and connect.</p>
+        </div>
+        <div class="steps-row reveal">
+            <div class="step">
+                <div class="step-n">01</div>
+                <h4>Download both apps</h4>
+                <p>Grab the .exe for Windows and the .apk for Android from the releases page below.</p>
+            </div>
+            <div class="step">
+                <div class="step-n">02</div>
+                <h4>Turn on your hotspot</h4>
+                <p>Enable your phone's mobile hotspot and connect your PC to it — just like any WiFi network.</p>
+            </div>
+            <div class="step">
+                <div class="step-n">03</div>
+                <h4>Enter your PC address</h4>
+                <p>CYPHER on your PC displays its address. Type it into the phone app. Takes 5 seconds.</p>
+            </div>
+            <div class="step">
+                <div class="step-n">04</div>
+                <h4>Enter the connect code</h4>
+                <p>A 6-digit code confirms the link. Enter it once — your devices remember each other after that.</p>
+            </div>
+        </div>
+    </div>
+</section>
 
-        // --- REVEAL ---
-        document.querySelectorAll('.reveal').forEach((el) => {
-            gsap.to(el, {
-                scrollTrigger: {
-                    trigger: el,
-                    start: "top 90%",
-                },
-                opacity: 1,
-                y: 0,
-                duration: 1.2,
-                ease: "power4.out"
-            });
-        });
+<!-- ── FAQ ────────────────────────────────── -->
+<section class="section-sm">
+    <div class="wrap">
+        <div style="text-align:center; margin-bottom:60px">
+            <div class="s-label" style="justify-content:center">FAQ</div>
+            <h2 class="s-title reveal">Real questions.<br>Straight answers.</h2>
+        </div>
+        <div class="faq-grid reveal">
+            <div class="faq-card">
+                <h4>Does it actually work without internet?</h4>
+                <p>Yes, completely. Every byte travels directly between your phone and PC over your local WiFi. <strong>Internet is never required</strong> for any feature.</p>
+            </div>
+            <div class="faq-card">
+                <h4>How fast are transfers really?</h4>
+                <p>On a 5GHz hotspot you can expect <strong>20–50 MB/s</strong>. A 1GB file transfers in about 30 seconds. Much faster than Bluetooth, comparable to USB.</p>
+            </div>
+            <div class="faq-card">
+                <h4>Can anyone else access my files?</h4>
+                <p>Only devices you explicitly pair using the 6-digit code. Random devices on the same network <strong>cannot connect</strong> without the code.</p>
+            </div>
+            <div class="faq-card">
+                <h4>What file types work?</h4>
+                <p><strong>All of them.</strong> CYPHER transfers raw bytes — documents, 4K videos, executables, zip archives. No restrictions on type or size.</p>
+            </div>
+            <div class="faq-card">
+                <h4>Does the PC need to stay on?</h4>
+                <p>Yes, your PC needs to be on and running the CYPHER app. You can <strong>remotely sleep or shut it down</strong> via the phone when you're done.</p>
+            </div>
+            <div class="faq-card">
+                <h4>Is CYPHER really free?</h4>
+                <p>Yes. No premium tier, no subscription, no feature gates. <strong>Everything is free forever.</strong> It's open source on GitHub.</p>
+            </div>
+        </div>
+    </div>
+</section>
 
-        // --- MOCKUP PARALLAX ---
-        gsap.to(".pc-mock", {
-            scrollTrigger: {
-                trigger: ".mockup-scene",
-                start: "top bottom",
-                end: "bottom top",
-                scrub: 1
-            },
-            y: -50,
-            rotation: 0
-        });
+<!-- ── CTA ────────────────────────────────── -->
+<section class="section" id="download">
+    <div class="wrap">
+        <div class="cta-box reveal">
+            <div class="cta-label">Free. Forever. Local.</div>
+            <h2>Ready to<br>link up?</h2>
+            <p>Stop emailing files to yourself. Stop hunting for USB cables.<br>Just CYPHER.</p>
+            <div class="cta-btns">
+                <a href="https://github.com/Oluwadaredaniel/Cypher/releases/download/v1.0.0/Cypher_Setup_v1.0.0.exe" class="cta-primary">
+                    Windows .exe
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v8M3 7l4 5 4-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
+                <a href="https://github.com/Oluwadaredaniel/Cypher/releases/download/v1.0.0/Cypher.apk" class="cta-secondary">
+                    Android .apk
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v8M3 7l4 5 4-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
 
-        gsap.to(".phone-mock", {
-            scrollTrigger: {
-                trigger: ".mockup-scene",
-                start: "top bottom",
-                end: "bottom top",
-                scrub: 1
-            },
-            y: -100,
-            rotation: 0
-        });
+<!-- ── FOOTER ─────────────────────────────── -->
+<footer>
+    <div class="wrap footer-row">
+        <div class="logo">C<em>Y</em>PHER</div>
+        <div class="footer-copy">© 2026 CYPHER · Privacy First · Local First · Designed by <a href="https://www.tiktok.com/@emerald_dev1" target="_blank" class="footer-link">Emerald</a></div>
+    </div>
+</footer>
 
-        // --- NAV SCROLL ---
-        window.addEventListener('scroll', () => {
-            const nav = document.getElementById('nav');
-            if (window.scrollY > 50) nav.classList.add('scrolled');
-            else nav.classList.remove('scrolled');
-        });
-    </script>
+<script>
+    // CURSOR
+    const cur=document.getElementById('cur'),ring=document.getElementById('ring');
+    let mx=0,my=0,rx=0,ry=0;
+    document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px'});
+    (function loop(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(loop)})();
+    document.querySelectorAll('a,button,.f-block,.faq-card,.step,.p-card').forEach(el=>{
+      el.addEventListener('mouseenter',()=>document.body.classList.add('hov'));
+      el.addEventListener('mouseleave',()=>document.body.classList.remove('hov'));
+    });
+
+    // NAV STUCK
+    window.addEventListener('scroll',()=>document.getElementById('nav').classList.toggle('stuck',scrollY>60));
+
+    // SCROLL REVEAL
+    const obs=new IntersectionObserver(entries=>{
+      entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis')});
+    },{threshold:.1,rootMargin:'0px 0px -30px 0px'});
+    document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+    // COUNTER ANIMATION
+    function countTo(el,target,suffix=''){
+      let n=0;const step=target/50;
+      const iv=setInterval(()=>{
+        n=Math.min(n+step,target);
+        el.textContent=Math.round(n)+suffix;
+        if(n>=target)clearInterval(iv);
+      },25);
+    }
+    const statsObs=new IntersectionObserver(entries=>{
+      entries.forEach(e=>{
+        if(e.isIntersecting){
+          const n1=document.getElementById('n1');
+          const n3=document.getElementById('n3');
+          if(n1)countTo(n1,50);
+          if(n3)countTo(n3,20);
+          statsObs.disconnect();
+        }
+      });
+    },{threshold:.5});
+    const sb=document.querySelector('.stats-row');
+    if(sb)statsObs.observe(sb);
+</script>
 </body>
 </html>
