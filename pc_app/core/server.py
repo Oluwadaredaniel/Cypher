@@ -2,7 +2,6 @@ import os
 import socket
 import platform
 import psutil
-import ctypes
 import io
 import base64
 import json
@@ -12,23 +11,48 @@ import random
 import time
 import zipfile
 import threading
-import pyautogui
-import pyperclip
-import pygetwindow as gw
+import queue
 from datetime import datetime, timedelta
 from pathlib import Path
-from PIL import Image
+
+# Detect platform
+WINDOWS = platform.system() == 'Windows'
+
+# Standard imports (work everywhere)
 from flask import Flask, jsonify, request, send_file, Response, stream_with_context
 from flask_cors import CORS
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-from comtypes import CLSCTX_ALL
+
+# Windows-only imports
+if WINDOWS:
+    try:
+        import ctypes
+        import pyautogui
+        import pyperclip
+        import pygetwindow as gw
+        from PIL import Image
+        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+        from comtypes import CLSCTX_ALL
+    except ImportError as e:
+        print(f"Warning: Some Windows packages not available: {e}")
+
+# Fallback for non-Windows or missing packages
+if not WINDOWS or 'pyautogui' not in dir():
+    pyautogui = None
+    pyperclip = None
+    gw = None
+    Image = None
+    AudioUtilities = None
+    IAudioEndpointVolume = None
+    ctypes = None
+    CLSCTX_ALL = None
 
 app = Flask(__name__)
 CORS(app)
 
 # --- CONSTANTS & SECURITY ---
 INTERNAL_TOKEN = "cypher-internal-pc-app-token-2024"
-pyautogui.FAILSAFE = False # Prevent server crash if mouse hits screen corner
+if pyautogui:
+    pyautogui.FAILSAFE = False  # Prevent server crash if mouse hits screen corner
 
 from core.utils import get_config_path, log_event
 
@@ -36,7 +60,7 @@ from core.utils import get_config_path, log_event
 notifications_list = []
 command_history = []
 connection_events = []
-active_transfers = {} # Format: {transfer_id: {"name": str, "size": int, "progress": int, "speed": str}}
+active_transfers = {}  # Format: {transfer_id: {"name": str, "size": int, "progress": int, "speed": str}}
 cancel_all_transfers = False
 phone_clipboard = {"content": "", "timestamp": ""}
 
@@ -176,6 +200,8 @@ def get_local_ip():
         return "127.0.0.1"
 
 def set_volume(change):
+    if not WINDOWS or not AudioUtilities:
+        return False
     try:
         devices = AudioUtilities.GetSpeakers()
         interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
@@ -241,6 +267,8 @@ def handle_phone_clipboard():
 
 @app.route('/clipboard/paste-from-phone', methods=['POST'])
 def paste_from_phone():
+    if not WINDOWS or not pyperclip:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     if phone_clipboard["content"]:
         log_to_ui("Pasted from Phone")
         pyperclip.copy(phone_clipboard["content"])
@@ -360,8 +388,6 @@ def get_uptime():
 def ping():
     return jsonify({"message": "pong", "timestamp": datetime.now().strftime("%H:%M:%S")})
 
-import queue
-
 # --- COMMUNICATION CHANNEL TO UI ---
 ui_queue = queue.Queue()
 
@@ -370,8 +396,10 @@ def log_to_ui(action, device="Phone"):
 
 @app.route('/power/shutdown', methods=['POST'])
 def shutdown():
+    if not WINDOWS:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     # [CENTURY CHAOS FIX] Prevent shutdown during active transfers to avoid file corruption
-    active = [t for t in active_transfers.values() if t["status"] == "receiving"]
+    active = [t for t in active_transfers.values() if t.get("status") == "receiving"]
     if active:
         return jsonify({"success": False, "error": "Cannot shutdown while transfers are active"}), 409
 
@@ -381,24 +409,32 @@ def shutdown():
 
 @app.route('/power/restart', methods=['POST'])
 def restart():
+    if not WINDOWS:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     log_to_ui("Restart Requested")
     os.system("shutdown /r /t 5")
     return jsonify({"success": True, "action": "restart"})
 
 @app.route('/power/sleep', methods=['POST'])
 def sleep():
+    if not WINDOWS:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     log_to_ui("Sleep Mode Activated")
     os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
     return jsonify({"success": True, "action": "sleep"})
 
 @app.route('/power/hibernate', methods=['POST'])
 def hibernate():
+    if not WINDOWS:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     log_to_ui("Hibernation Requested")
     os.system("shutdown /h")
     return jsonify({"success": True, "action": "hibernate"})
 
 @app.route('/power/lock', methods=['POST'])
 def lock():
+    if not WINDOWS or not ctypes:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     log_to_ui("Locking Workstation")
     ctypes.windll.user32.LockWorkStation()
     return jsonify({"success": True, "action": "lock"})
@@ -432,6 +468,8 @@ def kill_process():
 
 @app.route('/apps', methods=['GET'])
 def get_installed_apps():
+    if not WINDOWS:
+        return jsonify([]), 200
     apps = []
     search_paths = [
         Path(os.environ.get('ProgramData', '')) / "Microsoft/Windows/Start Menu/Programs",
@@ -445,6 +483,8 @@ def get_installed_apps():
 
 @app.route('/apps/launch', methods=['POST'])
 def launch_application():
+    if not WINDOWS:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     path = request.json.get("path")
     if path:
         os.startfile(path)
@@ -465,6 +505,8 @@ def get_network_info():
 
 @app.route('/activewindow', methods=['GET'])
 def get_active_window():
+    if not WINDOWS or not gw:
+        return jsonify({"window_title": "N/A", "process_name": "N/A"})
     try:
         win = gw.getActiveWindow()
         return jsonify({"window_title": win.title if win else "None", "process_name": "N/A"})
@@ -647,6 +689,8 @@ def delete_file():
 
 @app.route('/screenshot', methods=['GET'])
 def get_screenshot():
+    if not WINDOWS or not pyautogui:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     try:
         log_to_ui("Screenshot Captured")
         screenshot = pyautogui.screenshot()
@@ -661,7 +705,12 @@ def get_screenshot():
 @app.route('/clipboard', methods=['GET', 'POST'])
 def handle_pc_clipboard():
     if request.method == 'GET':
+        if not WINDOWS or not pyperclip:
+            return jsonify({"success": True, "content": ""})
         return jsonify({"success": True, "content": pyperclip.paste()})
+
+    if not WINDOWS or not pyperclip:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
 
     # [CENTURY CHAOS FIX] Prevent memory exhaustion from massive clipboard payloads
     text = request.json.get("text", "")
@@ -674,6 +723,8 @@ def handle_pc_clipboard():
 
 @app.route('/type', methods=['POST'])
 def remote_type():
+    if not WINDOWS or not pyautogui:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     text = request.json.get("text", "")
     log_to_ui(f"Typed: {text[:15]}...")
     pyautogui.write(text)
@@ -683,6 +734,8 @@ def remote_type():
 @app.route('/keyboard/hotkey', methods=['POST'])
 def remote_hotkey():
     """Presses a combination of keys (e.g., ['ctrl', 'c'])."""
+    if not WINDOWS or not pyautogui:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     keys = request.json.get("keys", [])
     if keys:
         log_to_ui(f"Hotkey: {'+'.join(keys)}")
@@ -692,6 +745,8 @@ def remote_hotkey():
 
 @app.route('/mouse/move', methods=['POST'])
 def mouse_move():
+    if not WINDOWS or not pyautogui:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     data = request.json
     dx, dy = data.get('x', 0), data.get('y', 0)
     pyautogui.moveRel(dx, dy)
@@ -699,22 +754,31 @@ def mouse_move():
 
 @app.route('/mouse/click', methods=['POST'])
 def mouse_click():
+    if not WINDOWS or not pyautogui:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     btn = request.json.get('button', 'left')
     pyautogui.click(button=btn)
     return jsonify({"success": True})
 
 @app.route('/media/volume/set', methods=['POST'])
 def volume_set_exact():
+    if not WINDOWS or not AudioUtilities:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     level = request.json.get("level", 50)
     log_to_ui(f"Volume Set: {level}%")
-    devices = AudioUtilities.GetSpeakers()
-    interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-    volume = ctypes.cast(interface, ctypes.POINTER(IAudioEndpointVolume))
-    volume.SetMasterVolumeLevelScalar(level / 100.0, None)
-    return jsonify({"success": True, "level": level})
+    try:
+        devices = AudioUtilities.GetSpeakers()
+        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+        volume = ctypes.cast(interface, ctypes.POINTER(IAudioEndpointVolume))
+        volume.SetMasterVolumeLevelScalar(level / 100.0, None)
+        return jsonify({"success": True, "level": level})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/media/<action>', methods=['POST'])
 def media_generic_control(action):
+    if not WINDOWS or not pyautogui:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     # dynamic mapping for common keys
     map = {
         "playpause": "playpause",
@@ -731,11 +795,15 @@ def media_generic_control(action):
 
 @app.route('/media/volumeup', methods=['POST'])
 def volume_up():
+    if not WINDOWS or not AudioUtilities:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     set_volume(0.05)
     return jsonify({"success": True})
 
 @app.route('/media/volumedown', methods=['POST'])
 def volume_down():
+    if not WINDOWS or not AudioUtilities:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     set_volume(-0.05)
     return jsonify({"success": True})
 
@@ -798,14 +866,16 @@ def create_macro():
 
 @app.route('/macros/run', methods=['POST'])
 def run_macro():
+    if not WINDOWS:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
     macro_name = request.json.get("name")
     with open(MACROS_FILE, 'r') as f: macros = json.load(f)
     macro = next((m for m in macros if m["name"] == macro_name), None)
     if not macro: return jsonify({"success": False, "error": "Macro not found"}), 404
     for action in macro["actions"]:
         a_type, val = action["type"], action.get("value")
-        if a_type == "open_app": os.startfile(val)
-        elif a_type == "lock": ctypes.windll.user32.LockWorkStation()
+        if a_type == "open_app" and WINDOWS: os.startfile(val)
+        elif a_type == "lock" and WINDOWS and ctypes: ctypes.windll.user32.LockWorkStation()
         elif a_type == "volume_up": set_volume(0.05)
         elif a_type == "wait": time.sleep(float(val))
     return jsonify({"success": True, "action": f"Executed: {macro_name}"})
@@ -828,5 +898,6 @@ if __name__ == '__main__':
     print(f"IP: {local_ip}")
     print(f"PAIRING KEY: {PAIRING_CODE}")
     print(f"INTERNAL BYPASS TOKEN: {INTERNAL_TOKEN}")
+    print(f"Platform: {platform.system()}")
     print("-" * 50)
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
