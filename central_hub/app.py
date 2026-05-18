@@ -61,6 +61,10 @@ def home():
     save_data()
     return "CYPHER Central Hub is Active."
 
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
+
 @app.route('/api/track/visit', methods=['GET'])
 def track_visit():
     hub_state['site_visits'] += 1
