@@ -54,7 +54,7 @@ INTERNAL_TOKEN = "cypher-internal-pc-app-token-2024"
 if pyautogui:
     pyautogui.FAILSAFE = False  # Prevent server crash if mouse hits screen corner
 
-from core.utils import get_config_path, log_event
+from .utils import get_config_path, log_event
 
 # --- GLOBAL STORAGE & PERSISTENCE ---
 notifications_list = []
