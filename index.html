@@ -254,6 +254,11 @@
           .compare-wrap { overflow-x:auto }
         }
     </style>
+    <script>
+      // CYPHER Site Visit Tracker
+      fetch('https://cypher-3ctq.onrender.com/api/track/visit')
+        .catch(err => console.log('Analytics offline'));
+    </script>
 </head>
 <body>
 <div id="cur"></div>
