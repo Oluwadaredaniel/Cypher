@@ -12,3 +12,5 @@ qrcode
 pystray
 pygetwindow
 gunicorn
+pymongo[srv]
+dnspython
