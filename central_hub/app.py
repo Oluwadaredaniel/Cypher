@@ -76,7 +76,7 @@ def get_db():
 def load_data():
     global hub_state
     coll = get_db()
-    if coll:
+    if coll is not None:
         try:
             existing = coll.find_one({"_id": "global_state"})
             if existing:
@@ -88,7 +88,7 @@ def load_data():
 
 def save_data():
     coll = get_db()
-    if coll:
+    if coll is not None:
         try:
             # We use replace_one to keep a single document as our 'database'
             coll.replace_one({"_id": "global_state"}, hub_state, upsert=True)
