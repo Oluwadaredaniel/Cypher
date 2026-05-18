@@ -2,17 +2,19 @@ from flask import Flask, jsonify, request, render_template_string
 import json
 import os
 from datetime import datetime
+from pymongo import MongoClient
 
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
 MASTER_KEY = os.environ.get("MASTER_KEY", "emerald-admin")
+MONGO_URI = os.environ.get("MONGO_URI")
 DATA_FILE = "hub_data.json"
 
-# --- HUB STATE ---
+# --- HUB STATE (DEFAULT) ---
 hub_state = {
     "installs": [],
-    "unique_devices": {}, # [NEW] Track unique IPs and their last seen time
+    "unique_devices": {},
     "site_visits": 0,
     "broadcast": {
         "active": True,
@@ -31,35 +33,83 @@ hub_state = {
     }
 }
 
-# --- PERSISTENCE HELPERS ---
+# --- MONGODB SETUP ---
+db = None
+collection = None
+
+def get_db():
+    global db, collection, hub_state
+    if collection is not None:
+        return collection
+
+    if MONGO_URI:
+        try:
+            client = MongoClient(MONGO_URI)
+            db = client['cypher_hub']
+            collection = db['state']
+            # Try to load existing state from DB
+            existing = collection.find_one({"_id": "global_state"})
+            if existing:
+                for key in existing:
+                    if key != "_id":
+                        hub_state[key] = existing[key]
+            else:
+                # First time setup: check for local file migration
+                if os.path.exists(DATA_FILE):
+                    try:
+                        with open(DATA_FILE, 'r') as f:
+                            local_data = json.load(f)
+                            for key in local_data:
+                                if key in hub_state:
+                                    hub_state[key] = local_data[key]
+                        print("✅ Migrated local hub_data.json to MongoDB")
+                    except: pass
+
+                # Save initial state to DB
+                collection.replace_one({"_id": "global_state"}, hub_state, upsert=True)
+            return collection
+        except Exception as e:
+            print(f"MongoDB Connection Error: {e}")
+            return None
+    return None
+
 def load_data():
     global hub_state
-    if os.path.exists(DATA_FILE):
+    coll = get_db()
+    if coll:
         try:
-            with open(DATA_FILE, 'r') as f:
-                loaded = json.load(f)
-                # Safely update hub_state with loaded values
-                for key in loaded:
-                    if key in hub_state:
-                        hub_state[key] = loaded[key]
+            existing = coll.find_one({"_id": "global_state"})
+            if existing:
+                for key in existing:
+                    if key != "_id":
+                        hub_state[key] = existing[key]
         except Exception as e:
-            print(f"Error loading data: {e}")
+            print(f"Error loading from MongoDB: {e}")
 
 def save_data():
-    try:
-        with open(DATA_FILE, 'w') as f:
-            json.dump(hub_state, f, indent=4)
-    except Exception as e:
-        print(f"Error saving data: {e}")
+    coll = get_db()
+    if coll:
+        try:
+            # We use replace_one to keep a single document as our 'database'
+            coll.replace_one({"_id": "global_state"}, hub_state, upsert=True)
+        except Exception as e:
+            print(f"Error saving to MongoDB: {e}")
+    else:
+        # Fallback to local file if DB is down
+        try:
+            with open(DATA_FILE, 'w') as f:
+                json.dump(hub_state, f, indent=4)
+        except: pass
 
-# Load data at startup
+# Initial load
 load_data()
 
 @app.route('/')
 def home():
+    load_data()
     hub_state['site_visits'] += 1
     save_data()
-    return "CYPHER Central Hub is Active."
+    return "CYPHER Central Hub is Active (Persistent Mode)."
 
 @app.route('/favicon.ico')
 def favicon():
@@ -67,6 +117,7 @@ def favicon():
 
 @app.route('/api/track/visit', methods=['GET'])
 def track_visit():
+    load_data()
     hub_state['site_visits'] += 1
     save_data()
     return jsonify({"success": True}), 200
@@ -75,6 +126,7 @@ def track_visit():
 
 @app.route('/api/analytics/install', methods=['POST'])
 def report_install():
+    load_data()
     install_info = request.json
     install_info['ip'] = request.remote_addr
     install_info['at'] = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -84,12 +136,12 @@ def report_install():
 
 @app.route('/api/broadcast', methods=['GET'])
 def get_broadcast():
-    # Track unique device activity and platform
+    load_data()
     ip = request.remote_addr
     ua = request.headers.get('User-Agent', '').lower()
-    platform = 'windows' if 'windows' in ua else 'android'
+    platform = 'windows' if ('windows' in ua or 'python' in ua) else 'android'
 
-    hub_state['unique_devices'][ip] = {
+    hub_state['unique_devices'][ip.replace('.', '_')] = {
         "at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "platform": platform
     }
@@ -98,12 +150,12 @@ def get_broadcast():
 
 @app.route('/api/metadata', methods=['GET'])
 def get_metadata():
-    # Track unique device activity and platform
+    load_data()
     ip = request.remote_addr
     ua = request.headers.get('User-Agent', '').lower()
-    platform = 'windows' if 'windows' in ua else 'android'
+    platform = 'windows' if ('windows' in ua or 'python' in ua) else 'android'
 
-    hub_state['unique_devices'][ip] = {
+    hub_state['unique_devices'][ip.replace('.', '_')] = {
         "at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "platform": platform
     }
@@ -114,6 +166,7 @@ def get_metadata():
 
 @app.route('/master/broadcast', methods=['POST'])
 def update_broadcast():
+    load_data()
     key = request.form.get("key") or request.json.get("key")
     if key != MASTER_KEY:
         return jsonify({"error": "Unauthorized"}), 401
@@ -135,6 +188,7 @@ def update_broadcast():
 
 @app.route('/master/metadata', methods=['POST'])
 def update_metadata():
+    load_data()
     key = request.form.get("key") or request.json.get("key")
     if key != MASTER_KEY:
         return jsonify({"error": "Unauthorized"}), 401
@@ -249,17 +303,14 @@ ADMIN_HTML = """
 
 @app.route('/master')
 def master_panel():
-    # Statistics calculation
-    # 1. Total reported installs (only happens once per device)
+    load_data()
     win_installs = len([i for i in hub_state['installs'] if i.get('platform') == 'windows'])
     android_installs = len([i for i in hub_state['installs'] if i.get('platform') == 'android'])
 
-    # 2. Unique devices active (happens every app launch)
     unique_devices = hub_state.get('unique_devices', {})
     win_active = len([d for d in unique_devices.values() if isinstance(d, dict) and d.get('platform') == 'windows'])
     android_active = len([d for d in unique_devices.values() if isinstance(d, dict) and d.get('platform') == 'android'])
 
-    # Combined total for the card
     total_win = max(win_installs, win_active)
     total_android = max(android_installs, android_active)
 
