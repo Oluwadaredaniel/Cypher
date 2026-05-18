@@ -84,17 +84,29 @@ def report_install():
 
 @app.route('/api/broadcast', methods=['GET'])
 def get_broadcast():
-    # Track unique device activity
+    # Track unique device activity and platform
     ip = request.remote_addr
-    hub_state['unique_devices'][ip] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    ua = request.headers.get('User-Agent', '').lower()
+    platform = 'windows' if 'windows' in ua else 'android'
+
+    hub_state['unique_devices'][ip] = {
+        "at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "platform": platform
+    }
     save_data()
     return jsonify(hub_state['broadcast']), 200
 
 @app.route('/api/metadata', methods=['GET'])
 def get_metadata():
-    # Track unique device activity
+    # Track unique device activity and platform
     ip = request.remote_addr
-    hub_state['unique_devices'][ip] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    ua = request.headers.get('User-Agent', '').lower()
+    platform = 'windows' if 'windows' in ua else 'android'
+
+    hub_state['unique_devices'][ip] = {
+        "at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "platform": platform
+    }
     save_data()
     return jsonify(hub_state['metadata']), 200
 
@@ -238,16 +250,25 @@ ADMIN_HTML = """
 @app.route('/master')
 def master_panel():
     # Statistics calculation
-    win_count = len([i for i in hub_state['installs'] if i.get('platform') == 'windows'])
-    android_count = len([i for i in hub_state['installs'] if i.get('platform') == 'android'])
-    active_count = len(hub_state.get('unique_devices', {}))
+    # 1. Total reported installs (only happens once per device)
+    win_installs = len([i for i in hub_state['installs'] if i.get('platform') == 'windows'])
+    android_installs = len([i for i in hub_state['installs'] if i.get('platform') == 'android'])
+
+    # 2. Unique devices active (happens every app launch)
+    unique_devices = hub_state.get('unique_devices', {})
+    win_active = len([d for d in unique_devices.values() if isinstance(d, dict) and d.get('platform') == 'windows'])
+    android_active = len([d for d in unique_devices.values() if isinstance(d, dict) and d.get('platform') == 'android'])
+
+    # Combined total for the card
+    total_win = max(win_installs, win_active)
+    total_android = max(android_installs, android_active)
 
     return render_template_string(
         ADMIN_HTML,
-        count=len(hub_state['installs']),
-        win_count=win_count,
-        android_count=android_count,
-        active_count=active_count,
+        count=total_win + total_android,
+        win_count=total_win,
+        android_count=total_android,
+        active_count=len(unique_devices),
         visits=hub_state['site_visits'],
         b=hub_state['broadcast'],
         m=hub_state['metadata'],
