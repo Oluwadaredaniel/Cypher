@@ -233,11 +233,6 @@ ADMIN_HTML = """
 
 @app.route('/master')
 def master_panel():
-    # Force check for key in URL if you want security, or just allow view
-    key = request.args.get("key")
-    if os.environ.get("FORCE_ADMIN_KEY") and key != MASTER_KEY:
-         return jsonify({"error": "Unauthorized. Please add ?key=YOUR_PASSWORD to the URL"}), 401
-
     # Statistics calculation
     win_count = len([i for i in hub_state['installs'] if i.get('platform') == 'windows'])
     android_count = len([i for i in hub_state['installs'] if i.get('platform') == 'android'])
