@@ -7,10 +7,12 @@ app = Flask(__name__)
 
 # --- CONFIGURATION ---
 MASTER_KEY = os.environ.get("MASTER_KEY", "emerald-admin")
+DATA_FILE = "hub_data.json"
 
 # --- HUB STATE ---
 hub_state = {
     "installs": [],
+    "site_visits": 0,
     "broadcast": {
         "active": True,
         "title": "Welcome to CYPHER!",
@@ -28,9 +30,41 @@ hub_state = {
     }
 }
 
+# --- PERSISTENCE HELPERS ---
+def load_data():
+    global hub_state
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, 'r') as f:
+                loaded = json.load(f)
+                # Safely update hub_state with loaded values
+                for key in loaded:
+                    if key in hub_state:
+                        hub_state[key] = loaded[key]
+        except Exception as e:
+            print(f"Error loading data: {e}")
+
+def save_data():
+    try:
+        with open(DATA_FILE, 'w') as f:
+            json.dump(hub_state, f, indent=4)
+    except Exception as e:
+        print(f"Error saving data: {e}")
+
+# Load data at startup
+load_data()
+
 @app.route('/')
 def home():
+    hub_state['site_visits'] += 1
+    save_data()
     return "CYPHER Central Hub is Active."
+
+@app.route('/api/track/visit', methods=['GET'])
+def track_visit():
+    hub_state['site_visits'] += 1
+    save_data()
+    return jsonify({"success": True}), 200
 
 # --- CLIENT API ---
 
@@ -40,6 +74,7 @@ def report_install():
     install_info['ip'] = request.remote_addr
     install_info['at'] = datetime.now().strftime("%Y-%m-%d %H:%M")
     hub_state['installs'].append(install_info)
+    save_data()
     return jsonify({"status": "ok"}), 200
 
 @app.route('/api/broadcast', methods=['GET'])
@@ -58,7 +93,6 @@ def update_broadcast():
     if key != MASTER_KEY:
         return jsonify({"error": "Unauthorized"}), 401
 
-    # Handle form or JSON
     if request.form:
         hub_state['broadcast'] = {
             "active": 'active' in request.form,
@@ -67,9 +101,11 @@ def update_broadcast():
             "link": request.form['link'],
             "link_text": request.form['link_text']
         }
+        save_data()
         return "<script>alert('Broadcast Deployed!'); window.location='/master';</script>"
     else:
         hub_state['broadcast'] = request.json['broadcast']
+        save_data()
         return jsonify({"success": True})
 
 @app.route('/master/metadata', methods=['POST'])
@@ -87,9 +123,11 @@ def update_metadata():
             "app_id": request.form['app_id'],
             "master_password": request.form['master_password']
         }
+        save_data()
         return "<script>alert('Ecosystem Metadata Updated!'); window.location='/master';</script>"
     else:
         hub_state['metadata'] = request.json['metadata']
+        save_data()
         return jsonify({"success": True})
 
 # --- MASTER ADMIN INTERFACE ---
@@ -117,10 +155,21 @@ ADMIN_HTML = """
     <div class="container">
         <h1 class="accent">Emerald Master Hub</h1>
 
-        <div class="card">
-            <div class="label">LIVE INSTALLATIONS</div>
-            <div class="stat">{{ count }}</div>
-            <div style="font-size: 14px; color: #444;">Tracking Android & Windows Ecosystem</div>
+        <div class="grid">
+            <div class="card">
+                <div class="label">LIVE INSTALLATIONS</div>
+                <div class="stat">{{ count }}</div>
+                <div style="font-size: 14px; color: #444;">Tracking Android & Windows Ecosystem</div>
+                <div style="margin-top: 15px; font-size: 12px; color: #6C63FF;">
+                    Windows: {{ win_count }} | Android: {{ android_count }}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="label">TOTAL SITE VISITS</div>
+                <div class="stat" style="color: #00FF88;">{{ visits }}</div>
+                <div style="font-size: 14px; color: #444;">Landing Page Traffic</div>
+            </div>
         </div>
 
         <div class="grid">
@@ -172,8 +221,25 @@ ADMIN_HTML = """
 
 @app.route('/master')
 def master_panel():
-    # In a real deployment, you'd add a password check here
-    return render_template_string(ADMIN_HTML, count=len(hub_state['installs']), b=hub_state['broadcast'], m=hub_state['metadata'], logs=hub_state['installs'])
+    # Force check for key in URL if you want security, or just allow view
+    key = request.args.get("key")
+    if os.environ.get("FORCE_ADMIN_KEY") and key != MASTER_KEY:
+         return jsonify({"error": "Unauthorized. Please add ?key=YOUR_PASSWORD to the URL"}), 401
+
+    # Statistics calculation
+    win_count = len([i for i in hub_state['installs'] if i.get('platform') == 'windows'])
+    android_count = len([i for i in hub_state['installs'] if i.get('platform') == 'android'])
+
+    return render_template_string(
+        ADMIN_HTML,
+        count=len(hub_state['installs']),
+        win_count=win_count,
+        android_count=android_count,
+        visits=hub_state['site_visits'],
+        b=hub_state['broadcast'],
+        m=hub_state['metadata'],
+        logs=hub_state['installs']
+    )
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
