@@ -12,6 +12,7 @@ DATA_FILE = "hub_data.json"
 # --- HUB STATE ---
 hub_state = {
     "installs": [],
+    "unique_devices": {}, # [NEW] Track unique IPs and their last seen time
     "site_visits": 0,
     "broadcast": {
         "active": True,
@@ -79,10 +80,18 @@ def report_install():
 
 @app.route('/api/broadcast', methods=['GET'])
 def get_broadcast():
+    # Track unique device activity
+    ip = request.remote_addr
+    hub_state['unique_devices'][ip] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    save_data()
     return jsonify(hub_state['broadcast']), 200
 
 @app.route('/api/metadata', methods=['GET'])
 def get_metadata():
+    # Track unique device activity
+    ip = request.remote_addr
+    hub_state['unique_devices'][ip] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    save_data()
     return jsonify(hub_state['metadata']), 200
 
 # --- MASTER ADMIN API ---
@@ -163,6 +172,9 @@ ADMIN_HTML = """
                 <div style="margin-top: 15px; font-size: 12px; color: #6C63FF;">
                     Windows: {{ win_count }} | Android: {{ android_count }}
                 </div>
+                <div style="margin-top: 10px; font-size: 11px; color: #00FF88; font-weight: bold;">
+                    Unique Active Devices (Estimated): {{ active_count }}
+                </div>
             </div>
 
             <div class="card">
@@ -229,12 +241,14 @@ def master_panel():
     # Statistics calculation
     win_count = len([i for i in hub_state['installs'] if i.get('platform') == 'windows'])
     android_count = len([i for i in hub_state['installs'] if i.get('platform') == 'android'])
+    active_count = len(hub_state.get('unique_devices', {}))
 
     return render_template_string(
         ADMIN_HTML,
         count=len(hub_state['installs']),
         win_count=win_count,
         android_count=android_count,
+        active_count=active_count,
         visits=hub_state['site_visits'],
         b=hub_state['broadcast'],
         m=hub_state['metadata'],
