@@ -270,12 +270,13 @@ class GuestPanel(ctk.CTkFrame):
 
                     # Use standard colors first for debugging, or high-contrast purple
                     img = qr.make_image(fill_color="#6C63FF", back_color="#FFFFFF")
-                    self.after(0, lambda: self.display_qr(img))
+                    self.after(0, lambda i=img: self.display_qr(i))
                 else:
                     err = data.get("error", "Unknown server error")
-                    self.after(0, lambda: self.qr_label.configure(text=f"Server Error: {err}", text_color="#FF453A"))
+                    self.after(0, lambda e=err: self.qr_label.configure(text=f"Server Error: {e}", text_color="#FF453A"))
             except Exception as e:
-                self.after(0, lambda: self.qr_label.configure(text=f"Connection Error: {str(e)}", text_color="#FF453A"))
+                err_msg = str(e)
+                self.after(0, lambda m=err_msg: self.qr_label.configure(text=f"Connection Error: {m}", text_color="#FF453A"))
         threading.Thread(target=_logic, daemon=True).start()
 
     def display_qr(self, pil_img):
