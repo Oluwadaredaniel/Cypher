@@ -161,17 +161,20 @@ class GuestPanel(ctk.CTkFrame):
             try:
                 # Add delay to ensure server is ready or handle rapid switching
                 time.sleep(0.5)
+                print(f"DEBUG UI: Requesting folders from {BASE_URL}/settings")
                 r = requests.get(f"{BASE_URL}/settings", headers=HEADERS, timeout=5)
                 if r.status_code == 200:
                     data = r.json()
+                    print(f"DEBUG UI: Received settings data: {data}")
                     shared_folders = data.get("shared_folders", [])
-                    print(f"DEBUG: Found {len(shared_folders)} shared folders")
+                    print(f"DEBUG UI: Extracted {len(shared_folders)} shared folders")
                     self.available_folders = [{"name": os.path.basename(f) or f, "path": f} for f in shared_folders]
                     self.after(0, self.update_folder_list)
                 else:
+                    print(f"DEBUG UI: Server error {r.status_code}")
                     self.after(0, lambda: self.loading_label.configure(text=f"Error: Server returned {r.status_code}"))
             except Exception as e:
-                print(f"DEBUG: Fetch Error: {e}")
+                print(f"DEBUG UI: Fetch Error: {e}")
                 self.after(0, lambda: self.loading_label.configure(text="Error: Could not reach PC server"))
 
         threading.Thread(target=_fetch, daemon=True).start()

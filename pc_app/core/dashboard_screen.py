@@ -415,29 +415,60 @@ class DashboardScreen(ctk.CTkFrame):
 
         def load():
             try:
-                r = requests.get("http://localhost:5000/files", headers={"X-Auth-Token": INTERNAL_TOKEN}, timeout=2)
+                # [FIX] Always request from /settings to get the true persistent list
+                r = requests.get(f"http://localhost:5000/settings", headers={"X-Auth-Token": INTERNAL_TOKEN}, timeout=2)
                 if r.status_code == 200:
-                    folders = r.json()
+                    data = r.json()
+                    folders = data.get("shared_folders", [])
+
                     def update_ui():
+                        if not scroll.winfo_exists(): return
                         loading_lbl.destroy()
                         if not folders:
                             ctk.CTkLabel(scroll, text="No shared folders found.", text_color=COLORS["secondary"]).pack(pady=40)
                             return
-                        for f in folders:
+                        for f_path in folders:
+                            # Standardize format for UI
+                            f_obj = {'name': os.path.basename(f_path) or f_path, 'path': f_path}
+
                             card = ctk.CTkFrame(scroll, fg_color=COLORS["card"], corner_radius=16, height=70)
                             card.pack(fill="x", pady=6)
                             card.pack_propagate(False)
                             ctk.CTkLabel(card, text="📁", font=("Segoe UI", 20)).pack(side="left", padx=20)
-                            ctk.CTkLabel(card, text=f['name'], font=("Segoe UI", 15, "bold")).pack(side="left")
-                            ctk.CTkLabel(card, text=f['path'], font=("Segoe UI", 12), text_color="#444").pack(side="left", padx=20)
-                            ctk.CTkButton(card, text="Remove", width=80, height=32, corner_radius=10, fg_color="#222", hover_color=COLORS["danger"]).pack(side="right", padx=20)
+                            ctk.CTkLabel(card, text=f_obj['name'], font=("Segoe UI", 15, "bold")).pack(side="left")
+                            ctk.CTkLabel(card, text=f_obj['path'], font=("Segoe UI", 12), text_color="#444").pack(side="left", padx=20)
+
+                            # Add functioning Remove button
+                            btn = ctk.CTkButton(card, text="Remove", width=80, height=32, corner_radius=10,
+                                          fg_color="#222", hover_color=COLORS["danger"],
+                                          command=lambda p=f_path: self.remove_shared_folder(p))
+                            btn.pack(side="right", padx=20)
                     self.after(0, update_ui)
                 else:
-                    self.after(0, lambda: loading_lbl.configure(text="Failed to load file system.", text_color=COLORS["danger"]))
-            except:
-                self.after(0, lambda: loading_lbl.configure(text="Unable to load file system engine.", text_color=COLORS["danger"]))
+                    self.after(0, lambda: loading_lbl.configure(text=f"Server error: {r.status_code}", text_color=COLORS["danger"]))
+            except Exception as e:
+                self.after(0, lambda: loading_lbl.configure(text=f"Connection failed: {str(e)}", text_color=COLORS["danger"]))
 
         threading.Thread(target=load, daemon=True).start()
+
+    def remove_shared_folder(self, path):
+        """API call to remove a folder from persistence."""
+        def _do_remove():
+            try:
+                # 1. Get current list
+                r = requests.get("http://localhost:5000/settings", headers={"X-Auth-Token": INTERNAL_TOKEN}, timeout=2)
+                if r.status_code == 200:
+                    current = r.json().get("shared_folders", [])
+                    if path in current:
+                        current.remove(path)
+                        # 2. Save new list
+                        requests.post("http://localhost:5000/settings",
+                                     headers={"X-Auth-Token": INTERNAL_TOKEN},
+                                     json={"shared_folders": current}, timeout=2)
+                        # 3. Refresh UI
+                        self.after(0, self.render_files)
+            except: pass
+        threading.Thread(target=_do_remove, daemon=True).start()
 
     def render_security(self):
         header = ctk.CTkLabel(self.main_content, text="Security & Guest Access", font=("Segoe UI", 32, "bold"), text_color="#FFF")
