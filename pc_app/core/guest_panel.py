@@ -1,3 +1,4 @@
+import os
 import customtkinter as ctk
 import requests
 import threading

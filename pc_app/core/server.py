@@ -1087,19 +1087,26 @@ def guest_create_session():
     """TIER 1: Create a guest session from authenticated device."""
     token = request.headers.get("X-Auth-Token")
     if not token or token not in valid_tokens:
-        return jsonify({"success": False, "error": "Unauthorized"}), 401
+        # Check if it's the internal token for convenience when generating from PC UI
+        if token != INTERNAL_TOKEN:
+            return jsonify({"success": False, "error": "Unauthorized"}), 401
     
     data = request.json
     folders = data.get("folders", [])
     duration = data.get("duration_minutes", 15)
     
     guest_token = guest_manager.create_session(folders, duration, token)
-    guest_url = f"http://{get_local_ip()}:5000/guest/access?token={guest_token}"
+    local_ip = get_local_ip()
+    guest_url = f"http://{local_ip}:5000/guest/access?token={guest_token}"
+
+    # Universal Link for the scanner
+    qr_link = f"cypher://{local_ip}:5000/guest?token={guest_token}"
     
     return jsonify({
         "success": True,
         "token": guest_token,
         "url": guest_url,
+        "qr_link": qr_link,
         "expires_at": (datetime.now() + timedelta(minutes=duration)).strftime("%Y-%m-%d %H:%M:%S")
     }), 200
 

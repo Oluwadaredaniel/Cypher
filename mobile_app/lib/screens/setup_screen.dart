@@ -87,31 +87,51 @@ class _SetupScreenState extends State<SetupScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.black,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
       builder: (context) => SizedBox(
-        height: MediaQuery.of(context).size.height * 0.8,
+        height: MediaQuery.of(context).size.height * 0.85,
         child: Column(
           children: [
             const SizedBox(height: 20),
-            Text("Scan Guest QR Code",
-                style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))),
+            const SizedBox(height: 25),
+            Text("Scan QR Code",
+                style: GoogleFonts.outfit(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            Text("Dashboard, Connect, or Guest Access",
+                style: GoogleFonts.outfit(color: Colors.white38, fontSize: 13)),
+            const SizedBox(height: 30),
             Expanded(
-              child: MobileScanner(
-                onDetect: (capture) {
-                  final List<Barcode> barcodes = capture.barcodes;
-                  for (final barcode in barcodes) {
-                    if (barcode.rawValue != null && barcode.rawValue!.contains("cypher://")) {
-                      Navigator.pop(context);
-                      _handleQrLink(barcode.rawValue!);
-                      break;
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 30),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: const Color(0xFF6C63FF), width: 2),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: MobileScanner(
+                  onDetect: (capture) {
+                    final List<Barcode> barcodes = capture.barcodes;
+                    for (final barcode in barcodes) {
+                      if (barcode.rawValue != null) {
+                        final val = barcode.rawValue!;
+                        if (val.contains("cypher://") || val.contains("/guest/access")) {
+                          HapticFeedback.heavyImpact();
+                          Navigator.pop(context);
+                          _handleQrLink(val);
+                          break;
+                        }
+                      }
                     }
-                  }
-                },
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 40),
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-            const SizedBox(height: 20),
+            TextButton(
+              onPressed: () => Navigator.pop(context), 
+              child: Text("CANCEL", style: GoogleFonts.outfit(color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 2))
+            ),
+            const SizedBox(height: 30),
           ],
         ),
       ),
@@ -120,11 +140,41 @@ class _SetupScreenState extends State<SetupScreen> {
 
   void _handleQrLink(String link) {
     try {
+      if (link.contains("/guest/access")) {
+        // Universal Web Link fallback
+        final uri = Uri.parse(link);
+        final address = uri.host;
+        final token = uri.queryParameters['token'];
+        if (token != null) {
+          _navigateToGuestView(address, token);
+        }
+        return;
+      }
+
       final uri = link.replaceFirst("cypher://", "");
-      final parts = uri.split("/");
-      final address = parts[0].split(":")[0];
-      Navigator.pushNamed(context, '/pairing', arguments: {'pcIpAddress': address});
-    } catch (_) {}
+      if (uri.contains("/guest")) {
+         // Guest Link: address:port/guest?token=xyz
+         final parts = uri.split("/guest");
+         final address = parts[0].split(":")[0];
+         final token = Uri.parse(link).queryParameters['token'];
+         if (token != null) _navigateToGuestView(address, token);
+      } else {
+        // Pairing Link: address:port/pair
+        final parts = uri.split("/");
+        final address = parts[0].split(":")[0];
+        Navigator.pushNamed(context, '/pairing', arguments: {'pcIpAddress': address});
+      }
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Invalid QR Code")));
+    }
+  }
+
+  void _navigateToGuestView(String ip, String token) {
+     // This would ideally open a restricted guest file browser in-app 
+     // or just launch the browser if we want total convenience.
+     // For now, let's launch the browser as it's the "Ultimate Convenience" path.
+     import 'package:url_launcher/url_launcher_string.dart';
+     launchUrlString("http://$ip:5000/guest/access?token=$token");
   }
 
   @override
@@ -158,6 +208,32 @@ class _SetupScreenState extends State<SetupScreen> {
                     style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 14)),
               ),
               const SizedBox(height: 40),
+              
+              // [NEW] Scan Instructions Card
+              FadeInUp(
+                delay: const Duration(milliseconds: 300),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6C63FF).withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.1))
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: Color(0xFF6C63FF), size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "Tip: You can scan the PC dashboard or a friend's phone to link instantly.",
+                          style: GoogleFonts.outfit(color: Colors.white70, fontSize: 12)
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
