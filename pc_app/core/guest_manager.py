@@ -46,6 +46,7 @@ class GuestSession:
             "expires_at": self.expires_at.strftime("%Y-%m-%d %H:%M:%S"),
             "allowed_folders": self.allowed_folders,
             "access_count": self.access_count,
+            "access_log": self.access_log[-5:], # Latest 5 actions
             "is_active": self.is_active,
             "time_remaining_seconds": max(0, int((self.expires_at - datetime.now()).total_seconds()))
         }

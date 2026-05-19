@@ -1777,12 +1777,14 @@ def guest_end_session():
 
 @app.route('/guest/sessions', methods=['GET'])
 def guest_list_sessions():
-    """TIER 3: List all active guest sessions for authenticated device."""
+    """TIER 3: List active guest sessions. PC UI sees all sessions."""
     token = request.headers.get("X-Auth-Token")
-    if not token or token not in valid_tokens:
+    if not token or (token not in valid_tokens and token != INTERNAL_TOKEN):
         return jsonify({"success": False, "error": "Unauthorized"}), 401
 
-    sessions = guest_manager.get_all_active_sessions(host_device_id=token)
+    # If it's the PC UI, show EVERYTHING. If it's a phone, show only what it created.
+    filter_id = token if token != INTERNAL_TOKEN else None
+    sessions = guest_manager.get_all_active_sessions(host_device_id=filter_id)
     return jsonify({"success": True, "sessions": sessions}), 200
 
 # --- SCREEN RECORDING ENGINE ---

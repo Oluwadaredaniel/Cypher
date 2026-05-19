@@ -18,29 +18,19 @@ class GuestPanel(ctk.CTkFrame):
         super().__init__(parent, fg_color="#08080A", corner_radius=0)
         self.controller = controller
         
-        # Session State
-        self.current_state = "NO_SESSION"
+        # UI State
+        self.current_state = "DASHBOARD" # DASHBOARD, SETUP, QR_VIEW
         self.available_folders = []
         self.selected_folders = {}
-        self.selected_duration = 30 # Default 30 mins
-        self.remaining_seconds = 0
-        self.guest_session_id = None
-        self.is_guest_connected = False
+        self.selected_duration = 30
+        self.active_sessions = []
         
         # UI Container
         self.container = ctk.CTkFrame(self, fg_color="transparent")
         self.container.pack(fill="both", expand=True, padx=20, pady=10)
         
-        self.show_state("NO_SESSION")
-
-    def get_pc_ip(self):
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except: return "127.0.0.1"
+        self.show_state("DASHBOARD")
+        self._start_polling()
 
     def clear_container(self):
         for widget in self.container.winfo_children():
@@ -50,39 +40,87 @@ class GuestPanel(ctk.CTkFrame):
         self.current_state = state
         self.clear_container()
         
-        if state == "NO_SESSION":
-            self.render_no_session()
+        if state == "DASHBOARD":
+            self.render_dashboard()
         elif state == "SETUP":
             self.render_setup()
-        elif state == "ACTIVE":
-            self.render_active()
+        elif state == "QR_VIEW":
+            self.render_qr_view()
 
-    # --- STATE 1: NO SESSION ---
-    def render_no_session(self):
-        ctk.CTkLabel(self.container, text="Guest Access Control", font=("Segoe UI", 20, "bold"), text_color="#FFFFFF").pack(anchor="w")
-        ctk.CTkLabel(self.container, text="Securely share folders with visitors.", font=("Segoe UI", 13), text_color="#8E8E93").pack(anchor="w", pady=(2, 20))
+    # --- DASHBOARD: Active Sessions & Activity ---
+    def render_dashboard(self):
+        header = ctk.CTkFrame(self.container, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 20))
         
-        placeholder = ctk.CTkFrame(self.container, width=320, height=240, fg_color="#121216",
-                           border_width=1, border_color="#1D1D26", corner_radius=28)
-        placeholder.pack(pady=30)
-        placeholder.pack_propagate(False)
+        ctk.CTkLabel(header, text="Guest Access Hub", font=("Segoe UI", 20, "bold"), text_color="#FFFFFF").pack(side="left")
         
-        ctk.CTkLabel(placeholder, text="👥", font=("Arial", 64)).place(relx=0.5, rely=0.4, anchor="center")
-        ctk.CTkLabel(placeholder, text="No active guest session", font=("Segoe UI", 14, "bold"), text_color="#3F3F46").place(relx=0.5, rely=0.7, anchor="center")
-        
-        ctk.CTkButton(self.container, text="Start New Guest Session", fg_color="#6C63FF", hover_color="#5B52E0",
-                      height=52, corner_radius=16, font=("Segoe UI", 14, "bold"),
-                      command=lambda: self.show_state("SETUP")).pack(fill="x", pady=20, padx=40)
+        # New Session Button
+        ctk.CTkButton(header, text="+ New Access", width=120, height=32, corner_radius=8,
+                      fg_color="#6C63FF", font=("Segoe UI", 12, "bold"),
+                      command=lambda: self.show_state("SETUP")).pack(side="right")
 
-    # --- STATE 2: SETUP ---
+        self.sessions_scroll = ctk.CTkScrollableFrame(self.container, fg_color="transparent", height=400)
+        self.sessions_scroll.pack(fill="both", expand=True)
+        
+        self.update_sessions_ui()
+
+    def update_sessions_ui(self):
+        if self.current_state != "DASHBOARD": return
+
+        for widget in self.sessions_scroll.winfo_children():
+            widget.destroy()
+
+        if not self.active_sessions:
+            placeholder = ctk.CTkFrame(self.sessions_scroll, fg_color="#121216", height=200, corner_radius=20)
+            placeholder.pack(fill="x", pady=40)
+            ctk.CTkLabel(placeholder, text="No active guest sessions", font=("Segoe UI", 14), text_color="#3F3F46").pack(expand=True)
+            return
+
+        for session in self.active_sessions:
+            card = ctk.CTkFrame(self.sessions_scroll, fg_color="#121216", corner_radius=16, border_width=1, border_color="#1D1D26")
+            card.pack(fill="x", pady=6, padx=2)
+
+            # Left: Info
+            info_frame = ctk.CTkFrame(card, fg_color="transparent")
+            info_frame.pack(side="left", fill="both", expand=True, padx=15, pady=12)
+
+            token_short = session['token'][:8] + "..."
+            ctk.CTkLabel(info_frame, text=f"Guest {token_short}", font=("Segoe UI", 14, "bold"), text_color="#FFFFFF").pack(anchor="w")
+
+            # Time Remaining
+            rem = session.get('time_remaining_seconds', 0)
+            mins, secs = divmod(rem, 60)
+            timer_text = f"Ends in {mins:02d}:{secs:02d}"
+            timer_color = "#6C63FF" if rem > 300 else "#FF453A"
+            ctk.CTkLabel(info_frame, text=timer_text, font=("Segoe UI", 12), text_color=timer_color).pack(anchor="w")
+
+            # Recent Activity
+            log = session.get('access_log', [])
+            if log:
+                last_act = log[-1]
+                detail = f"Last: {last_act['action']} {os.path.basename(last_act['file_path'])}"
+                ctk.CTkLabel(info_frame, text=detail, font=("Segoe UI", 11), text_color="#8E8E93").pack(anchor="w", pady=(5, 0))
+            else:
+                ctk.CTkLabel(info_frame, text="Connected, no activity yet", font=("Segoe UI", 11), text_color="#3F3F46").pack(anchor="w", pady=(5, 0))
+
+            # Right: Revoke
+            ctk.CTkButton(card, text="Revoke", width=80, height=32, corner_radius=8,
+                          fg_color="#1A1A1A", hover_color="#FF453A",
+                          command=lambda t=session['token']: self.revoke_session(t)).pack(side="right", padx=15)
+
+    # --- SETUP: Choose Folders & Duration ---
     def render_setup(self):
         ctk.CTkLabel(self.container, text="Setup Guest Access", font=("Segoe UI", 20, "bold"), text_color="#FFFFFF").pack(anchor="w")
         
+        # Back Button
+        ctk.CTkButton(self.container, text="← Back to Hub", width=100, height=24, fg_color="transparent",
+                      text_color="#6C63FF", hover_color="#1A1A1A", anchor="w",
+                      command=lambda: self.show_state("DASHBOARD")).pack(anchor="w", pady=5)
+
         # Folder Selection
-        ctk.CTkLabel(self.container, text="Which folders can they see?", font=("Segoe UI", 13, "bold"), text_color="#8E8E93").pack(anchor="w", pady=(20, 10))
+        ctk.CTkLabel(self.container, text="Which folders can they see?", font=("Segoe UI", 13, "bold"), text_color="#8E8E93").pack(anchor="w", pady=(15, 5))
         
-        self.folder_scroll = ctk.CTkScrollableFrame(self.folder_scroll_parent if hasattr(self, 'folder_scroll_parent') else self.container,
-                                                    fg_color="#121216", height=180, corner_radius=20, border_width=1, border_color="#1D1D26")
+        self.folder_scroll = ctk.CTkScrollableFrame(self.container, fg_color="#121216", height=150, corner_radius=16, border_width=1, border_color="#1D1D26")
         self.folder_scroll.pack(fill="x", pady=5)
         
         # Duration Selection
@@ -91,17 +129,15 @@ class GuestPanel(ctk.CTkFrame):
         duration_frame.pack(fill="x")
         
         self.dur_btns = {}
-        durations = [("15 min", 15), ("30 min", 30), ("1 hour", 60), ("2 hours", 120)]
+        durations = [("15m", 15), ("30m", 30), ("1h", 60), ("2h", 120)]
         for label, mins in durations:
-            btn = ctk.CTkButton(duration_frame, text=label, width=90, height=38, corner_radius=14,
+            btn = ctk.CTkButton(duration_frame, text=label, width=75, height=36, corner_radius=12,
                                 fg_color="#6C63FF" if mins == self.selected_duration else "#121216",
-                                text_color="#FFFFFF" if mins == self.selected_duration else "#8E8E93",
-                                border_width=1, border_color="#6C63FF" if mins == self.selected_duration else "#1D1D26",
                                 command=lambda m=mins: self.set_duration(m))
             btn.pack(side="left", padx=4)
             self.dur_btns[mins] = btn
 
-        ctk.CTkButton(self.container, text="Generate Access Code", fg_color="#6C63FF", hover_color="#5B52E0",
+        ctk.CTkButton(self.container, text="Create Guest Link", fg_color="#6C63FF", hover_color="#5B52E0",
                       height=52, corner_radius=16, font=("Segoe UI", 14, "bold"),
                       command=self.start_session).pack(fill="x", pady=(25, 0), padx=40)
         
@@ -110,27 +146,17 @@ class GuestPanel(ctk.CTkFrame):
     def set_duration(self, mins):
         self.selected_duration = mins
         for m, btn in self.dur_btns.items():
-            if m == mins:
-                btn.configure(fg_color="#6C63FF", border_color="#6C63FF")
-            else:
-                btn.configure(fg_color="#1A1A1A", border_color="#2C2C2C")
+            btn.configure(fg_color="#6C63FF" if m == mins else "#121216")
 
     def fetch_available_folders(self):
         def _fetch():
             try:
-                # Use the proper endpoint and headers
                 r = requests.get(f"{BASE_URL}/settings", headers=HEADERS, timeout=5)
                 if r.status_code == 200:
                     shared_folders = r.json().get("shared_folders", [])
-                    # Transform list of strings into the expected dictionary format for the UI
                     self.available_folders = [{"name": os.path.basename(f) or f, "path": f} for f in shared_folders]
                     self.after(0, self.update_folder_list)
-                else:
-                    print(f"Error fetching folders: {r.status_code}")
-            except Exception as e:
-                print(f"Fetch Error: {e}")
-
-        import os # Ensure os is available in this scope
+            except: pass
         threading.Thread(target=_fetch, daemon=True).start()
 
     def update_folder_list(self):
@@ -140,136 +166,67 @@ class GuestPanel(ctk.CTkFrame):
             self.selected_folders[path] = var
             row = ctk.CTkFrame(self.folder_scroll, fg_color="transparent")
             row.pack(fill="x", pady=2, padx=5)
-            ctk.CTkCheckBox(row, text=f['name'], variable=var, border_color="#6C63FF", checkmark_color="#6C63FF").pack(side="left")
-            ctk.CTkLabel(row, text=path, font=("Arial", 10), text_color="#86868B").pack(side="right")
+            ctk.CTkCheckBox(row, text=f['name'], variable=var, border_color="#6C63FF", checkmark_color="#6C63FF", font=("Segoe UI", 12)).pack(side="left")
 
-    # --- STATE 3: ACTIVE ---
-    def render_active(self):
-        # Green Banner (Glass)
-        self.status_banner = ctk.CTkFrame(self.container, fg_color="#12241A", height=44, corner_radius=12, border_width=1, border_color="#1F4D32")
-        self.status_banner.pack(fill="x", pady=(0, 20))
-        self.status_text = ctk.CTkLabel(self.status_banner, text="Guest session is active", text_color="#30D158", font=("Segoe UI", 13, "bold"))
-        self.status_text.pack(pady=10)
+    # --- QR VIEW: Show the Code ---
+    def render_qr_view(self):
+        ctk.CTkLabel(self.container, text="Guest Access Ready", font=("Segoe UI", 20, "bold"), text_color="#FFFFFF").pack(anchor="w")
         
-        # QR Code Area (Centered Card)
         qr_card = ctk.CTkFrame(self.container, fg_color="#121216", corner_radius=24, border_width=1, border_color="#1D1D26")
-        qr_card.pack(pady=10, padx=20)
+        qr_card.pack(pady=20, padx=20)
         
         self.qr_label = ctk.CTkLabel(qr_card, text="")
         self.qr_label.pack(pady=20, padx=20)
-        ctk.CTkLabel(self.container, text="Ask your guest to scan this", text_color="#8E8E93", font=("Segoe UI", 12)).pack()
 
-        # Timer (Bold Accent)
-        self.timer_label = ctk.CTkLabel(self.container, text="00:00", font=("Courier New", 48, "bold"), text_color="#6C63FF")
-        self.timer_label.pack(pady=15)
+        ctk.CTkLabel(self.container, text="Guests can scan this to see files.", text_color="#8E8E93", font=("Segoe UI", 12)).pack()
         
-        # Info
-        shared_count = sum(1 for v in self.selected_folders.values() if v.get())
-        ctk.CTkLabel(self.container, text=f"Folders shared: {shared_count} selected", font=("Segoe UI", 12), text_color="#3F3F46").pack()
-        
-        # End Button
-        self.end_btn = ctk.CTkButton(self.container, text="End Session Now", fg_color="#1A1A22", hover_color="#FF453A",
-                                     height=48, corner_radius=16, border_width=1, border_color="#2C2C35",
-                                     command=self.end_session)
-        self.end_btn.pack(fill="x", pady=20, padx=40)
+        ctk.CTkButton(self.container, text="Done (Go to Hub)", fg_color="#1A1A22", height=48, corner_radius=16,
+                      command=lambda: self.show_state("DASHBOARD")).pack(fill="x", pady=20, padx=40)
 
         self.generate_qr_logic()
-        self.countdown_tick()
-        self.poll_guest()
 
     def generate_qr_logic(self):
         def _logic():
             try:
-                # 1. Prepare data for session creation
                 selected = [p for p, v in self.selected_folders.items() if v.get()]
-                if not selected:
-                    # If no folders selected, we can't really start a meaningful session
-                    return
-
-                payload = {
-                    "folders": selected,
-                    "duration_minutes": self.selected_duration
-                }
-
-                # 2. Call /guest/create to get a restricted guest URL
+                payload = {"folders": selected, "duration_minutes": self.selected_duration}
                 r = requests.post(f"{BASE_URL}/guest/create", json=payload, headers=HEADERS, timeout=5)
                 data = r.json()
-
                 if data.get("success"):
                     guest_url = data.get("url")
-                    self.guest_session_token = data.get("token") # Store for status polling if needed
-                    
-                    # 3. Generate QR Image for the URL (so browser can open it)
                     qr = qrcode.QRCode(box_size=10, border=2)
                     qr.add_data(guest_url)
                     qr.make(fit=True)
                     img = qr.make_image(fill_color="#6C63FF", back_color="#0D0D0D")
-                    
-                    # Convert to CTkImage
                     self.after(0, lambda: self.display_qr(img))
-                else:
-                    print(f"Failed to create guest session: {data.get('error')}")
-            except Exception as e:
-                print(f"QR Generation Error: {e}")
+            except: pass
         threading.Thread(target=_logic, daemon=True).start()
 
     def display_qr(self, pil_img):
         ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(180, 180))
         self.qr_label.configure(image=ctk_img)
-        self.remaining_seconds = self.selected_duration * 60
 
-    def countdown_tick(self):
-        if self.current_state != "ACTIVE": return
-        
-        if self.remaining_seconds <= 0:
-            self.end_session()
-            return
-            
-        self.remaining_seconds -= 1
-        mins, secs = divmod(self.remaining_seconds, 60)
-        self.timer_label.configure(text=f"{mins:02d}:{secs:02d}")
-        
-        # Color Shifting
-        if self.remaining_seconds < 60: # Under 1 min
-            self.timer_label.configure(text_color="#FF453A")
-        elif self.remaining_seconds < 300: # Under 5 mins
-            self.timer_label.configure(text_color="#FF9F0A")
-            
-        self.after(1000, self.countdown_tick)
-
-    def poll_guest(self):
-        if self.current_state != "ACTIVE" or not hasattr(self, 'guest_session_token'): return
-        
-        def _poll():
-            try:
-                r = requests.get(f"{BASE_URL}/guest/session?token={self.guest_session_token}", timeout=2)
-                data = r.json()
-                
-                if data.get("success"):
-                    session = data
-                    # Check if access count has increased
-                    if session.get('access_count', 0) > 0 and not self.is_guest_connected:
-                        self.is_guest_connected = True
-                        self.after(0, self.flash_banner)
-                else:
-                    # Session might have ended or expired
-                    pass
-            except: pass
-            
-        threading.Thread(target=_poll, daemon=True).start()
-        self.after(3000, self.poll_guest)
-
+    # --- ACTIONS ---
     def start_session(self):
-        self.show_state("ACTIVE")
+        self.show_state("QR_VIEW")
 
-    def end_session(self):
-        def _unpair():
-            try:
-                if hasattr(self, 'guest_session_token'):
-                    requests.post(f"{BASE_URL}/guest/end?token={self.guest_session_token}", headers=HEADERS)
+    def revoke_session(self, token):
+        def _revoke():
+            try: requests.post(f"{BASE_URL}/guest/end?token={token}", headers=HEADERS)
             except: pass
-            self.after(0, lambda: self.show_state("NO_SESSION"))
-        
-        threading.Thread(target=_unpair, daemon=True).start()
-        self.remaining_seconds = 0
-        self.is_guest_connected = False
+            self.after(0, self.refresh_sessions)
+        threading.Thread(target=_revoke, daemon=True).start()
+
+    def refresh_sessions(self):
+        def _fetch():
+            try:
+                r = requests.get(f"{BASE_URL}/guest/sessions", headers=HEADERS, timeout=3)
+                if r.status_code == 200:
+                    self.active_sessions = r.json().get("sessions", [])
+                    self.after(0, self.update_sessions_ui)
+            except: pass
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    def _start_polling(self):
+        self.refresh_sessions()
+        self.after(5000, self._start_polling)
