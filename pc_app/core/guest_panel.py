@@ -117,11 +117,19 @@ class GuestPanel(ctk.CTkFrame):
     def fetch_available_folders(self):
         def _fetch():
             try:
-                r = requests.get(f"{BASE_URL}/files", headers=HEADERS, timeout=5)
+                # Use the proper endpoint and headers
+                r = requests.get(f"{BASE_URL}/settings", headers=HEADERS, timeout=5)
                 if r.status_code == 200:
-                    self.available_folders = r.json()
+                    shared_folders = r.json().get("shared_folders", [])
+                    # Transform list of strings into the expected dictionary format for the UI
+                    self.available_folders = [{"name": os.path.basename(f) or f, "path": f} for f in shared_folders]
                     self.after(0, self.update_folder_list)
-            except: pass
+                else:
+                    print(f"Error fetching folders: {r.status_code}")
+            except Exception as e:
+                print(f"Fetch Error: {e}")
+
+        import os # Ensure os is available in this scope
         threading.Thread(target=_fetch, daemon=True).start()
 
     def update_folder_list(self):
