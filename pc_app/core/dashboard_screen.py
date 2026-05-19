@@ -836,7 +836,11 @@ class DashboardScreen(ctk.CTkFrame):
                             ctk.CTkLabel(info, text=item['timestamp'], font=("Segoe UI", 11), text_color=COLORS["secondary"]).pack(anchor="w")
                             status = "DONE" if item['success'] else "FAILED"
                             color = COLORS["success"] if item['success'] else COLORS["danger"]
-                            ctk.CTkLabel(row, text=status, font=("Segoe UI", 10, "bold"), text_color=color, fg_color=color+"11", corner_radius=8, width=70, height=24).pack(side="right", padx=20)
+                            # [FIX] Use standard hex colors. Tkinter doesn't support #RRGGBBAA alpha hex
+                            status_bg = "#1A2E1A" if item['success'] else "#2E1A1A"
+                            ctk.CTkLabel(row, text=status, font=("Segoe UI", 10, "bold"),
+                                         text_color=color, fg_color=status_bg,
+                                         corner_radius=8, width=70, height=24).pack(side="right", padx=20)
                     self.after(0, update_ui)
             except: pass
         threading.Thread(target=load, daemon=True).start()

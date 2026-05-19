@@ -295,23 +295,33 @@ def handle_settings():
     global battery_threshold
     if request.method == 'GET':
         try:
-            with open(SETTINGS_FILE, 'r') as f:
-                settings = json.load(f)
+            # 1. Load basic settings
+            settings = {}
+            if SETTINGS_FILE.exists():
+                with open(SETTINGS_FILE, 'r') as f:
+                    settings = json.load(f)
+            else:
+                settings = DEFAULT_SETTINGS.copy()
 
-            # [NEW] Add shared folders to settings for the Guest Hub to see
+            # 2. Add shared folders from the master config file
             try:
                 if SHARED_FOLDERS_FILE.exists():
                     with open(SHARED_FOLDERS_FILE, 'r') as f:
                         config_data = json.load(f)
-                        settings["shared_folders"] = config_data.get("shared_folders", [])
+                        # Check if config_data is a list (old format) or dict (new format)
+                        if isinstance(config_data, list):
+                            settings["shared_folders"] = config_data
+                        else:
+                            settings["shared_folders"] = config_data.get("shared_folders", [])
                 else:
                     settings["shared_folders"] = []
             except Exception as e:
-                print(f"DEBUG: Error reading shared folders: {e}")
+                print(f"SERVER ERROR: Reading shared folders: {e}")
                 settings["shared_folders"] = []
 
             return jsonify(settings)
-        except:
+        except Exception as e:
+            print(f"SERVER ERROR: Getting settings: {e}")
             return jsonify(DEFAULT_SETTINGS)
 
     new_settings = request.json
