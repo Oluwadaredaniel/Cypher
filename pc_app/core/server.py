@@ -1119,16 +1119,28 @@ def delete_file():
 def guest_create_session():
     """TIER 1: Create a guest session from authenticated device."""
     token = request.headers.get("X-Auth-Token")
-    if not token or token not in valid_tokens:
-        # Check if it's the internal token for convenience when generating from PC UI
-        if token != INTERNAL_TOKEN:
-            return jsonify({"success": False, "error": "Unauthorized"}), 401
+    if not token or (token not in valid_tokens and token != INTERNAL_TOKEN):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
     
     data = request.json
-    folders = data.get("folders", [])
+    raw_folders = data.get("folders", [])
     duration = data.get("duration_minutes", 15)
     
-    guest_token = guest_manager.create_session(folders, duration, token)
+    # [NEW] Normalize and Validate Folders
+    valid_folders = []
+    for f in raw_folders:
+        p = Path(f)
+        if not p.is_absolute():
+            # Try to resolve common names to user home
+            p = Path.home() / f
+
+        if p.exists() and p.is_dir():
+            valid_folders.append(str(p.resolve()))
+
+    if not valid_folders:
+        return jsonify({"success": False, "error": "No valid folders provided"}), 400
+
+    guest_token = guest_manager.create_session(valid_folders, duration, token)
     local_ip = get_local_ip()
     guest_url = f"http://{local_ip}:5000/guest/access?token={guest_token}"
 
@@ -1140,6 +1152,7 @@ def guest_create_session():
         "token": guest_token,
         "url": guest_url,
         "qr_link": qr_link,
+        "accepted_folders": valid_folders,
         "expires_at": (datetime.now() + timedelta(minutes=duration)).strftime("%Y-%m-%d %H:%M:%S")
     }), 200
 

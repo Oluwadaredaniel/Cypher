@@ -207,8 +207,9 @@ class _GuestScreenState extends State<GuestScreen> {
   }
 
   Future<void> _endSessionManually() async {
+    setState(() => _isLoading = true);
     try {
-      await http.post(
+      final res = await http.post(
         Uri.parse('http://${widget.pcIpAddress}:5000/guest/end'),
         headers: {
           "Content-Type": "application/json",
@@ -216,8 +217,15 @@ class _GuestScreenState extends State<GuestScreen> {
         },
         body: json.encode({"guest_token": _guestToken}),
       );
-    } catch (e) {}
-    _expireSession();
+      if (res.statusCode == 200) {
+        _expireSession();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to end session on server")));
+      }
+    } catch (e) {
+      _expireSession(); // Fallback to local expiry
+    }
+    setState(() => _isLoading = false);
   }
 
   // --- UI COMPONENTS ---
