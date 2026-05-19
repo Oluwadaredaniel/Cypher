@@ -70,7 +70,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       boxShadow: [BoxShadow(color: accent.withOpacity(0.2), blurRadius: 40, spreadRadius: 10)],
                     ),
                     child: Pulse(
-                        infinite: true,
+                        duration: const Duration(seconds: 2),
                         child: CypherIllustrations.splashCore(),
                       ),
                   ),

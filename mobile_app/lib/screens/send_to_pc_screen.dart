@@ -15,12 +15,14 @@ class SendToPCScreen extends StatefulWidget {
   final String pcIpAddress;
   final String authToken;
   final File? preSelectedFile;
+  final List<String>? sharedFiles;
 
   const SendToPCScreen({
     super.key,
     required this.pcIpAddress,
     required this.authToken,
     this.preSelectedFile,
+    this.sharedFiles,
   });
 
   @override
@@ -31,15 +33,19 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
   // Logic State
   UploadState _currentState = UploadState.picking;
   List<PlatformFile> _selectedFiles = [];
+  List<File> _directFiles = [];
   File? _directFile;
   String? _selectedDestination;
   String _currentPath = ""; // Empty string represents Root
   List<dynamic> _folders = [];
   bool _isLoadingFolders = false;
+  String? _folderError;
 
   // Upload Tracking
   double _uploadProgress = 0.0;
   int _currentFileIndex = 0;
+  bool _isUploadingCancelled = false;
+  http.Client? _uploadClient;
 
   // Animations
   late AnimationController _pulseController;
@@ -54,6 +60,9 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
     if (widget.preSelectedFile != null) {
       _directFile = widget.preSelectedFile;
     }
+    if (widget.sharedFiles != null && widget.sharedFiles!.isNotEmpty) {
+      _directFiles = widget.sharedFiles!.map((path) => File(path)).toList();
+    }
     _loadFolders();
   }
 
@@ -66,23 +75,71 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
   String get _baseUrl => "http://${widget.pcIpAddress}:5000";
   Map<String, String> get _headers => {"X-Auth-Token": widget.authToken};
 
-  Future<void> _loadFolders() async {
-    setState(() => _isLoadingFolders = true);
+  Future<void> _loadFolders([Function? setModalState]) async {
+    if (!mounted) return;
+    if (setModalState != null) {
+      setModalState(() {
+        _isLoadingFolders = true;
+        _folderError = null;
+      });
+    } else {
+      setState(() {
+        _isLoadingFolders = true;
+        _folderError = null;
+      });
+    }
+
     try {
+      final encodedPath = Uri.encodeComponent(_currentPath);
       final response = await http.get(
-        Uri.parse("$_baseUrl/files/list?path=$_currentPath"),
+        Uri.parse("$_baseUrl/files/list?path=$encodedPath"),
         headers: _headers,
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        setState(() {
-          _folders = data['contents'].where((item) => item['is_dir'] == true).toList();
-          _isLoadingFolders = false;
-        });
+        if (mounted) {
+          if (setModalState != null) {
+            setModalState(() {
+              _folders = data['contents'].where((item) => item['is_dir'] == true).toList();
+              _isLoadingFolders = false;
+            });
+          } else {
+            setState(() {
+              _folders = data['contents'].where((item) => item['is_dir'] == true).toList();
+              _isLoadingFolders = false;
+            });
+          }
+        }
+      } else {
+        if (mounted) {
+          if (setModalState != null) {
+            setModalState(() {
+              _isLoadingFolders = false;
+              _folderError = "Server returned error: ${response.statusCode}";
+            });
+          } else {
+            setState(() {
+              _isLoadingFolders = false;
+              _folderError = "Server returned error: ${response.statusCode}";
+            });
+          }
+        }
       }
     } catch (e) {
-      setState(() => _isLoadingFolders = false);
+      if (mounted) {
+        if (setModalState != null) {
+          setModalState(() {
+            _isLoadingFolders = false;
+            _folderError = "Connection failed. Is the PC online?";
+          });
+        } else {
+          setState(() {
+            _isLoadingFolders = false;
+            _folderError = "Connection failed. Is the PC online?";
+          });
+        }
+      }
     }
   }
 
@@ -97,39 +154,89 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
   }
 
   Future<void> _uploadFile() async {
-    if ((_selectedFiles.isEmpty && _directFile == null) || _selectedDestination == null) return;
+    if ((_selectedFiles.isEmpty && _directFile == null && _directFiles.isEmpty) || _selectedDestination == null) return;
 
     setState(() {
       _currentState = UploadState.uploading;
       _uploadProgress = 0.0;
       _currentFileIndex = 0;
+      _isUploadingCancelled = false;
     });
+
+    _uploadClient = http.Client();
 
     try {
       if (_directFile != null) {
         await _uploadSingleFile(_directFile!.path);
+      } else if (_directFiles.isNotEmpty) {
+        for (int i = 0; i < _directFiles.length; i++) {
+          if (_isUploadingCancelled) break;
+          setState(() => _currentFileIndex = i);
+          await _uploadSingleFile(_directFiles[i].path);
+        }
       } else {
         for (int i = 0; i < _selectedFiles.length; i++) {
+          if (_isUploadingCancelled) break;
           setState(() => _currentFileIndex = i);
           await _uploadSingleFile(_selectedFiles[i].path!);
         }
       }
-      _triggerSuccess();
+      
+      if (!_isUploadingCancelled) {
+        _triggerSuccess();
+      }
     } catch (e) {
-      setState(() => _currentState = UploadState.error);
+      if (!_isUploadingCancelled) {
+        setState(() => _currentState = UploadState.error);
+      }
+    } finally {
+      _uploadClient?.close();
     }
   }
 
   Future<void> _uploadSingleFile(String path) async {
+    if (_isUploadingCancelled) return;
+    
+    final file = File(path);
+    final totalBytes = await file.length();
+    int sentBytes = 0;
+
     final request = http.MultipartRequest('POST', Uri.parse("$_baseUrl/files/upload"));
     request.headers.addAll(_headers);
     request.fields['destination'] = _selectedDestination!;
 
-    final multipartFile = await http.MultipartFile.fromPath('file', path);
+    final stream = file.openRead();
+    final multipartFile = http.MultipartFile(
+      'file',
+      stream.map((chunk) {
+        sentBytes += chunk.length;
+        if (mounted) {
+          setState(() {
+            _uploadProgress = sentBytes / totalBytes;
+          });
+        }
+        return chunk;
+      }),
+      totalBytes,
+      filename: p.basename(path),
+    );
+
     request.files.add(multipartFile);
 
-    final response = await request.send();
-    if (response.statusCode != 200) throw Exception("Failed");
+    final streamedResponse = await _uploadClient!.send(request);
+    
+    if (streamedResponse.statusCode != 200) throw Exception("Failed");
+  }
+
+  void _cancelUpload() {
+    setState(() {
+      _isUploadingCancelled = true;
+      _currentState = UploadState.picking;
+    });
+    _uploadClient?.close();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Upload cancelled")),
+    );
   }
 
   void _triggerSuccess() {
@@ -137,7 +244,6 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
   }
 
   void _showDestinationSheet() {
-    _loadFolders();
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0C0C10),
@@ -146,6 +252,13 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            // Fetch initial folders for the modal
+            if (_isLoadingFolders && _folders.isEmpty && _folderError == null) {
+               _loadFolders(setModalState);
+            } else if (!_isLoadingFolders && _folders.isEmpty && _folderError == null) {
+               _loadFolders(setModalState);
+            }
+
             return DraggableScrollableSheet(
               initialChildSize: 0.7,
               minChildSize: 0.5,
@@ -169,10 +282,8 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
                               onPressed: () {
                                 final parts = _currentPath.split(Platform.pathSeparator);
                                 parts.removeLast();
-                                setModalState(() {
-                                  _currentPath = parts.join(Platform.pathSeparator);
-                                  _loadFolders().then((_) => setModalState(() {}));
-                                });
+                                _currentPath = parts.join(Platform.pathSeparator);
+                                _loadFolders(setModalState);
                               },
                             )
                         ],
@@ -182,10 +293,26 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
                     Expanded(
                       child: _isLoadingFolders 
                           ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
-                          : ListView.builder(
-                              controller: scrollController,
-                              itemCount: _folders.length + 1,
-                              itemBuilder: (context, index) {
+                          : _folderError != null
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.cloud_off_rounded, color: Colors.white24, size: 48),
+                                    const SizedBox(height: 16),
+                                    Text(_folderError!, style: const TextStyle(color: Colors.white60)),
+                                    const SizedBox(height: 16),
+                                    TextButton(
+                                      onPressed: () => _loadFolders(setModalState),
+                                      child: const Text("Retry", style: TextStyle(color: Color(0xFF6C63FF))),
+                                    )
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: scrollController,
+                                itemCount: _folders.length + 1,
+                                itemBuilder: (context, index) {
                                 if (index == 0) {
                                   return ListTile(
                                     leading: const Icon(Icons.check_circle_outline, color: Color(0xFF6C63FF)),
@@ -196,17 +323,24 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
                                     },
                                   );
                                 }
-                                final folder = _folders[index - 1];
+                                final item = _folders[index - 1];
+                                final isDir = item['is_dir'] ?? true;
+                                final isSelectable = item['selectable'] ?? isDir;
+
                                 return ListTile(
-                                  leading: const Icon(Icons.folder_rounded, color: Color(0xFF86868B)),
-                                  title: Text(folder['name'], style: const TextStyle(color: Colors.white)),
-                                  trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white24),
-                                  onTap: () {
-                                    setModalState(() {
-                                      _currentPath = folder['path'];
-                                      _loadFolders().then((_) => setModalState(() {}));
-                                    });
-                                  },
+                                  leading: Icon(
+                                    isDir ? Icons.folder_rounded : Icons.insert_drive_file_outlined, 
+                                    color: isDir ? const Color(0xFF86868B) : const Color(0xFF444444)
+                                  ),
+                                  title: Text(
+                                    item['name'], 
+                                    style: TextStyle(color: isSelectable ? Colors.white : Colors.white24)
+                                  ),
+                                  trailing: isDir ? const Icon(Icons.chevron_right_rounded, color: Colors.white24) : null,
+                                  onTap: isDir ? () {
+                                    _currentPath = item['path'];
+                                    _loadFolders(setModalState);
+                                  } : null,
                                 );
                               },
                             ),
@@ -431,7 +565,7 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("${_currentFileIndex + 1}/${_selectedFiles.length + (_directFile != null ? 1 : 0)}", 
+                Text("${_currentFileIndex + 1}/${_selectedFiles.length + (_directFile != null ? 1 : 0) + _directFiles.length}",
                   style: GoogleFonts.outfit(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
                 const Text("Sending", style: TextStyle(color: Color(0xFF86868B), fontSize: 12)),
               ],
@@ -444,7 +578,7 @@ class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStat
         Text("Warp Speed Protocol Active", style: const TextStyle(color: Color(0xFF86868B), fontSize: 12)),
         const SizedBox(height: 40),
         TextButton(
-            onPressed: () => setState(() => _currentState = UploadState.picking),
+            onPressed: _cancelUpload,
             child: const Text("Cancel Batch", style: TextStyle(color: Colors.redAccent, fontSize: 14))
         ),
       ],

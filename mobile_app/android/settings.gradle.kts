@@ -20,11 +20,15 @@ pluginManagement {
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
 
-    // ✅ Updated Android Gradle Plugin
-    id("com.android.application") version "8.9.1" apply false
+    // ✅ Emerald Compatibility Bridge: Use 8.7.2 (Stable) to satisfy Camera dependencies
+    // while avoiding the Windows-specific hang of 8.9.1
+    id("com.android.application") version "8.7.2" apply false
 
     // ✅ Updated Kotlin
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
+    
+    // ✅ Add Google Services Plugin for Firebase
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 include(":app")

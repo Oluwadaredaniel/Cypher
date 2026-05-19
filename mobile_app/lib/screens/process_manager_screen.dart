@@ -53,8 +53,12 @@ class _ProcessManagerScreenState extends State<ProcessManagerScreen> {
     try {
       final response = await http.get(Uri.parse('$_baseUrl/processes'), headers: _headers).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is! List) throw Exception("Invalid data format");
+        
+        final List<dynamic> data = decoded;
         data.sort((a, b) => (b['cpu_percent'] ?? 0).compareTo(a['cpu_percent'] ?? 0));
+        
         if (mounted) {
           setState(() {
             _processes = data;
@@ -67,7 +71,12 @@ class _ProcessManagerScreenState extends State<ProcessManagerScreen> {
         throw Exception();
       }
     } catch (e) {
-      if (mounted) setState(() { _isLoading = false; _isError = true; });
+      if (mounted) {
+        setState(() { 
+          _isLoading = false; 
+          if (_processes.isEmpty) _isError = true; 
+        });
+      }
     }
   }
 
@@ -212,7 +221,14 @@ class _ProcessManagerScreenState extends State<ProcessManagerScreen> {
                 Container(
                   width: 40, height: 40,
                   decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(10)),
-                  child: Center(child: Text(p['name'].toString().substring(0, 1).toUpperCase(), style: const TextStyle(color: Color(0xFF6C63FF), fontWeight: FontWeight.bold))),
+                  child: Center(
+                    child: Text(
+                      (p['name'] != null && p['name'].toString().isNotEmpty) 
+                        ? p['name'].toString().substring(0, 1).toUpperCase() 
+                        : "?", 
+                      style: const TextStyle(color: Color(0xFF6C63FF), fontWeight: FontWeight.bold)
+                    )
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(

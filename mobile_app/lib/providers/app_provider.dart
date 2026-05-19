@@ -14,7 +14,7 @@ class AppProvider with ChangeNotifier {
 
   Future<void> loadSavedData() async {
     final prefs = await SharedPreferences.getInstance();
-    _pcIpAddress = prefs.getString('pc_ip') ?? '';
+    _pcIpAddress = prefs.getString('pc_ip_address') ?? '';
     _authToken = prefs.getString('auth_token') ?? '';
     notifyListeners();
   }
@@ -22,7 +22,7 @@ class AppProvider with ChangeNotifier {
   Future<void> saveIpAddress(String ip) async {
     final prefs = await SharedPreferences.getInstance();
     _pcIpAddress = ip;
-    await prefs.setString('pc_ip', ip);
+    await prefs.setString('pc_ip_address', ip);
     notifyListeners();
   }
 

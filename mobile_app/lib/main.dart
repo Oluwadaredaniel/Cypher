@@ -5,6 +5,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/central_service.dart';
+import 'screens/send_to_pc_screen.dart';
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 // Existing Screen Imports
 import 'screens/splash_screen.dart';
@@ -25,8 +30,75 @@ import 'screens/disconnected_screen.dart';
 import 'screens/send_to_pc_screen.dart';
 import 'screens/transfer_progress_screen.dart';
 import 'screens/file_preview_screen.dart';
+import 'screens/connection_screen.dart';
 import 'screens/guide_screen.dart';
 import 'screens/master_control_screen.dart';
+import 'screens/process_manager_screen.dart';
+import 'screens/app_launcher_screen.dart';
+import 'screens/active_tasks_screen.dart';
+import 'screens/screen_recorder_screen.dart';
+import 'screens/image_editor_screen.dart';
+import 'dart:async';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+class SharingWrapper extends StatefulWidget {
+  final Widget child;
+  const SharingWrapper({super.key, required this.child});
+
+  @override
+  State<SharingWrapper> createState() => _SharingWrapperState();
+}
+
+class _SharingWrapperState extends State<SharingWrapper> {
+  static const platform = MethodChannel('app/share');
+
+  @override
+  void initState() {
+    super.initState();
+    _initNativeShareListener();
+  }
+
+  void _initNativeShareListener() {
+    platform.setMethodCallHandler((call) async {
+      if (call.method == "onSharedFiles") {
+        final List<dynamic> files = call.arguments;
+        _handleSharedMedia(files.cast<String>());
+      }
+    });
+
+    // Check for initial sharing data (if app was opened via intent)
+    platform.invokeMethod('getSharedFiles').then((files) {
+      if (files != null) {
+        _handleSharedMedia(List<String>.from(files));
+      }
+    });
+  }
+
+  void _handleSharedMedia(List<String> files) async {
+    if (files.isEmpty) return;
+    
+    final prefs = await SharedPreferences.getInstance();
+    final ip = prefs.getString('pc_ip_address') ?? '';
+    final token = prefs.getString('auth_token') ?? '';
+
+    if (ip.isEmpty || token.isEmpty) return;
+
+    navigatorKey.currentState?.pushNamed('/send', arguments: {
+      'pcIpAddress': ip,
+      'authToken': token,
+      'sharedFiles': files,
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -60,6 +132,14 @@ void callbackDispatcher() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp();
+    FirebaseAnalytics.instance.logAppOpen();
+  } catch (e) {
+    debugPrint("Firebase initialization failed: $e");
+  }
+  
   // Analytics: Report Install to Emerald's Central Hub
   await CentralService.reportInstall();
 
@@ -81,6 +161,7 @@ class CypherApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'CYPHER',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -88,6 +169,7 @@ class CypherApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF0D0D0D),
         textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme),
       ),
+      builder: (context, child) => SharingWrapper(child: child!),
       initialRoute: '/',
       onGenerateRoute: (settings) {
         switch (settings.name) {
@@ -107,6 +189,12 @@ class CypherApp extends StatelessWidget {
             return CustomPageRoute(
               settings: settings,
               builder: (context) => const SetupScreen(),
+            );
+
+          case '/connection':
+            return CustomPageRoute(
+              settings: settings,
+              builder: (context) => const ConnectionScreen(),
             );
 
           case '/pairing':
@@ -144,6 +232,8 @@ class CypherApp extends StatelessWidget {
               builder: (context) => SendToPCScreen(
                 pcIpAddress: args?['pcIpAddress'] ?? '',
                 authToken: args?['authToken'] ?? '',
+                preSelectedFile: args?['preSelectedFile'],
+                sharedFiles: args?['sharedFiles'],
               ),
             );
 
@@ -253,6 +343,57 @@ class CypherApp extends StatelessWidget {
             return CustomPageRoute(
               settings: settings,
               builder: (context) => const MasterControlScreen(),
+            );
+
+          case '/processes':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return CustomPageRoute(
+              settings: settings,
+              builder: (context) => ProcessManagerScreen(
+                pcIpAddress: args?['pcIpAddress'] ?? '',
+                authToken: args?['authToken'] ?? '',
+              ),
+            );
+
+          case '/apps_launcher':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return CustomPageRoute(
+              settings: settings,
+              builder: (context) => AppLauncherScreen(
+                pcIpAddress: args?['pcIpAddress'] ?? '',
+                authToken: args?['authToken'] ?? '',
+              ),
+            );
+
+          case '/active_tasks':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return CustomPageRoute(
+              settings: settings,
+              builder: (context) => ActiveTasksScreen(
+                pcIpAddress: args?['pcIpAddress'] ?? '',
+                authToken: args?['authToken'] ?? '',
+              ),
+            );
+
+          case '/recorder':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return CustomPageRoute(
+              settings: settings,
+              builder: (context) => ScreenRecorderScreen(
+                pcIpAddress: args?['pcIpAddress'] ?? '',
+                authToken: args?['authToken'] ?? '',
+              ),
+            );
+
+          case '/image_editor':
+            final args = settings.arguments as Map<String, dynamic>?;
+            return CustomPageRoute(
+              settings: settings,
+              builder: (context) => ImageEditorScreen(
+                imageFile: args?['imageFile'],
+                pcIpAddress: args?['pcIpAddress'] ?? '',
+                authToken: args?['authToken'] ?? '',
+              ),
             );
 
           default:

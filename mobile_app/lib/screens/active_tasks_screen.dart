@@ -44,6 +44,11 @@ class _ActiveTasksScreenState extends State<ActiveTasksScreen> {
             _isLoading = false;
             _isError = false;
           });
+          // Track Feature Usage
+          http.post(Uri.parse('https://cypher-3ctq.onrender.com/api/track/feature'), 
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'feature': 'app_launch'})
+          );
         }
       } else {
         throw Exception();

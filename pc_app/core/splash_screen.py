@@ -34,7 +34,7 @@ class SplashScreen(ctk.CTkFrame):
             color = COLORS["accent"] if i == 1 else COLORS["white"]
 
             lbl = ctk.CTkLabel(logo_row, text=char,
-                font=("Helvetica Neue", 58, "bold"),
+                font=("Segoe UI", 58, "bold"),
                 text_color=COLORS["bg"]) # Hide initially
             lbl.pack(side="left")
             self._letter_labels.append((lbl, color))
@@ -42,7 +42,7 @@ class SplashScreen(ctk.CTkFrame):
         # Tagline
         self._tagline = ctk.CTkLabel(center,
             text="Your files. Anywhere.",
-            font=("Helvetica Neue", 14),
+            font=("Segoe UI", 14),
             text_color=COLORS["bg"])
         self._tagline.pack(pady=(10, 0))
 

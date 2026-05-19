@@ -42,7 +42,8 @@ def get_metadata():
         # Try to find metadata.json in the app root
         meta_path = get_resource_path("metadata.json")
         if os.path.exists(meta_path):
-            with open(meta_path, "r") as f:
+            # [FIX] Use utf-8-sig to handle Byte Order Mark (BOM) from Windows-saved files
+            with open(meta_path, "r", encoding="utf-8-sig") as f:
                 return json.load(f)
     except:
         pass
@@ -66,7 +67,9 @@ def check_for_updates():
         url = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/pc_app/metadata.json"
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
-            remote_metadata = response.json()
+            # [FIX] Manually decode with utf-8-sig to strip potential BOM from remote file
+            raw_text = response.content.decode("utf-8-sig")
+            remote_metadata = json.loads(raw_text)
             remote_version = remote_metadata.get("app_version", "1.0.0")
 
             if remote_version > current_version:

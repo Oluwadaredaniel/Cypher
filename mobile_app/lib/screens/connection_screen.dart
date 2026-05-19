@@ -3,7 +3,8 @@ import 'package:flutter/services.dart'; // Required for built-in HapticFeedback
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cypher/providers/app_provider.dart';
+import 'package:cypher/screens/setup_screen.dart'; // Needed for direct navigation
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cypher/theme/app_theme.dart';
 
 class ConnectionScreen extends StatefulWidget {
@@ -31,16 +32,16 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
 
     setState(() => _isConnecting = true);
     
-    final provider = Provider.of<AppProvider>(context, listen: false);
-    await provider.saveIpAddress(_ipController.text);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('pc_ip_address', _ipController.text);
     
     // Simulating network latency for the skeleton/loading state
     await Future.delayed(const Duration(seconds: 1));
     
     if (mounted) {
       setState(() => _isConnecting = false);
-      // Navigate to Home
-      Navigator.pushNamed(context, '/home');
+      // Navigate to Pairing
+      Navigator.pushNamed(context, '/pairing', arguments: {'pcIpAddress': _ipController.text});
     }
   }
 
@@ -67,10 +68,10 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  "Enter the IP address of your Windows PC running the CYPHER backend.",
+                  "Enter the PC address of your Windows PC running the CYPHER backend. If on a mobile hotspot, ensure 'Client Isolation' is disabled in your hotspot settings.",
                   style: GoogleFonts.outfit(
                     color: Colors.white54, 
-                    fontSize: 16,
+                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -95,18 +96,26 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                   child: AnimatedScale(
                     scale: _buttonScale,
                     duration: const Duration(milliseconds: 100),
-                    child: ElevatedButton(
-                      onPressed: _isConnecting ? null : _handleConnect,
-                      child: _isConnecting 
-                        ? const SizedBox(
-                            height: 24, 
-                            width: 24, 
-                            child: CircularProgressIndicator(
-                              color: AppTheme.background, 
-                              strokeWidth: 2.5,
-                            ),
-                          )
-                        : const Text("ESTABLISH LINK"),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _isConnecting ? null : _handleConnect,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6C63FF),
+                          shape: const StadiumBorder(),
+                        ),
+                        child: _isConnecting 
+                          ? const SizedBox(
+                              height: 24, 
+                              width: 24, 
+                              child: CircularProgressIndicator(
+                                color: Colors.white, 
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Text("ESTABLISH LINK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
                     ),
                   ),
                 ),

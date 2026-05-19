@@ -5,6 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher_string.dart';
+import '../services/central_service.dart';
+import '../services/permission_service.dart';
 import 'setup_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -57,11 +60,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveSettings() async {
     setState(() => _isSaving = true);
     try {
+      final name = _settings['device_name'] ?? _settings['pc_name'] ?? 'My PC';
       await http.post(
         Uri.parse('$_baseUrl/settings'),
         headers: _headers,
         body: jsonEncode({
           ..._settings,
+          'device_name': name,
+          'pc_name': name, // Send both to be safe
           'battery_alert_threshold': _batteryThreshold.toInt(),
           'battery_alert_enabled': _batteryAlertEnabled,
         }),
@@ -167,7 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 _buildSection('YOUR CONNECTION'),
                 _buildRow('PC Address', widget.pcIpAddress),
-                _buildRow('PC Name', _settings['device_name'] ?? 'My PC'),
+                _buildRow('Identity Label', _settings['device_name'] ?? _settings['pc_name'] ?? 'My PC'),
                 _buildSection('ALERTS'),
                 _buildToggleRow('Battery alert', 'Get notified when PC battery is low', _batteryAlertEnabled, (v) => setState(() => _batteryAlertEnabled = v)),
                 if (_batteryAlertEnabled) Container(
@@ -187,7 +193,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _buildSection('APPEARANCE'),
                 _buildToggleRow('Haptic feedback', 'Vibrate on actions', _hapticEnabled, (v) => setState(() => _hapticEnabled = v)),
                 _buildSection('ABOUT CYPHER'),
-                _buildRow('Version', '1.0.0'),
+                _buildRow('Version', '1.0.0 (Production)'),
+                _buildRow('Software License', 'Standard User Agreement'),
+                _buildRow('Check for Updates', 'Manual Check', onTap: _checkForUpdates),
+                _buildRow('System Permissions', '🛠 Configure All', onTap: _requestPermissions),
                 _buildSection('DANGER ZONE'),
                 _buildRow('Forget this PC', null, onTap: _forgetPC, danger: true),
               ],
@@ -205,6 +214,105 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+    );
+  }
+
+  void _showNameEditSheet() {
+    final currentName = _settings['device_name'] ?? _settings['pc_name'] ?? 'My PC';
+    final controller = TextEditingController(text: currentName);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("Edit PC Name", style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text("This name will be shown during discovery.", style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 13)),
+            const SizedBox(height: 24),
+            TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFF0D0D0D),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _settings['device_name'] = controller.text.trim();
+                  _settings['pc_name'] = controller.text.trim();
+                });
+                Navigator.pop(context);
+                _saveSettings();
+              },
+              child: Container(
+                width: double.infinity,
+                height: 52,
+                decoration: BoxDecoration(color: const Color(0xFF6C63FF), borderRadius: BorderRadius.circular(100)),
+                child: Center(
+                  child: Text("Save & Update", style: GoogleFonts.outfit(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _checkForUpdates() async {
+    _showToast('Checking for updates...');
+    final update = await CentralService.checkForUpdates();
+    if (update != null && update['update_available'] == true) {
+      _showUpdateDialog(update['version'], update['url']);
+    } else {
+      _showToast('App is already up to date! ✨');
+    }
+  }
+
+  Future<void> _requestPermissions() async {
+    _showToast('Requesting system permissions...');
+    await PermissionService.requestAllPermissions();
+    _showToast('Permissions updated ✓');
+  }
+
+  void _showUpdateDialog(String version, String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text('New Version Available!', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Version v$version is ready for download.', style: GoogleFonts.outfit(color: Colors.white)),
+            const SizedBox(height: 12),
+            Text('This update includes stability improvements and new features.', style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 13)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Later', style: GoogleFonts.outfit(color: const Color(0xFF86868B)))),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              launchUrlString(url);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: const StadiumBorder()),
+            child: Text('Get APK', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 }

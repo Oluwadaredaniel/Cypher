@@ -82,21 +82,44 @@ class _GuestScreenState extends State<GuestScreen> {
       );
 
       if (codeRes.statusCode == 200) {
-        // 2. Mocking/Generating the specific guest session token logic 
-        // In a real flow, you'd POST to /pair to register the session
-        _guestToken = "GUEST_${DateTime.now().millisecondsSinceEpoch}";
-        _expiryTime = DateTime.now().add(Duration(minutes: _selectedDurationMinutes));
-        
-        setState(() {
-          _currentState = GuestState.active;
-          _isLoading = false;
-        });
+        final code = json.decode(codeRes.body)['code'];
+        final deviceId = "GUEST-${DateTime.now().millisecondsSinceEpoch}";
+        final deviceName = "Guest Device (Limited)";
 
-        _startCountdown();
-        _startPolling();
+        // 2. Register Guest Session with PC server
+        final pairRes = await http.post(
+          Uri.parse('http://${widget.pcIpAddress}:5000/pair_device'),
+          headers: {"Content-Type": "application/json"},
+          body: json.encode({
+            "pairing_code": code,
+            "device_id": deviceId,
+            "device_name": deviceName,
+          }),
+        );
+
+        if (pairRes.statusCode == 200) {
+          final data = json.decode(pairRes.body);
+          _guestToken = data['token'];
+          _expiryTime = DateTime.now().add(Duration(minutes: _selectedDurationMinutes));
+          
+          setState(() {
+            _currentState = GuestState.active;
+            _isLoading = false;
+          });
+
+          _startCountdown();
+          _startPolling();
+        } else {
+          throw Exception("Failed to pair guest session");
+        }
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to create guest access. Ensure PC is online.")),
+        );
+      }
     }
   }
 

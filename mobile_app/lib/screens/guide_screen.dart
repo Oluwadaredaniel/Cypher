@@ -64,28 +64,46 @@ class _GuideScreenState extends State<GuideScreen> {
   }
 
   final String _fallbackGuide = """
-# Getting Started with CYPHER
+# 📗 The Ultimate CYPHER Guide
 
-Welcome to the future of local file sharing.
-
-### 1. Connecting for the first time
-Ensure your PC and Phone are on the **same WiFi network**.
-- Open CYPHER on your PC.
-- Tap 'Connect to PC' on your phone.
-- Your PC should appear automatically. Tap it and enter the 6-digit code.
-
-### 2. Fast File Sharing
-- Use the **Browser** to download files from your PC.
-- Use the **Send** button to push photos or links from your phone to your PC.
-
-### 3. Quick Paste (Pro Tip)
-You can paste your phone's clipboard anywhere on your PC by pressing `Ctrl + Alt + V` on your keyboard.
-
-### 4. Remote Power
-You can Lock, Sleep, or Shutdown your PC directly from the **Controls** tab.
+Welcome to your new digital command center. CYPHER is designed to make the boundary between your PC and Phone disappear.
 
 ---
-*Version 1.0.0 • © 2024 CYPHER Team*
+
+### 1. 📋 Universal Clipboard
+Stop emailing links to yourself. 
+- **Send to PC**: Copy text on your phone, go to the **Clipboard** tab, and tap **"Send to PC"**. It will instantly be ready to paste on your PC using `Ctrl + V`.
+- **Get from PC**: Anything you copy on your PC can be fetched by tapping **"Fetch from PC"** on your phone.
+
+### 2. 📂 Windows-Style File Browsing
+The Browser is now more powerful than ever.
+- **View Modes**: Toggle between **List** and **Grid** views (Windows Explorer style) using the top icon.
+- **Smart Grouping**: Tap the filter icon to group files by **Date** (Today, Last Week, etc.) or **Type**.
+- **Deep Rendering**: We now show **ALL** file types including `.exe`, `.apk`, and system files. Large folders with thousands of items now load smoothly.
+- **Live Thumbnails**: See small previews of your images directly in the list, just like on your PC.
+
+### 3. 🎞️ Pro Previews & Editing
+- **Media**: Instant playback for Video and Audio.
+- **Documents**: View **PDFs** and **Code Files** (Python, JS, Dart, etc.) with full syntax highlighting without downloading.
+- **Auto-Open**: For Word, Excel, and APKs, just tap download. Once finished, Cypher will automatically ask to open them in your preferred app.
+
+### 4. 👥 Secure Guest Access
+Perfect for sharing files with visitors without sharing your Wi-Fi password or giving full PC access.
+- **PC Dashboard**: Go to the **Security** tab on your PC app.
+- **Setup Permissions**: You can choose exactly which folders the guest can see. By default, they only see a temporary "Public" folder, but you can add your "Downloads" or "Pictures" for specific sessions.
+- **Access Control**: You can set a timer (e.g., 30 minutes). Once the time is up, their connection is automatically severed by the PC.
+- **Connect**: The guest just needs to scan the **QR Code** generated on your screen. They don't need to install the app; they can use their browser!
+- **Useful for**: Sharing study materials, office documents, or party photos without handing over your unlocked phone.
+
+### 5. 🌐 Troubleshooting Connection (Hotspots & Wi-Fi)
+If you see "Lost Connection to PC" while on a hotspot or public Wi-Fi:
+- **AP Isolation**: Some routers (and phone hotspots) prevent devices from "talking" to each other for security. Check your hotspot settings for "Allow devices to see each other".
+- **Windows Firewall**: Your PC might be blocking incoming connections on a "Public" network. Try setting your hotspot network to **"Private"** in Windows Network Settings.
+- **IP Change**: Hotspots often change your PC's address. If connection fails, check the **PC Address** on the dashboard and ensure it matches what the app is looking for.
+- **Mum's Hotspot Tip**: Ensure "Data Saver" isn't killing background processes on either the phone or the PC.
+
+---
+*Version 1.1.0 • Built for Power Users • Emerald Dev*
 """;
 }
 

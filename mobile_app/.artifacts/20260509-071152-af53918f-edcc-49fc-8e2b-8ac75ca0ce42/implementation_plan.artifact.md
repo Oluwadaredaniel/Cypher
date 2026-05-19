@@ -1,64 +1,41 @@
-# Implementation Plan - UI Features, Permissions, and File Transfer Fixes
+# Implementation Plan - Share Sheet & WhatsApp Integration
 
-This plan addresses user feedback regarding missing UI features (Cancel buttons, Updates), permission handling, download visibility, and the "Choose Destination" spinner bug.
+This plan details the addition of Cypher to the Android Share menu and the implementation of WhatsApp media shortcuts.
 
 ## User Review Required
 
-> [!NOTE]
-> The "Transfer Progress" screen exists in the code but is not currently used for active background transfers. I will focus on fixing the cancellation logic in the screens where transfers are actually initiated (`FileBrowserScreen`, `FilePreviewScreen`, and `SendToPCScreen`).
+- **Dependencies**: Requires adding `receive_sharing_intent: ^1.6.3` to `pubspec.yaml`.
+- **System Integration**: Modifying `AndroidManifest.xml` to register Cypher for `SEND` intents.
+- **Background Handling**: Share sheet actions will launch the app and navigate directly to the "Send to PC" screen.
 
 ## Proposed Changes
 
-### File Transfer & Visibility Fixes
+### [Mobile App] Share Sheet Integration
 
-#### [send_to_pc_screen.dart](file:///C:/Cypher/mobile_app/lib/screens/send_to_pc_screen.dart)
+#### [pubspec.yaml](file:///C:/Cypher/mobile_app/pubspec.yaml)
+- Add: `receive_sharing_intent: ^1.6.3`.
 
-- Fix the "Choose Destination" spinner by encoding the path parameter and improving error handling.
-- Ensure the modal UI updates correctly when folder loading completes.
+#### [AndroidManifest.xml](file:///C:/Cypher/mobile_app/android/app/src/main/AndroidManifest.xml)
+- Add `<intent-filter>` for `action.SEND` and `action.SEND_MULTIPLE` to handle images, videos, and files.
 
-```dart
-// Example fix for URL encoding
-final response = await http.get(
-  Uri.parse("$_baseUrl/files/list?path=${Uri.encodeComponent(_currentPath)}"),
-  headers: _headers,
-).timeout(const Duration(seconds: 5));
-```
-
-#### [file_preview_screen.dart](file:///C:/Cypher/mobile_app/lib/screens/file_preview_screen.dart)
-
-- Refactor download logic to use `IOSink` for streaming directly to disk, preventing OutOfMemory (OOM) errors on large files.
-- Improve `MediaScanner` integration to ensure files show up in the system Downloads app.
-- Ensure the Cancel button is prominent and correctly cleans up resources.
-
-#### [file_browser_screen.dart](file:///C:/Cypher/mobile_app/lib/screens/file_browser_screen.dart)
-
-- Similar refactor as `file_preview_screen.dart` to use `IOSink` for downloads.
-- Fix the download progress sheet to properly handle cancellation and resource cleanup.
+#### [main.dart](file:///C:/Cypher/mobile_app/lib/main.dart)
+- Initialize `ReceiveSharingIntent` to listen for incoming shares.
+- Logic: If a share is received, navigate the user to `/send_to_pc` with the shared files pre-loaded.
 
 ---
 
-### Permissions & Updates
+### [Mobile App] WhatsApp & Quick Access
 
-#### [permission_service.dart](file:///C:/Cypher/mobile_app/lib/services/permission_service.dart)
-
-- Ensure `MANAGE_EXTERNAL_STORAGE` is requested on Android 11+ to provide a better user experience for file management.
-
-#### [home_screen.dart](file:///C:/Cypher/mobile_app/lib/screens/home_screen.dart)
-
-- Ensure the update check runs on startup and shows a clear notification.
-- Add a visual indicator (badge or icon) to the settings/activity button if an update is available.
-
-#### [settings_screen.dart](file:///C:/Cypher/mobile_app/lib/screens/settings_screen.dart)
-
-- Verify "Check for Updates" button provides immediate feedback.
-- Add a "Request All Permissions" button to allow users to easily fix permission issues.
+#### [phone_browser_screen.dart](file:///C:/Cypher/mobile_app/lib/screens/phone_browser_screen.dart)
+- **Shortcut Section**: Add a horizontal list at the top for "Quick Folders":
+    - **WhatsApp Images**: Direct link to `/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images`.
+    - **Downloads**: Link to `/storage/emulated/0/Download`.
+    - **Camera**: Link to `/storage/emulated/0/DCIM/Camera`.
+- This avoids digging through nested folders for the most common items.
 
 ## Verification Plan
 
 ### Manual Verification
-- **Spinner Fix**: Open "Send to PC", click "Choose Destination", and verify folders load (even those with spaces/special chars) and the spinner stops.
-- **Download Visibility**: Download a file and check if it appears in the Android system "Files" -> "Downloads" app immediately.
-- **Large File Download**: Attempt to download a file > 500MB to verify that the app doesn't crash (Streaming to file fix).
-- **Cancellation**: Start a download/upload and click Cancel. Verify the transfer stops and partial files are cleaned up.
-- **Update Check**: Click "Check for Updates" in Settings and verify the "Up to date" or "New version" dialog appears.
-- **Permissions**: Clear app data, open app, and verify it asks for Camera, Location, and Storage permissions.
+- **Share Sheet**: Open your phone's Gallery or a PDF, click "Share," select **CYPHER**, and verify it opens the "Send to PC" screen with the file ready.
+- **WhatsApp Shortcut**: Open "Phone Storage" in Cypher, click the "WhatsApp Images" button, and verify it instantly loads all your WhatsApp photos.
+- **Multiple Files**: Select 3 photos in your Gallery and share them to Cypher. Verify all 3 appear in the "Send to PC" queue.

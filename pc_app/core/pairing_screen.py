@@ -40,16 +40,16 @@ class PairingScreen(ctk.CTkFrame):
         # Wordmark
         wm_frame = ctk.CTkFrame(header, fg_color="transparent")
         wm_frame.pack(side="left")
-        ctk.CTkLabel(wm_frame, text="C", font=("Outfit", 24, "bold"), text_color="#FFFFFF").pack(side="left")
-        ctk.CTkLabel(wm_frame, text="Y", font=("Outfit", 24, "bold"), text_color="#6C63FF").pack(side="left")
-        ctk.CTkLabel(wm_frame, text="PHER", font=("Outfit", 24, "bold"), text_color="#FFFFFF").pack(side="left")
+        ctk.CTkLabel(wm_frame, text="C", font=("Segoe UI", 24, "bold"), text_color="#FFFFFF").pack(side="left")
+        ctk.CTkLabel(wm_frame, text="Y", font=("Segoe UI", 24, "bold"), text_color="#6C63FF").pack(side="left")
+        ctk.CTkLabel(wm_frame, text="PHER", font=("Segoe UI", 24, "bold"), text_color="#FFFFFF").pack(side="left")
         
         # Status Pill
         status_pill = ctk.CTkFrame(header, fg_color="#1A1A1A", height=32, corner_radius=16)
         status_pill.pack(side="right")
         status_dot = ctk.CTkFrame(status_pill, width=8, height=8, corner_radius=4, fg_color="#6C63FF")
         status_dot.pack(side="left", padx=(12, 6), pady=12)
-        ctk.CTkLabel(status_pill, text="Waiting", font=("Outfit", 12), text_color="#86868B").pack(side="left", padx=(0, 12))
+        ctk.CTkLabel(status_pill, text="Waiting", font=("Segoe UI", 12), text_color="#86868B").pack(side="left", padx=(0, 12))
 
     def setup_content(self):
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
@@ -67,11 +67,11 @@ class PairingScreen(ctk.CTkFrame):
 
         # 2. Text Section
         ctk.CTkLabel(self.main_container, text="Someone wants to connect", 
-                     font=("Outfit", 24, "bold"), text_color="#FFFFFF").pack()
+                     font=("Segoe UI", 24, "bold"), text_color="#FFFFFF").pack()
         ctk.CTkLabel(self.main_container, text=self.device_name, 
-                     font=("Outfit", 18, "bold"), text_color="#6C63FF").pack(pady=(5, 2))
+                     font=("Segoe UI", 18, "bold"), text_color="#6C63FF").pack(pady=(5, 2))
         ctk.CTkLabel(self.main_container, text="Is this you? Allow them to access your files.", 
-                     font=("Outfit", 14), text_color="#86868B").pack(pady=(0, 20))
+                     font=("Segoe UI", 14), text_color="#86868B").pack(pady=(0, 20))
 
         # Divider
         ctk.CTkFrame(self.main_container, fg_color="#2C2C2C", height=1, width=400).pack(pady=10)
@@ -92,20 +92,20 @@ class PairingScreen(ctk.CTkFrame):
         
         self.allow_btn = ctk.CTkButton(btn_frame, text="Allow Access", height=50,
                                        fg_color="#6C63FF", hover_color="#7B74FF",
-                                       font=("Outfit", 15, "bold"), corner_radius=25,
+                                       font=("Segoe UI", 15, "bold"), corner_radius=25,
                                        command=self.handle_allow)
         self.allow_btn.pack(side="left", expand=True, fill="x", padx=10)
         
         self.deny_btn = ctk.CTkButton(btn_frame, text="Not Me", height=50,
                                       fg_color="#1A1A1A", hover_color="#2C2C2C",
                                       border_color="#2C2C2C", border_width=1,
-                                      font=("Outfit", 15, "bold"), corner_radius=25,
+                                      font=("Segoe UI", 15, "bold"), corner_radius=25,
                                       command=self.handle_deny)
         self.deny_btn.pack(side="left", expand=True, fill="x", padx=10)
 
     def setup_footer(self):
         ctk.CTkLabel(self, text="You can manage connected devices in Settings", 
-                     font=("Outfit", 11), text_color="#86868B").grid(row=2, column=0, pady=30)
+                     font=("Segoe UI", 11), text_color="#86868B").grid(row=2, column=0, pady=30)
 
     # --- ANIMATION LOGIC ---
 

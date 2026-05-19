@@ -7,7 +7,11 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:convert';
+import 'package:media_scanner/media_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:intl/intl.dart';
 import 'file_preview_screen.dart'; // IMPORTED FOR FLOW
+import '../services/permission_service.dart';
 
 class FileBrowserScreen extends StatefulWidget {
   final String pcIpAddress;
@@ -34,12 +38,17 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   bool _isLoading = true;
   bool _hasError = false;
   bool _isSearching = false;
+  bool _isGridView = false;
+  String _groupBy = "None"; // "None", "Date", "Type"
   final TextEditingController _searchController = TextEditingController();
 
   // Download State
   double _downloadProgress = 0.0;
   String _downloadSpeed = "0 KB/s";
   String _timeLeft = "";
+  http.Client? _downloadClient;
+  StreamSubscription? _downloadSubscription;
+  bool _isDownloading = false;
 
   @override
   void initState() {
@@ -50,6 +59,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _downloadSubscription?.cancel();
+    _downloadClient?.close();
     super.dispose();
   }
 
@@ -70,7 +81,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     if (!mounted) return;
     setState(() { _isLoading = true; _hasError = false; });
     try {
-      final response = await http.get(Uri.parse("$_baseUrl/files"), headers: _headers);
+      final response = await http.get(Uri.parse("$_baseUrl/files"), headers: _headers).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         if (!mounted) return;
         setState(() {
@@ -95,7 +106,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
       final response = await http.get(
           Uri.parse("$_baseUrl/files/browse?path=$encodedPath"),
           headers: _headers
-      );
+      ).timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         if (!mounted) return;
         setState(() {
@@ -133,8 +144,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
 
     if (confirm == true) {
       try {
-        final url = Uri.parse("$_baseUrl/files?path=${Uri.encodeComponent(path)}");
-        final response = await http.delete(url, headers: _headers);
+        final url = Uri.parse("$_baseUrl/files/delete?path=${Uri.encodeComponent(path)}");
+        final response = await http.delete(url, headers: _headers).timeout(const Duration(seconds: 10));
         if (response.statusCode == 200) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Deleted successfully")));
@@ -152,6 +163,45 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
           .where((item) => item['name'].toString().toLowerCase().contains(query.toLowerCase()))
           .toList();
     });
+  }
+
+  String _getDateCategory(String? dateStr) {
+    if (dateStr == null) return "Unknown";
+    try {
+      DateTime date = DateTime.parse(dateStr);
+      DateTime now = DateTime.now();
+      DateTime today = DateTime(now.year, now.month, now.day);
+      DateTime yesterday = today.subtract(const Duration(days: 1));
+      DateTime thisWeekStart = today.subtract(Duration(days: today.weekday - 1));
+      DateTime lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
+      
+      if (date.isAfter(today)) return "Today";
+      if (date.isAfter(yesterday)) return "Yesterday";
+      if (date.isAfter(thisWeekStart)) return "Earlier this week";
+      if (date.isAfter(lastWeekStart)) return "Last week";
+      if (date.year == now.year && date.month == now.month) return "Earlier this month";
+      if (date.year == now.year && date.month == now.month - 1) return "Last month";
+      if (date.year == now.year) return "Earlier this year";
+      return "Long ago";
+    } catch (e) {
+      return "Unknown";
+    }
+  }
+
+  Map<String, List<dynamic>> _getGroupedItems() {
+    Map<String, List<dynamic>> groups = {};
+    for (var item in _filteredItems) {
+      String key = "Other";
+      if (_groupBy == "Date") {
+        key = _getDateCategory(item['modified']);
+      } else if (_groupBy == "Type") {
+        key = item['type'] == 'folder' ? "Folders" : (item['extension']?.toString().toUpperCase() ?? "Files");
+      }
+      
+      if (!groups.containsKey(key)) groups[key] = [];
+      groups[key]!.add(item);
+    }
+    return groups;
   }
 
   // --- NAVIGATION ---
@@ -189,27 +239,46 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   Future<void> _startDownload(Map file) async {
     Navigator.pop(context); // Close options sheet
 
+    // Request Storage Permission
+    if (Platform.isAndroid) {
+      await PermissionService.requestAllPermissions();
+    }
+
     late StateSetter setProgressState;
+    setState(() => _isDownloading = true);
 
     _showDownloadSheet(file, (stateSetter) {
       setProgressState = stateSetter;
     });
 
     try {
-      final client = http.Client();
-      final request = http.Request('GET', Uri.parse("$_baseUrl/files/download?path=${Uri.encodeComponent(file['path'])}"));
+      _downloadClient = http.Client();
+      final request = http.Request('GET', Uri.parse("$_baseUrl/files/download/chunked?path=${Uri.encodeComponent(file['path'])}"));
       request.headers.addAll(_headers);
 
-      final response = await client.send(request);
+      final response = await _downloadClient!.send(request);
       final total = response.contentLength ?? 0;
       int received = 0;
-      List<int> bytes = [];
+      
+      Directory? dir;
+      if (Platform.isAndroid) {
+        dir = Directory('/storage/emulated/0/Download');
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      final saveFile = File("${dir.path}/${file['name']}");
+      final IOSink sink = saveFile.openWrite();
 
       final stopwatch = Stopwatch()..start();
 
-      response.stream.listen((chunk) {
+      _downloadSubscription = response.stream.listen((chunk) {
         received += chunk.length;
-        bytes.addAll(chunk);
+        sink.add(chunk);
 
         final elapsed = stopwatch.elapsed.inSeconds;
 
@@ -233,30 +302,51 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
         });
 
       }, onDone: () async {
-        Directory? dir;
-        if (Platform.isAndroid) {
-          dir = Directory('/storage/emulated/0/Download');
-        } else {
-          dir = await getApplicationDocumentsDirectory();
+        await sink.close();
+        
+        if (!_isDownloading) {
+          if (await saveFile.exists()) await saveFile.delete();
+          return;
         }
 
-        final saveFile = File("${dir.path}/${file['name']}");
-        await saveFile.writeAsBytes(bytes);
+        // Notify Media Scanner
+        if (Platform.isAndroid) {
+          await MediaScanner.loadMedia(path: saveFile.path);
+        }
 
         if (mounted) {
-          setProgressState(() { _downloadProgress = 1.0; });
+          setProgressState(() { _downloadProgress = 1.0; _isDownloading = false; });
+          setState(() => _isDownloading = false);
         }
-        client.close();
-      }, onError: (e) {
-        client.close();
-        if (mounted) Navigator.pop(context);
+        _downloadClient?.close();
+      }, onError: (e) async {
+        await sink.close();
+        if (await saveFile.exists()) await saveFile.delete();
+        _downloadClient?.close();
+        if (mounted) {
+          Navigator.pop(context);
+          setState(() => _isDownloading = false);
+        }
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Download Failed")));
       }, cancelOnError: true);
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
+        setState(() => _isDownloading = false);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Download Failed")));
       }
+    }
+  }
+
+  void _cancelBrowserDownload() async {
+    await _downloadSubscription?.cancel();
+    _downloadClient?.close();
+    try {
+      http.post(Uri.parse("$_baseUrl/files/download/cancel"), headers: _headers);
+    } catch (_) {}
+    if (mounted) {
+      setState(() => _isDownloading = false);
+      Navigator.pop(context);
     }
   }
 
@@ -277,7 +367,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
               color: const Color(0xFF6C63FF),
               child: _hasError
                   ? _buildErrorState()
-                  : (_isLoading ? _buildShimmer() : _buildList()),
+                  : (_isLoading ? _buildShimmer() : (_isGridView ? _buildGrid() : _buildList())),
             ),
           ),
         ],
@@ -296,6 +386,25 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
       title: Text(widget.initialPath == null ? "Browser" : widget.initialPath!.split(Platform.pathSeparator).last, 
         style: GoogleFonts.outfit(color: Colors.white, fontSize: 18)),
       actions: [
+        IconButton(
+          icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view, color: Colors.white, size: 20),
+          onPressed: () => setState(() => _isGridView = !_isGridView),
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.filter_list, color: Colors.white, size: 20),
+          onSelected: (val) {
+            setState(() {
+              if (val.startsWith("group:")) {
+                _groupBy = val.split(":").last;
+              }
+            });
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(value: "group:None", child: Text("Don't Group")),
+            const PopupMenuItem(value: "group:Date", child: Text("Group by Date")),
+            const PopupMenuItem(value: "group:Type", child: Text("Group by Type")),
+          ],
+        ),
         IconButton(
           icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.white),
           onPressed: () => setState(() {
@@ -388,53 +497,225 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   Widget _buildList() {
     if (_filteredItems.isEmpty) return _buildEmptyState();
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(20),
+    if (_groupBy != "None") {
+      final groups = _getGroupedItems();
+      final List<dynamic> flattenedItems = [];
+      groups.forEach((key, items) {
+        flattenedItems.add({'isHeader': true, 'headerName': key});
+        flattenedItems.addAll(items);
+      });
+
+      return ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
+        itemCount: flattenedItems.length,
+        itemBuilder: (context, index) {
+          final item = flattenedItems[index];
+          if (item is Map && item['isHeader'] == true) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text(item['headerName'], style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontWeight: FontWeight.bold, fontSize: 13)),
+            );
+          }
+          return _buildListItem(item);
+        },
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
       itemCount: _filteredItems.length,
-      separatorBuilder: (context, index) => const Divider(color: Color(0xFF1A1A1A), height: 1),
       itemBuilder: (context, index) {
-        final item = _filteredItems[index];
-        bool isFolder = item['type'] == 'folder' || item['type'] == 'directory';
-        return FadeInUp(
-          duration: const Duration(milliseconds: 300),
-          delay: Duration(milliseconds: index * 10),
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: _buildFileIcon(item['type'], item['name']),
-            title: Text(item['name'], style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis),
-            subtitle: Text("${item['size'] ?? ''} • ${item['modified'] ?? ''}", style: const TextStyle(color: Color(0xFF86868B), fontSize: 11)),
-            trailing: IconButton(
-              icon: Icon(isFolder ? Icons.chevron_right : Icons.more_vert, color: const Color(0xFF444444)),
-              onPressed: isFolder ? null : () => _showOptionsSheet(item),
-            ),
-            onTap: () => isFolder ? _navigateToFolder(item) : _navigateToFile(item),
-            onLongPress: () => _handleDelete(item['path'], item['name']),
-          ),
-        );
+        return _buildListItem(_filteredItems[index]);
       },
     );
   }
 
-  Widget _buildFileIcon(String type, String name) {
+  Widget _buildListItem(dynamic item) {
+    bool isFolder = item['type'] == 'folder' || item['type'] == 'directory';
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: _buildFileIcon(item['type'], item['name'], item['path']),
+          title: Text(item['name'], style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis),
+          subtitle: Text("${_formatSize(item['size'])} • ${item['modified'] ?? ''}", style: const TextStyle(color: Color(0xFF86868B), fontSize: 11)),
+          trailing: IconButton(
+            icon: Icon(isFolder ? Icons.chevron_right : Icons.more_vert, color: const Color(0xFF444444)),
+            onPressed: isFolder ? null : () => _showOptionsSheet(item),
+          ),
+          onTap: () => isFolder ? _navigateToFolder(item) : _navigateToFile(item),
+          onLongPress: () => _handleDelete(item['path'], item['name']),
+        ),
+        const Divider(color: Color(0xFF1A1A1A), height: 1),
+      ],
+    );
+  }
+
+  Widget _buildGrid() {
+    if (_filteredItems.isEmpty) return _buildEmptyState();
+
+    if (_groupBy != "None") {
+      final groups = _getGroupedItems();
+      final sortedKeys = groups.keys.toList();
+      return ListView.builder(
+        padding: const EdgeInsets.all(20),
+        itemCount: sortedKeys.length,
+        itemBuilder: (context, gIdx) {
+          String key = sortedKeys[gIdx];
+          List items = groups[key]!;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Text(key, style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 15,
+                  mainAxisSpacing: 15,
+                  childAspectRatio: 0.8,
+                ),
+                itemCount: items.length,
+                itemBuilder: (context, i) => _buildGridItem(items[i]),
+              ),
+              const SizedBox(height: 20),
+            ],
+          );
+        },
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(20),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 15,
+        mainAxisSpacing: 15,
+        childAspectRatio: 0.8,
+      ),
+      itemCount: _filteredItems.length,
+      itemBuilder: (context, index) {
+        return _buildGridItem(_filteredItems[index]);
+      },
+    );
+  }
+
+  Widget _buildGridItem(dynamic item) {
+    bool isFolder = item['type'] == 'folder' || item['type'] == 'directory';
+    return GestureDetector(
+      onTap: () => isFolder ? _navigateToFolder(item) : _navigateToFile(item),
+      onLongPress: () => _handleDelete(item['path'], item['name']),
+      child: Column(
+        children: [
+          Expanded(
+            child: _buildFileIcon(item['type'], item['name'], item['path'], large: true),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            item['name'],
+            textAlign: TextAlign.center,
+            style: GoogleFonts.outfit(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatSize(dynamic size) {
+    if (size == null || size == 0) return "";
+    int bytes = (size is int) ? size : int.tryParse(size.toString()) ?? 0;
+    if (bytes == 0) return "";
+    if (bytes < 1024) return "$bytes B";
+    if (bytes < 1024 * 1024) return "${(bytes / 1024).toStringAsFixed(1)} KB";
+    if (bytes < 1024 * 1024 * 1024) return "${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB";
+    return "${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB";
+  }
+
+  Widget _buildFileIcon(String type, String name, String path, {bool large = false}) {
     Color color = const Color(0xFF86868B);
     IconData icon = Icons.insert_drive_file;
     String ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    bool isImage = ['jpg', 'png', 'jpeg', 'gif', 'bmp'].contains(ext);
+    bool isFolder = type == 'folder' || type == 'directory' || type == 'drive';
 
-    if (type == 'folder' || type == 'directory') {
+    if (isFolder) {
       color = const Color(0xFF6C63FF);
-      icon = Icons.folder;
+      icon = type == 'drive' ? Icons.storage_rounded : Icons.folder;
     } else {
-      if (['jpg', 'png', 'jpeg', 'gif'].contains(ext)) { color = Colors.greenAccent; icon = Icons.image; }
+      if (isImage) { color = Colors.greenAccent; icon = Icons.image; }
       else if (['mp4', 'mkv', 'mov'].contains(ext)) { color = Colors.blueAccent; icon = Icons.movie; }
       else if (['pdf'].contains(ext)) { color = Colors.redAccent; icon = Icons.picture_as_pdf; }
       else if (['zip', 'rar'].contains(ext)) { color = Colors.amberAccent; icon = Icons.archive; }
+      else if (['exe', 'msi', 'apk'].contains(ext)) { color = Colors.orangeAccent; icon = Icons.terminal; }
+      else if (['doc', 'docx', 'xlsx', 'xls', 'ppt', 'pptx'].contains(ext)) { color = Colors.lightBlueAccent; icon = Icons.description; }
+    }
+
+    // Windows Style Folder Peek
+    if (isFolder && large) {
+      return Container(
+        width: double.infinity, height: double.infinity,
+        decoration: BoxDecoration(color: color.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withOpacity(0.1))),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(top: 15, child: Icon(icon, color: color.withOpacity(0.2), size: 64)),
+            Positioned(bottom: 25, child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildSmallPeek(Colors.white24),
+                const SizedBox(width: 4),
+                _buildSmallPeek(Colors.white24),
+              ],
+            )),
+          ],
+        ),
+      );
+    }
+
+    Widget iconWidget = Icon(icon, color: color, size: large ? 32 : 20);
+
+    if (isImage) {
+      iconWidget = Image.network(
+        "$_baseUrl/files/thumbnail?path=${Uri.encodeComponent(path)}",
+        headers: _headers,
+        width: large ? double.infinity : 40,
+        height: large ? double.infinity : 40,
+        cacheWidth: large ? 300 : 120, // Optimization for memory
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Icon(icon, color: color, size: large ? 32 : 20),
+      );
+      
+      if (large) {
+        iconWidget = ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: iconWidget,
+        );
+      } else {
+        iconWidget = ClipOval(child: iconWidget);
+      }
     }
 
     return Container(
-      width: 40, height: 40,
-      decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-      child: Icon(icon, color: color, size: 20),
+      width: large ? double.infinity : 40,
+      height: large ? double.infinity : 40,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        shape: large ? BoxShape.rectangle : BoxShape.circle,
+        borderRadius: large ? BorderRadius.circular(12) : null,
+      ),
+      child: Center(child: iconWidget),
     );
+  }
+
+  Widget _buildSmallPeek(Color color) {
+    return Container(width: 14, height: 18, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)));
   }
 
   void _showOptionsSheet(Map item) {
@@ -496,13 +777,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                       child: LinearProgressIndicator(value: _downloadProgress, backgroundColor: Colors.white12, color: const Color(0xFF6C63FF), minHeight: 10),
                     ),
                     const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_downloadSpeed, style: const TextStyle(color: Color(0xFF86868B), fontSize: 12)),
-                        Text(_timeLeft, style: const TextStyle(color: Color(0xFF86868B), fontSize: 12)),
-                      ],
-                    ),
+                    if (_downloadProgress < 1.0)
+                      TextButton(
+                        onPressed: _cancelBrowserDownload,
+                        child: const Text("Cancel Download", style: TextStyle(color: Color(0xFFFF453A), fontWeight: FontWeight.bold)),
+                      ),
                   ] else ...[
                     ZoomIn(child: const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 70)),
                     const SizedBox(height: 15),

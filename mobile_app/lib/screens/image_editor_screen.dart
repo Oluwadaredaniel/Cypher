@@ -56,6 +56,11 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Synced to PC Clipboard ✓")));
           Navigator.pop(context);
+          // Track Feature Usage
+          http.post(Uri.parse('https://cypher-3ctq.onrender.com/api/track/feature'), 
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'feature': 'image_sync'})
+          );
         }
       }
     } catch (e) {

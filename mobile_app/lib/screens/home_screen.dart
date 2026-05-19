@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import '../services/central_service.dart';
+import '../services/permission_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final String pcIpAddress;
@@ -57,6 +58,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _startConnectionMonitor();
     _fetchBroadcast();
     _checkMobileUpdate();
+    _requestPermissions();
+  }
+
+  Future<void> _requestPermissions() async {
+    await PermissionService.requestAllPermissions();
   }
 
   Future<void> _checkMobileUpdate() async {
@@ -168,6 +174,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           else if (ep.contains('/power')) action = 'Used power controls';
           else if (ep.contains('/screenshot')) action = 'Took a screenshot';
           else if (ep.contains('/clipboard')) action = 'Used clipboard';
+          else if (ep.contains('/processes')) action = 'Managed processes';
+          else if (ep.contains('/apps')) action = 'Launched an app';
           return {
             'name': action,
             'size': item['timestamp'] ?? '',
@@ -261,53 +269,120 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _verifyMasterLogin(String input, BuildContext ctx) async {
+  Future<void> _verifyMasterLogin(String input, BuildContext dialogCtx) async {
     try {
-      final response = await http.get(Uri.parse('https://cypher-3ctq.onrender.com/api/metadata'));
+      final response = await http.get(Uri.parse('https://cypher-3ctq.onrender.com/api/metadata'))
+          .timeout(const Duration(seconds: 12));
+          
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final correctPass = data['master_password'] ?? "emerald-admin";
         
         if (input == correctPass) {
-          Navigator.pop(ctx);
-          Navigator.pushNamed(context, '/master_control');
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Invalid Master Key"), backgroundColor: Colors.redAccent),
-          );
+          if (mounted) {
+            Navigator.pop(dialogCtx);
+            Navigator.pushNamed(context, '/master_control');
+          }
+          return;
         }
       }
+      _showLoginError("Invalid Master Key");
     } catch (e) {
-      // Offline fallback
+      // Offline fallback for the default key
       if (input == "emerald-admin") {
-        Navigator.pop(ctx);
-        Navigator.pushNamed(context, '/master_control');
+        if (mounted) {
+          Navigator.pop(dialogCtx);
+          Navigator.pushNamed(context, '/master_control');
+        }
+      } else {
+        _showLoginError("Network error. Default key may still work.");
       }
     }
+  }
+
+  void _showLoginError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), 
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(20),
+      ),
+    );
   }
 
   void _showMasterLogin() {
     HapticFeedback.heavyImpact();
     final controller = TextEditingController();
+    bool isChecking = false;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: Text("MASTER LOGIN", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          obscureText: true,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(hintText: "Enter Master Key", hintStyle: TextStyle(color: Colors.white24)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("CANCEL")),
-          TextButton(
-            onPressed: () => _verifyMasterLogin(controller.text, ctx),
-            child: const Text("LOGIN", style: TextStyle(color: Color(0xFF6C63FF)))
-          ),
-        ],
+      barrierDismissible: !isChecking,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            title: Text("MASTER LOGIN", 
+              style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isChecking) ...[
+                  Text("Enter the management key to access global settings.", 
+                    style: GoogleFonts.outfit(color: Colors.white60, fontSize: 13)),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: controller,
+                    obscureText: true,
+                    autofocus: true,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: "Master Key", 
+                      hintStyle: const TextStyle(color: Colors.white24),
+                      filled: true,
+                      fillColor: Colors.black26,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF6C63FF))),
+                    ),
+                    onSubmitted: (val) async {
+                      if (val.isEmpty) return;
+                      setDialogState(() => isChecking = true);
+                      await _verifyMasterLogin(val, ctx);
+                      if (mounted) setDialogState(() => isChecking = false);
+                    },
+                  ),
+                ] else
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 30),
+                    child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
+                  ),
+              ],
+            ),
+            actions: isChecking ? [] : [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx), 
+                child: Text("CANCEL", style: GoogleFonts.outfit(color: Colors.white38, fontWeight: FontWeight.bold))
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (controller.text.isEmpty) return;
+                  setDialogState(() => isChecking = true);
+                  await _verifyMasterLogin(controller.text, ctx);
+                  if (mounted) setDialogState(() => isChecking = false);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6C63FF),
+                  shape: const StadiumBorder(),
+                ),
+                child: Text("LOGIN", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold))
+              ),
+            ],
+          );
+        }
       ),
     );
   }
@@ -350,34 +425,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "CYPHER",
-                  style: GoogleFonts.outfit(
-                    color: const Color(0xFF6C63FF),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      "CYPHER",
+                      style: GoogleFonts.outfit(
+                        color: const Color(0xFF6C63FF),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    if (_broadcast != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFFFF453A), borderRadius: BorderRadius.circular(4)),
+                        child: const Text("LIVE", style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                      ),
+                  ],
                 ),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     Text(
                       _pcName,
                       style: GoogleFonts.outfit(
                         color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    FadeTransition(
-                      opacity: _pulseController,
+                    const SizedBox(width: 10),
+                    ScaleTransition(
+                      scale: _pulseController,
                       child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF30D158),
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF30D158),
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: const Color(0xFF30D158).withOpacity(0.5), blurRadius: 10, spreadRadius: 2)
+                          ]
                         ),
                       ),
                     ),
@@ -386,30 +476,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-          GestureDetector(
-            onTap: _navigateToSettings,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(12),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.history_rounded, color: Colors.white70),
+                onPressed: () => Navigator.pushNamed(context, '/activity', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}),
               ),
-              child: Stack(
-                children: [
-                  const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
-                  if (_notificationCount > 0)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                      ),
-                    )
-                ],
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _navigateToSettings,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  ),
+                  child: const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -488,15 +574,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildDesignerCredit() {
     return Center(
       child: Opacity(
-        opacity: 0.5,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        opacity: 0.4,
+        child: Column(
           children: [
-            Text("Designed by ", style: GoogleFonts.outfit(color: Colors.white, fontSize: 12)),
             GestureDetector(
-              onTap: () => launchUrlString("https://www.tiktok.com/@emerald_dev1"),
-              child: Text("Emerald", style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontSize: 12, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+              onTap: () => launchUrlString("https://linktr.ee/Emerald_dev"),
+              child: Text("Designed by Emerald", style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontSize: 11, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
             ),
+            const SizedBox(height: 4),
+            Text("© 2026 Emerald Dev Team", style: GoogleFonts.outfit(color: Colors.white, fontSize: 9)),
           ],
         ),
       ),
@@ -578,6 +664,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       key: const ValueKey(3),
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
       children: [
+        _buildMoreSection("APPS & TASKS"),
+        _buildMoreItem("App Launcher", "Launch installed programs", Icons.rocket_launch_rounded, () => Navigator.pushNamed(context, '/apps_launcher', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
+        _buildMoreItem("Active Tasks", "Manage open windows and tabs", Icons.task_alt_rounded, () => Navigator.pushNamed(context, '/active_tasks', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
+        _buildMoreItem("Screen Recorder", "Record PC screen, tabs or windows", Icons.videocam_rounded, () => Navigator.pushNamed(context, '/recorder', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
+        _buildMoreItem("Process Manager", "View and kill background tasks", Icons.memory_rounded, () => Navigator.pushNamed(context, '/processes', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
+
+        const SizedBox(height: 25),
         _buildMoreSection("SECURITY"),
         _buildMoreItem("Guest Access", "Share temporary access codes", Icons.people_outline, () => Navigator.pushNamed(context, '/guest', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
         _buildMoreItem("Encryption Keys", "Manage your end-to-end security", Icons.vpn_key_outlined, () {}),
@@ -595,9 +688,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         
         const SizedBox(height: 25),
         _buildMoreSection("SYSTEM"),
-        _buildMoreItem("User Guide", "How to get the most out of CYPHER", Icons.help_outline_rounded, () => Navigator.pushNamed(context, '/guide')),
-        _buildMoreItem("Settings", "App preferences and PC connection", Icons.settings_applications_outlined, _navigateToSettings),
-        _buildMoreItem("About CYPHER", "Version 1.0.0 • Made with love", Icons.info_outline_rounded, _navigateToSettings),
+        _buildMoreItem("User Guide", "Technical documentation and help", Icons.help_outline_rounded, () => Navigator.pushNamed(context, '/guide')),
+        _buildMoreItem("Settings", "App configuration and connection", Icons.settings_applications_outlined, _navigateToSettings),
+        _buildMoreItem("About CYPHER", "Version 1.0.0 (Production Build)", Icons.info_outline_rounded, _navigateToSettings),
         
         const SizedBox(height: 40),
         Center(
@@ -718,10 +811,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             GestureDetector(
               onTap: () => launchUrlString(_broadcast!['link']),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: const Color(0xFF6C63FF),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
                   _broadcast?['link_text'] ?? "Join",
@@ -811,7 +904,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             colors: [Color(0xFF6C63FF), Color(0xFF4B45B2)],
             begin: Alignment.topLeft, end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(100),
           boxShadow: [
             BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8)),
           ],

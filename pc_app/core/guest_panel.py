@@ -14,7 +14,7 @@ BASE_URL = "http://localhost:5000"
 
 class GuestPanel(ctk.CTkFrame):
     def __init__(self, parent, controller=None):
-        super().__init__(parent, fg_color="#0D0D0D", corner_radius=0)
+        super().__init__(parent, fg_color="#08080A", corner_radius=0)
         self.controller = controller
         
         # Session State
@@ -28,7 +28,7 @@ class GuestPanel(ctk.CTkFrame):
         
         # UI Container
         self.container = ctk.CTkFrame(self, fg_color="transparent")
-        self.container.pack(fill="both", expand=True, padx=40, pady=30)
+        self.container.pack(fill="both", expand=True, padx=20, pady=10)
         
         self.show_state("NO_SESSION")
 
@@ -58,49 +58,51 @@ class GuestPanel(ctk.CTkFrame):
 
     # --- STATE 1: NO SESSION ---
     def render_no_session(self):
-        ctk.CTkLabel(self.container, text="Guest Access", font=("Helvetica Neue", 22, "bold"), text_color="#FFFFFF").pack(anchor="w")
-        ctk.CTkLabel(self.container, text="Let someone temporarily browse your files", font=("Helvetica Neue", 13), text_color="#86868B").pack(anchor="w", pady=(2, 20))
+        ctk.CTkLabel(self.container, text="Guest Access Control", font=("Segoe UI", 20, "bold"), text_color="#FFFFFF").pack(anchor="w")
+        ctk.CTkLabel(self.container, text="Securely share folders with visitors.", font=("Segoe UI", 13), text_color="#8E8E93").pack(anchor="w", pady=(2, 20))
         
-        placeholder = ctk.CTkFrame(self.container, width=300, height=220, fg_color="transparent", 
-                           border_width=2, border_color="#6C63FF", corner_radius=24)
-        placeholder.pack(pady=40)
+        placeholder = ctk.CTkFrame(self.container, width=320, height=240, fg_color="#121216",
+                           border_width=1, border_color="#1D1D26", corner_radius=28)
+        placeholder.pack(pady=30)
         placeholder.pack_propagate(False)
         
-        ctk.CTkLabel(placeholder, text="👥", font=("Arial", 60)).place(relx=0.5, rely=0.4, anchor="center")
-        ctk.CTkLabel(placeholder, text="No active session", font=("Helvetica Neue", 14), text_color="#86868B").place(relx=0.5, rely=0.7, anchor="center")
+        ctk.CTkLabel(placeholder, text="👥", font=("Arial", 64)).place(relx=0.5, rely=0.4, anchor="center")
+        ctk.CTkLabel(placeholder, text="No active guest session", font=("Segoe UI", 14, "bold"), text_color="#3F3F46").place(relx=0.5, rely=0.7, anchor="center")
         
-        ctk.CTkButton(self.container, text="Start Guest Session", fg_color="#6C63FF", hover_color="#5B52E0",
-                      height=45, corner_radius=22, font=("Helvetica Neue", 14, "bold"),
-                      command=lambda: self.show_state("SETUP")).pack(fill="x", pady=20)
+        ctk.CTkButton(self.container, text="Start New Guest Session", fg_color="#6C63FF", hover_color="#5B52E0",
+                      height=52, corner_radius=16, font=("Segoe UI", 14, "bold"),
+                      command=lambda: self.show_state("SETUP")).pack(fill="x", pady=20, padx=40)
 
     # --- STATE 2: SETUP ---
     def render_setup(self):
-        ctk.CTkLabel(self.container, text="Set up guest access", font=("Helvetica Neue", 20, "bold"), text_color="#FFFFFF").pack(anchor="w")
+        ctk.CTkLabel(self.container, text="Setup Guest Access", font=("Segoe UI", 20, "bold"), text_color="#FFFFFF").pack(anchor="w")
         
         # Folder Selection
-        ctk.CTkLabel(self.container, text="Which folders can they see?", font=("Helvetica Neue", 14, "bold"), text_color="#FFFFFF").pack(anchor="w", pady=(25, 10))
+        ctk.CTkLabel(self.container, text="Which folders can they see?", font=("Segoe UI", 13, "bold"), text_color="#8E8E93").pack(anchor="w", pady=(20, 10))
         
-        self.folder_scroll = ctk.CTkScrollableFrame(self.container, fg_color="#1A1A1A", height=200, corner_radius=16)
+        self.folder_scroll = ctk.CTkScrollableFrame(self.folder_scroll_parent if hasattr(self, 'folder_scroll_parent') else self.container,
+                                                    fg_color="#121216", height=180, corner_radius=20, border_width=1, border_color="#1D1D26")
         self.folder_scroll.pack(fill="x", pady=5)
         
         # Duration Selection
-        ctk.CTkLabel(self.container, text="How long?", font=("Helvetica Neue", 14, "bold"), text_color="#FFFFFF").pack(anchor="w", pady=(20, 10))
+        ctk.CTkLabel(self.container, text="Session duration", font=("Segoe UI", 13, "bold"), text_color="#8E8E93").pack(anchor="w", pady=(15, 10))
         duration_frame = ctk.CTkFrame(self.container, fg_color="transparent")
         duration_frame.pack(fill="x")
         
         self.dur_btns = {}
         durations = [("15 min", 15), ("30 min", 30), ("1 hour", 60), ("2 hours", 120)]
         for label, mins in durations:
-            btn = ctk.CTkButton(duration_frame, text=label, width=100, height=36, corner_radius=18,
-                                fg_color="#6C63FF" if mins == self.selected_duration else "#1A1A1A",
-                                border_width=1, border_color="#6C63FF" if mins == self.selected_duration else "#2C2C2C",
+            btn = ctk.CTkButton(duration_frame, text=label, width=90, height=38, corner_radius=14,
+                                fg_color="#6C63FF" if mins == self.selected_duration else "#121216",
+                                text_color="#FFFFFF" if mins == self.selected_duration else "#8E8E93",
+                                border_width=1, border_color="#6C63FF" if mins == self.selected_duration else "#1D1D26",
                                 command=lambda m=mins: self.set_duration(m))
-            btn.pack(side="left", padx=5)
+            btn.pack(side="left", padx=4)
             self.dur_btns[mins] = btn
 
         ctk.CTkButton(self.container, text="Generate Access Code", fg_color="#6C63FF", hover_color="#5B52E0",
-                      height=45, corner_radius=22, font=("Helvetica Neue", 14, "bold"),
-                      command=self.start_session).pack(fill="x", pady=30)
+                      height=52, corner_radius=16, font=("Segoe UI", 14, "bold"),
+                      command=self.start_session).pack(fill="x", pady=(25, 0), padx=40)
         
         self.fetch_available_folders()
 
@@ -134,30 +136,33 @@ class GuestPanel(ctk.CTkFrame):
 
     # --- STATE 3: ACTIVE ---
     def render_active(self):
-        # Green Banner
-        self.status_banner = ctk.CTkFrame(self.container, fg_color="#0D2818", height=40, corner_radius=12)
+        # Green Banner (Glass)
+        self.status_banner = ctk.CTkFrame(self.container, fg_color="#12241A", height=44, corner_radius=12, border_width=1, border_color="#1F4D32")
         self.status_banner.pack(fill="x", pady=(0, 20))
-        self.status_text = ctk.CTkLabel(self.status_banner, text="Guest session is active", text_color="#30D158", font=("Helvetica Neue", 13, "bold"))
-        self.status_text.pack(pady=8)
+        self.status_text = ctk.CTkLabel(self.status_banner, text="Guest session is active", text_color="#30D158", font=("Segoe UI", 13, "bold"))
+        self.status_text.pack(pady=10)
         
-        # QR Code Area
-        self.qr_label = ctk.CTkLabel(self.container, text="")
-        self.qr_label.pack(pady=10)
-        ctk.CTkLabel(self.container, text="Ask your guest to scan this", text_color="#86868B", font=("Helvetica Neue", 12)).pack()
+        # QR Code Area (Centered Card)
+        qr_card = ctk.CTkFrame(self.container, fg_color="#121216", corner_radius=24, border_width=1, border_color="#1D1D26")
+        qr_card.pack(pady=10, padx=20)
         
-        # Timer
-        self.timer_label = ctk.CTkLabel(self.container, text="00:00", font=("Courier New", 44, "bold"), text_color="#6C63FF")
-        self.timer_label.pack(pady=20)
+        self.qr_label = ctk.CTkLabel(qr_card, text="")
+        self.qr_label.pack(pady=20, padx=20)
+        ctk.CTkLabel(self.container, text="Ask your guest to scan this", text_color="#8E8E93", font=("Segoe UI", 12)).pack()
+
+        # Timer (Bold Accent)
+        self.timer_label = ctk.CTkLabel(self.container, text="00:00", font=("Courier New", 48, "bold"), text_color="#6C63FF")
+        self.timer_label.pack(pady=15)
         
         # Info
         shared_count = sum(1 for v in self.selected_folders.values() if v.get())
-        ctk.CTkLabel(self.container, text=f"Folders shared: {shared_count} selected", font=("Helvetica Neue", 12), text_color="#86868B").pack()
+        ctk.CTkLabel(self.container, text=f"Folders shared: {shared_count} selected", font=("Segoe UI", 12), text_color="#3F3F46").pack()
         
         # End Button
-        self.end_btn = ctk.CTkButton(self.container, text="End Session", fg_color="#1A1A1A", hover_color="#FF453A",
-                                     height=45, corner_radius=22, border_width=1, border_color="#333",
+        self.end_btn = ctk.CTkButton(self.container, text="End Session Now", fg_color="#1A1A22", hover_color="#FF453A",
+                                     height=48, corner_radius=16, border_width=1, border_color="#2C2C35",
                                      command=self.end_session)
-        self.end_btn.pack(fill="x", pady=25)
+        self.end_btn.pack(fill="x", pady=20, padx=40)
 
         self.generate_qr_logic()
         self.countdown_tick()
@@ -174,7 +179,7 @@ class GuestPanel(ctk.CTkFrame):
                 ts = int(time.time())
                 self.guest_session_id = f"guest-session-{ts}"
                 pair_data = {"pairing_code": code, "device_id": self.guest_session_id, "device_name": "Guest Device"}
-                r_pair = requests.post(f"{BASE_URL}/pair", json=pair_data, headers=HEADERS).json()
+                r_pair = requests.post(f"{BASE_URL}/pair_device", json=pair_data, headers=HEADERS).json()
                 
                 if r_pair.get("success"):
                     token = r_pair.get("token")

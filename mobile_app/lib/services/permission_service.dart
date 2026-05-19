@@ -34,7 +34,7 @@ class PermissionService {
     // This is often required for the app to see ALL files in Download folder
     if (sdkInt >= 30) {
       var status = await Permission.manageExternalStorage.status;
-      if (status.isDenied) {
+      if (!status.isGranted) {
         await Permission.manageExternalStorage.request();
       }
     }

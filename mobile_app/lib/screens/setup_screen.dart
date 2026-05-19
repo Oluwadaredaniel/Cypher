@@ -5,6 +5,7 @@ import 'package:animate_do/animate_do.dart';
 import 'package:nsd/nsd.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:http/http.dart' as http;
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
@@ -50,7 +51,15 @@ class _SetupScreenState extends State<SetupScreen> {
         if (mounted) {
           setState(() {
             _discoveredPCs.clear();
-            _discoveredPCs.addAll(_discovery!.services);
+            // AUDIT: Ensure we don't show duplicate entries by checking host/name
+            final seen = <String>{};
+            for (var service in _discovery!.services) {
+              final key = "${service.name}-${service.host}";
+              if (!seen.contains(key)) {
+                _discoveredPCs.add(service);
+                seen.add(key);
+              }
+            }
           });
         }
       });
@@ -58,7 +67,7 @@ class _SetupScreenState extends State<SetupScreen> {
       debugPrint('Discovery error: $e');
     }
 
-    Timer(const Duration(seconds: 10), () {
+    Timer(const Duration(seconds: 30), () {
       if (mounted) setState(() => _isScanning = false);
     });
   }
@@ -150,8 +159,18 @@ class _SetupScreenState extends State<SetupScreen> {
               ),
               const SizedBox(height: 40),
 
-              Text("FOUND ON NETWORK",
-                  style: GoogleFonts.outfit(color: const Color(0xFF4C4C4C), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("FOUND ON NETWORK",
+                      style: GoogleFonts.outfit(color: const Color(0xFF4C4C4C), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                  if (!_isScanning)
+                    GestureDetector(
+                      onTap: _startDiscovery,
+                      child: Text("REFRESH", style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontSize: 11, fontWeight: FontWeight.bold)),
+                    )
+                ],
+              ),
               const SizedBox(height: 16),
 
               Expanded(
@@ -171,7 +190,15 @@ class _SetupScreenState extends State<SetupScreen> {
 
               const SizedBox(height: 20),
               _buildManualInput(),
-              const SizedBox(height: 30),
+              const SizedBox(height: 10),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.pushNamed(context, '/guide'),
+                  child: Text("Can't find your PC? View Troubleshooting", 
+                    style: GoogleFonts.outfit(color: const Color(0xFF6C63FF).withOpacity(0.8), fontSize: 13)),
+                ),
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -237,32 +264,85 @@ class _SetupScreenState extends State<SetupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("OR ENTER ADDRESS MANUALLY",
-              style: GoogleFonts.outfit(color: const Color(0xFF4C4C4C), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("OR ENTER ADDRESS MANUALLY",
+                  style: GoogleFonts.outfit(color: const Color(0xFF4C4C4C), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+              if (_ipController.text.isNotEmpty)
+                _isTestingConnection 
+                  ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6C63FF)))
+                  : const SizedBox.shrink(),
+            ],
+          ),
           const SizedBox(height: 12),
           Container(
-            decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(20)),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A), 
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _ipController.text.isNotEmpty ? const Color(0xFF6C63FF).withOpacity(0.3) : Colors.transparent)
+            ),
             child: TextField(
               controller: _ipController,
               keyboardType: TextInputType.number,
               style: GoogleFonts.outfit(color: Colors.white),
+              onChanged: (v) => setState(() {}),
               decoration: InputDecoration(
-                hintText: "e.g. 192.168.1.5",
-                hintStyle: GoogleFonts.outfit(color: const Color(0xFF3A3A3C)),
+                hintText: "Enter address shown on PC (e.g. 192.168.1.5)",
+                hintStyle: GoogleFonts.outfit(color: const Color(0xFF3A3A3C), fontSize: 13),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
                 border: InputBorder.none,
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF6C63FF)),
-                  onPressed: () {
-                    if (_ipController.text.isNotEmpty) {
-                      Navigator.pushNamed(context, '/pairing', arguments: {'pcIpAddress': _ipController.text});
-                    }
-                  },
+                  onPressed: _testAndConnect,
                 ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  bool _isTestingConnection = false;
+  void _testAndConnect() async {
+    if (_ipController.text.isEmpty) return;
+    
+    setState(() => _isTestingConnection = true);
+    String ip = _ipController.text.trim();
+    
+    // AUDIT FIX: Prevent port doubling if user enters 192.168.1.5:5000
+    if (!ip.contains(":")) {
+      ip = "$ip:5000";
+    } else if (ip.endsWith(":5000")) {
+      // Correct, use as is
+    } else {
+      // Possibly another port, but let's assume they want the server's port
+      // For now, if it has a port, we trust it, otherwise we append :5000
+    }
+
+    try {
+      final response = await http.get(Uri.parse('http://$ip/connect-code')).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        // Strip port for pairing screen if it's the default 5000 to keep UI clean
+        final cleanIp = ip.contains(":") ? ip.split(":")[0] : ip;
+        Navigator.pushNamed(context, '/pairing', arguments: {'pcIpAddress': cleanIp});
+      } else {
+        _showConnectionError();
+      }
+    } catch (e) {
+      _showConnectionError();
+    } finally {
+      if (mounted) setState(() => _isTestingConnection = false);
+    }
+  }
+
+  void _showConnectionError() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Could not reach PC at this address. Check your Hotspot/WiFi."),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

@@ -2,11 +2,11 @@
 ; This script requires Inno Setup (https://jrsoftware.org/isdl.php)
 
 [Setup]
-AppId={{D3A5F6E8-4B2C-4E1D-9A7F-E8D9C0B1A2D3}
+AppId={{D3A5F6E8-4B2C-4E1D-9A7F-E8D9C0B1A2D3}}
 AppName=CYPHER
 AppVersion=1.0.0
 AppPublisher=Emerald Dev
-AppPublisherURL=https://tiktok.com/@emerald_dev1
+AppPublisherURL=https://linktr.ee/Emerald_dev
 AppSupportURL=https://tiktok.com/@emerald_dev1
 AppUpdatesURL=https://tiktok.com/@emerald_dev1
 
@@ -14,6 +14,11 @@ AppUpdatesURL=https://tiktok.com/@emerald_dev1
 DefaultDirName={localappdata}\CYPHER
 DefaultGroupName=CYPHER
 AllowNoIcons=yes
+
+; [FIX] Auto-close old version before updating
+CloseApplications=yes
+RestartApplications=yes
+AppMutex=CypherAppMutex_D3A5F6E8
 
 ; The following line specifies where to save the generated setup.exe
 OutputDir=dist\installer

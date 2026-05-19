@@ -21,7 +21,7 @@ class _PhoneBrowserScreenState extends State<PhoneBrowserScreen> {
   Directory? _currentDir;
   List<FileSystemEntity> _items = [];
   bool _isLoading = true;
-  bool _showHidden = true;
+  bool _showHidden = false;
 
   @override
   void initState() {
@@ -31,7 +31,6 @@ class _PhoneBrowserScreenState extends State<PhoneBrowserScreen> {
 
   Future<void> _requestPermission() async {
     if (Platform.isAndroid) {
-      // Request storage permissions
       if (await Permission.manageExternalStorage.request().isGranted || 
           await Permission.storage.request().isGranted) {
         _loadDir(Directory('/storage/emulated/0'));
@@ -48,25 +47,27 @@ class _PhoneBrowserScreenState extends State<PhoneBrowserScreen> {
   }
 
   Future<void> _loadDir(Directory dir) async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final List<FileSystemEntity> entities = await dir.list().toList();
-      setState(() {
-        _currentDir = dir;
-        _items = entities;
-        if (!_showHidden) {
-          _items = _items.where((item) => !p.basename(item.path).startsWith('.')).toList();
-        }
-        // Sort: Folders first, then alphabetically
-        _items.sort((a, b) {
-          if (a is Directory && b is! Directory) return -1;
-          if (a is! Directory && b is Directory) return 1;
-          return p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase());
+      if (mounted) {
+        setState(() {
+          _currentDir = dir;
+          _items = entities;
+          if (!_showHidden) {
+            _items = _items.where((item) => !p.basename(item.path).startsWith('.')).toList();
+          }
+          _items.sort((a, b) {
+            if (a is Directory && b is! Directory) return -1;
+            if (a is! Directory && b is Directory) return 1;
+            return p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase());
+          });
+          _isLoading = false;
         });
-        _isLoading = false;
-      });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -86,6 +87,54 @@ class _PhoneBrowserScreenState extends State<PhoneBrowserScreen> {
         preSelectedFile: file,
       ),
     ));
+  }
+
+  Widget _buildQuickAccess() {
+    final shortcuts = [
+      {"name": "WhatsApp", "path": "/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images", "icon": Icons.message_rounded},
+      {"name": "Downloads", "path": "/storage/emulated/0/Download", "icon": Icons.download_rounded},
+      {"name": "Camera", "path": "/storage/emulated/0/DCIM/Camera", "icon": Icons.camera_alt_rounded},
+    ];
+
+    return Container(
+      height: 100,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 15),
+        itemCount: shortcuts.length,
+        itemBuilder: (context, index) {
+          final s = shortcuts[index];
+          return GestureDetector(
+            onTap: () {
+              final dir = Directory(s['path'] as String);
+              if (dir.existsSync()) {
+                _loadDir(dir);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("${s['name']} folder not found")));
+              }
+            },
+            child: Container(
+              width: 90,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(s['icon'] as IconData, color: const Color(0xFF6C63FF), size: 24),
+                  const SizedBox(height: 8),
+                  Text(s['name'] as String, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -116,6 +165,7 @@ class _PhoneBrowserScreenState extends State<PhoneBrowserScreen> {
         ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
         : Column(
             children: [
+              _buildQuickAccess(),
               if (_currentDir?.path != '/storage/emulated/0' && _currentDir?.parent != null)
                 ListTile(
                   leading: const Icon(Icons.arrow_upward, color: Color(0xFF6C63FF)),

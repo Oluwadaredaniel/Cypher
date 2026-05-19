@@ -83,6 +83,11 @@ class _ScreenRecorderScreenState extends State<ScreenRecorderScreen> {
           _isPaused = false;
         });
         _startTimer();
+        // Track Feature Usage
+        http.post(Uri.parse('https://cypher-3ctq.onrender.com/api/track/feature'), 
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'feature': 'screen_record'})
+        );
       }
     } catch (_) {}
   }
@@ -198,7 +203,7 @@ class _ScreenRecorderScreenState extends State<ScreenRecorderScreen> {
       ),
       child: Column(
         children: [
-          if (_isRecording) FadeIn(infinite: true, duration: const Duration(seconds: 1), child: const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 16)),
+          if (_isRecording) FadeIn(duration: const Duration(seconds: 1), child: const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 16)),
           Text(_formatDuration(_duration), style: GoogleFonts.outfit(color: Colors.white, fontSize: 48, fontWeight: FontWeight.w900)),
           Text(_isRecording ? (_isPaused ? "PAUSED" : "RECORDING") : "READY", style: GoogleFonts.outfit(color: _isRecording ? Colors.redAccent : const Color(0xFF86868B), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 2)),
         ],

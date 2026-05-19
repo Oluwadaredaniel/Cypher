@@ -6,6 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
 
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+
 class ClipboardScreen extends StatefulWidget {
   final String pcIpAddress;
   final String authToken;
@@ -17,6 +20,7 @@ class ClipboardScreen extends StatefulWidget {
 
 class _ClipboardScreenState extends State<ClipboardScreen> {
   String _pcContent = '';
+  String _pcContentType = 'text'; // 'text' or 'image'
   String _phoneContent = '';
   bool _isCopying = false;
   bool _isSending = false;
@@ -45,9 +49,13 @@ class _ClipboardScreenState extends State<ClipboardScreen> {
 
   Future<void> _fetchAll() async {
     try {
-      final pcResp = await http.get(Uri.parse('$_baseUrl/clipboard'), headers: _headers).timeout(const Duration(seconds: 5));
+      final pcResp = await http.get(Uri.parse('$_baseUrl/clipboard/pc'), headers: _headers).timeout(const Duration(seconds: 5));
       if (pcResp.statusCode == 200 && mounted) {
-        setState(() => _pcContent = jsonDecode(pcResp.body)['content'] ?? '');
+        final data = jsonDecode(pcResp.body);
+        setState(() {
+          _pcContent = data['content'] ?? '';
+          _pcContentType = data['type'] ?? 'text';
+        });
       }
     } catch (_) {}
 
@@ -95,7 +103,20 @@ class _ClipboardScreenState extends State<ClipboardScreen> {
     ));
   }
 
-  Widget _buildCard({required String label, required String content, required List<Widget> actions}) {
+  Future<void> _pickAndEditImage() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result != null && result.files.single.path != null) {
+      if (mounted) {
+        Navigator.pushNamed(context, '/image_editor', arguments: {
+          'imageFile': File(result.files.single.path!),
+          'pcIpAddress': widget.pcIpAddress,
+          'authToken': widget.authToken,
+        });
+      }
+    }
+  }
+
+  Widget _buildCard({required String label, required String content, required List<Widget> actions, String type = 'text'}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(20)),
@@ -106,7 +127,12 @@ class _ClipboardScreenState extends State<ClipboardScreen> {
           const SizedBox(height: 12),
           content.isEmpty
             ? Text('Nothing here yet', style: GoogleFonts.outfit(color: const Color(0xFF444444), fontSize: 14, fontStyle: FontStyle.italic))
-            : Text(content, maxLines: 6, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(color: Colors.white, fontSize: 14, height: 1.5)),
+            : (type == 'image' 
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(base64Decode(content.split(',').last), fit: BoxFit.cover, height: 150, width: double.infinity),
+                  )
+                : Text(content, maxLines: 6, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(color: Colors.white, fontSize: 14, height: 1.5))),
           const SizedBox(height: 16),
           Row(children: actions),
         ],
@@ -140,6 +166,7 @@ class _ClipboardScreenState extends State<ClipboardScreen> {
             child: _buildCard(
               label: 'YOUR PC',
               content: _pcContent,
+              type: _pcContentType,
               actions: [
                 Expanded(child: GestureDetector(
                   onTap: _copyToPhone,
@@ -171,6 +198,15 @@ class _ClipboardScreenState extends State<ClipboardScreen> {
                       style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontWeight: FontWeight.bold, fontSize: 14))),
                   ),
                 )),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: _pickAndEditImage,
+                  child: Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(color: const Color(0xFF1A1A1A), shape: BoxShape.circle, border: Border.all(color: const Color(0xFF6C63FF))),
+                    child: const Icon(Icons.image_outlined, color: Color(0xFF6C63FF), size: 20),
+                  ),
+                ),
               ],
             ),
           ),

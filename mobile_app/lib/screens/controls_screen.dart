@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:media_scanner/media_scanner.dart';
+import '../services/permission_service.dart';
 
 class ControlsScreen extends StatefulWidget {
   final String pcIpAddress;
@@ -38,10 +40,16 @@ class _ControlsScreenState extends State<ControlsScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchStatusUpdates();
-    // Background polling for window title and clipboard
-    _statusTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (mounted) _fetchStatusUpdates();
+    
+    // Slight delay to allow navigation animation to finish smoothly
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        _fetchStatusUpdates();
+        // Background polling for window title and clipboard
+        _statusTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+          if (mounted) _fetchStatusUpdates();
+        });
+      }
     });
   }
 
@@ -119,6 +127,48 @@ class _ControlsScreenState extends State<ControlsScreen> {
     }
   }
 
+  Widget _buildHotkeyGrid() {
+    final hotkeys = [
+      {"label": "Alt + Tab", "keys": ["alt", "tab"], "icon": Icons.tab_unselected_rounded},
+      {"label": "Show Desktop", "keys": ["win", "d"], "icon": Icons.desktop_windows_rounded},
+      {"label": "File Explorer", "keys": ["win", "e"], "icon": Icons.folder_copy_rounded},
+      {"label": "Task Manager", "keys": ["ctrl", "shift", "esc"], "icon": Icons.list_alt_rounded},
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 2.2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+      ),
+      itemCount: hotkeys.length,
+      itemBuilder: (context, index) {
+        final hk = hotkeys[index];
+        return ScaleTap(
+          onPressed: () => _executeAction("/keyboard/hotkey", body: {"keys": hk['keys']}),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(hk['icon'] as IconData, color: const Color(0xFF6C63FF), size: 18),
+                const SizedBox(width: 10),
+                Text(hk['label'] as String, style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showToast(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -149,8 +199,12 @@ class _ControlsScreenState extends State<ControlsScreen> {
               _buildPowerGrid(),
               _buildSectionLabel("MEDIA"),
               _buildMediaCard(),
+              _buildSectionLabel("SYSTEM TOOLS"),
+              _buildSystemToolsGrid(),
               _buildSectionLabel("CLIPBOARD"),
               _buildClipboardCard(),
+              _buildSectionLabel("REMOTE HOTKEYS"),
+              _buildHotkeyGrid(),
               _buildSectionLabel("KEYBOARD"),
               _buildKeyboardCard(),
               _buildSectionLabel("SCREENSHOT"),
@@ -284,7 +338,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildMediaBtn(Icons.skip_previous, 50, const Color(0xFF2C2C2C), () => _executeAction("/media/previous")),
+              _buildMediaBtn(Icons.skip_previous, 50, const Color(0xFF2C2C2C), () => _executeAction("/media/prev")),
               const SizedBox(width: 20),
               _buildMediaBtn(Icons.play_arrow, 65, const Color(0xFF6C63FF), () => _executeAction("/media/playpause")),
               const SizedBox(width: 20),
@@ -306,7 +360,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
                     overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
                   ),
                   child: Slider(
-                    value: _currentVolume,
+                    value: _currentVolume.clamp(0.0, 100.0),
                     min: 0,
                     max: 100,
                     onChanged: (v) => setState(() => _currentVolume = v),
@@ -354,6 +408,46 @@ class _ControlsScreenState extends State<ControlsScreen> {
     );
   }
 
+  Widget _buildSystemToolsGrid() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      childAspectRatio: 2.2,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      children: [
+        _buildToolCard("Processes", Icons.memory_rounded, () {
+          Navigator.pushNamed(context, '/processes', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken});
+        }),
+        _buildToolCard("Launch Apps", Icons.rocket_launch_rounded, () {
+          Navigator.pushNamed(context, '/apps_launcher', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken});
+        }),
+      ],
+    );
+  }
+
+  Widget _buildToolCard(String label, IconData icon, VoidCallback tap) {
+    return ScaleTap(
+      onPressed: tap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFF6C63FF), size: 20),
+            const SizedBox(width: 12),
+            Text(label, style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildClipboardCard() {
     return Container(
       width: double.infinity,
@@ -377,16 +471,21 @@ class _ControlsScreenState extends State<ControlsScreen> {
             style: GoogleFonts.outfit(color: _pcClipboard.contains("empty") ? const Color(0xFF3A3A3C) : Colors.white, fontSize: 14, fontStyle: FontStyle.italic),
           ),
           const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(child: _buildPillBtn("Copy to Phone", const Color(0xFF6C63FF), () {
-                Clipboard.setData(ClipboardData(text: _pcClipboard));
-                _showToast("Synced to phone");
-              })),
-              const SizedBox(width: 12),
-              Expanded(child: _buildPillBtn("Send Text", Colors.transparent, _showTextInputSheet, isGhost: true)),
-            ],
-          )
+              Row(
+                children: [
+                  Expanded(child: _buildPillBtn("Copy to Phone", const Color(0xFF6C63FF), () {
+                    Clipboard.setData(ClipboardData(text: _pcClipboard));
+                    _showToast("Synced to phone");
+                  })),
+                  const SizedBox(width: 12),
+                  if (_pcClipboard.startsWith("http"))
+                    Expanded(child: _buildPillBtn("Open Link", Colors.green, () {
+                      _executeAction("/open-link", body: {"url": _pcClipboard});
+                    })),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildPillBtn("Send Text", Colors.transparent, _showTextInputSheet, isGhost: true)),
+                ],
+              )
         ],
       ),
     );
@@ -479,11 +578,26 @@ class _ControlsScreenState extends State<ControlsScreen> {
 
   Future<void> _saveScreenshotToGallery() async {
     if (_screenshotBytes == null) return;
+    
+    // Request Storage Permission
+    if (Platform.isAndroid) {
+      await PermissionService.requestAllPermissions();
+    }
+
     try {
       final dir = Directory('/storage/emulated/0/Download');
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
       final name = "CYPHER_Screenshot_${DateTime.now().millisecondsSinceEpoch}.jpg";
       final file = File("${dir.path}/$name");
       await file.writeAsBytes(_screenshotBytes!);
+      
+      // CRITICAL: Notify Media Scanner so it shows up in Gallery/Google Photos
+      if (Platform.isAndroid) {
+        await MediaScanner.loadMedia(path: file.path);
+      }
+
       _showToast("Saved to Downloads");
     } catch (e) {
       _showToast("Failed to save", isError: true);
@@ -497,7 +611,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
         height: 52,
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(100),
           border: isGhost ? Border.all(color: const Color(0xFF2C2C2C), width: 1.5) : null,
         ),
         child: Center(child: Text(label, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),

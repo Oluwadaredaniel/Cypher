@@ -323,7 +323,7 @@ class _PairingScreenState extends State<PairingScreen> with TickerProviderStateM
           width: double.infinity,
           decoration: BoxDecoration(
             color: active ? const Color(0xFF6C63FF) : const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(100),
             boxShadow: active ? [BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))] : [],
           ),
           child: Center(

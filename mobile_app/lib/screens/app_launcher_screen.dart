@@ -47,11 +47,22 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
     try {
       final response = await http.get(Uri.parse('$_baseUrl/apps'), headers: _headers).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        // Remove duplicates based on name
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is! List) throw Exception("Invalid data format");
+
+        final List<dynamic> data = decoded;
+        // Remove duplicates based on name, handling nulls
         final seen = <String>{};
-        final unique = data.where((a) => seen.add(a['name'])).toList();
-        unique.sort((a, b) => a['name'].toString().toLowerCase().compareTo(b['name'].toString().toLowerCase()));
+        final unique = data.where((a) {
+          final name = a['name']?.toString() ?? "";
+          return name.isNotEmpty && seen.add(name);
+        }).toList();
+        
+        unique.sort((a, b) {
+          final nameA = a['name']?.toString().toLowerCase() ?? "";
+          final nameB = b['name']?.toString().toLowerCase() ?? "";
+          return nameA.compareTo(nameB);
+        });
         
         if (mounted) {
           setState(() {

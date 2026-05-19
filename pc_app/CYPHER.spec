@@ -3,10 +3,10 @@
 
 a = Analysis(
     ['main.py'],
-    pathex=['.'],
+    pathex=[],
     binaries=[],
-    datas=[('C:\\Users\\hp\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\customtkinter', 'customtkinter/'), ('metadata.json', '.')],
-    hiddenimports=['core.server', 'core.dashboard_screen', 'core.splash_screen', 'core.setup_screen', 'core.discovery', 'core.tray', 'core.utils', 'core.files_panel', 'core.ui', 'core.pairing_screen', 'core.guest_panel'],
+    datas=[('core', 'core'), ('metadata.json', '.')],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

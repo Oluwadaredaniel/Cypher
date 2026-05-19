@@ -41,11 +41,11 @@ class SetupScreen(ctk.CTkFrame):
         self.clear_container()
 
         ctk.CTkLabel(self.container, text="Name your PC",
-                     font=("Helvetica Neue", 28, "bold"),
+                     font=("Segoe UI", 28, "bold"),
                      text_color=COLORS["white"]).pack(pady=(40, 10))
 
         ctk.CTkLabel(self.container, text="This name will be shown on your phone",
-                     font=("Helvetica Neue", 14),
+                     font=("Segoe UI", 14),
                      text_color=COLORS["grey"]).pack(pady=(0, 30))
 
         self.name_entry = ctk.CTkEntry(self.container,
@@ -63,7 +63,7 @@ class SetupScreen(ctk.CTkFrame):
                                       corner_radius=25,
                                       fg_color=COLORS["accent"],
                                       hover_color="#5B52E5",
-                                      font=("Helvetica Neue", 15, "bold"))
+                                      font=("Segoe UI", 15, "bold"))
         self.next_btn.pack(side="bottom", pady=40)
 
     def validate_step_1(self):
@@ -76,11 +76,11 @@ class SetupScreen(ctk.CTkFrame):
         self.clear_container()
 
         ctk.CTkLabel(self.container, text="Shared Folders",
-                     font=("Helvetica Neue", 28, "bold"),
+                     font=("Segoe UI", 28, "bold"),
                      text_color=COLORS["white"]).pack(pady=(40, 10))
 
         ctk.CTkLabel(self.container, text="Choose which folders to share with CYPHER",
-                     font=("Helvetica Neue", 14),
+                     font=("Segoe UI", 14),
                      text_color=COLORS["grey"]).pack(pady=(0, 30))
 
         scroll = ctk.CTkScrollableFrame(self.container, fg_color="transparent", width=340, height=300)
@@ -91,7 +91,7 @@ class SetupScreen(ctk.CTkFrame):
             f_row.pack(fill="x", pady=5)
             f_row.pack_propagate(False)
             
-            ctk.CTkLabel(f_row, text=folder, font=("Helvetica Neue", 15),
+            ctk.CTkLabel(f_row, text=folder, font=("Segoe UI", 15),
                          text_color=COLORS["white"]).pack(side="left", padx=20)
             
             sw = ctk.CTkSwitch(f_row, text="", command=lambda f=folder: self.toggle_folder(f),
@@ -108,7 +108,7 @@ class SetupScreen(ctk.CTkFrame):
 
         ctk.CTkButton(btn_row, text="Next", command=self.show_step_3,
                       width=200, height=50, corner_radius=25,
-                      fg_color=COLORS["accent"], font=("Helvetica Neue", 15, "bold")).pack(side="right", padx=10)
+                      fg_color=COLORS["accent"], font=("Segoe UI", 15, "bold")).pack(side="right", padx=10)
 
     def toggle_folder(self, folder):
         self.folders[folder] = not self.folders[folder]
@@ -117,22 +117,22 @@ class SetupScreen(ctk.CTkFrame):
         self.clear_container()
 
         ctk.CTkLabel(self.container, text="Ready to go!",
-                     font=("Helvetica Neue", 28, "bold"),
+                     font=("Segoe UI", 28, "bold"),
                      text_color=COLORS["white"]).pack(pady=(40, 10))
 
         summary_card = ctk.CTkFrame(self.container, fg_color=COLORS["card"], corner_radius=20, width=340, height=180)
         summary_card.pack(pady=40)
         summary_card.pack_propagate(False)
 
-        ctk.CTkLabel(summary_card, text="PC NAME", font=("Helvetica Neue", 11, "bold"), text_color=COLORS["grey"]).pack(pady=(20, 0))
-        ctk.CTkLabel(summary_card, text=self.pc_name.get(), font=("Helvetica Neue", 20, "bold"), text_color=COLORS["white"]).pack()
+        ctk.CTkLabel(summary_card, text="PC NAME", font=("Segoe UI", 11, "bold"), text_color=COLORS["grey"]).pack(pady=(20, 0))
+        ctk.CTkLabel(summary_card, text=self.pc_name.get(), font=("Segoe UI", 20, "bold"), text_color=COLORS["white"]).pack()
 
         folder_count = sum(1 for v in self.folders.values() if v)
-        ctk.CTkLabel(summary_card, text=f"{folder_count} Folders Shared", font=("Helvetica Neue", 14), text_color=COLORS["accent"]).pack(pady=20)
+        ctk.CTkLabel(summary_card, text=f"{folder_count} Folders Shared", font=("Segoe UI", 14), text_color=COLORS["accent"]).pack(pady=20)
 
         ctk.CTkButton(self.container, text="Open CYPHER", command=self.finish,
                       width=340, height=60, corner_radius=30,
-                      fg_color=COLORS["accent"], font=("Helvetica Neue", 16, "bold")).pack(side="bottom", pady=40)
+                      fg_color=COLORS["accent"], font=("Segoe UI", 16, "bold")).pack(side="bottom", pady=40)
 
     def finish(self):
         config = {

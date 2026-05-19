@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request, render_template_string
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pymongo import MongoClient
 
 app = Flask(__name__)
@@ -15,6 +15,14 @@ DATA_FILE = "hub_data.json"
 hub_state = {
     "installs": [],
     "unique_devices": {},
+    "feature_usage": {
+        "screen_record": 0,
+        "file_transfer": 0,
+        "image_sync": 0,
+        "app_launch": 0,
+        "pc_lock": 0
+    },
+    "pc_uptime_total": 0,
     "site_visits": 0,
     "broadcast": {
         "active": True,
@@ -162,6 +170,28 @@ def get_metadata():
     save_data()
     return jsonify(hub_state['metadata']), 200
 
+@app.route('/api/stats', methods=['GET'])
+def get_public_stats():
+    """Provides a summarized version of all analytics for the mobile app."""
+    load_data()
+    win_installs = len([i for i in hub_state['installs'] if i.get('platform') == 'windows'])
+    android_installs = len([i for i in hub_state['installs'] if i.get('platform') == 'android'])
+
+    unique_devices = hub_state.get('unique_devices', {})
+    now = datetime.now()
+    day_ago = now - timedelta(hours=24)
+    active_today = len([d for d in unique_devices.values() if isinstance(d, dict) and datetime.strptime(d.get('at', ''), "%Y-%m-%d %H:%M") > day_ago])
+
+    return jsonify({
+        "total_installs": win_installs + android_installs,
+        "windows": win_installs,
+        "android": android_installs,
+        "active_today": active_today,
+        "total_unique": len(unique_devices),
+        "site_visits": hub_state['site_visits'],
+        "feature_usage": hub_state.get('feature_usage', {})
+    }), 200
+
 # --- MASTER ADMIN API ---
 
 @app.route('/master/broadcast', methods=['POST'])
@@ -243,14 +273,29 @@ ADMIN_HTML = """
                     Windows: {{ win_count }} | Android: {{ android_count }}
                 </div>
                 <div style="margin-top: 10px; font-size: 11px; color: #00FF88; font-weight: bold;">
-                    Unique Active Devices (Estimated): {{ active_count }}
+                    Active Today: {{ active_today }} | This Week: {{ active_week }}
+                </div>
+                <div style="margin-top: 5px; font-size: 10px; color: #444;">
+                    Total Unique IDs: {{ active_count }}
                 </div>
             </div>
 
             <div class="card">
-                <div class="label">TOTAL SITE VISITS</div>
-                <div class="stat" style="color: #00FF88;">{{ visits }}</div>
-                <div style="font-size: 14px; color: #444;">Landing Page Traffic</div>
+                <div class="label">FEATURE ENGAGEMENT</div>
+                <div style="margin-top: 10px;">
+                    <div style="font-size: 13px; color: #888; margin-bottom: 8px;">
+                        Screen Record: <span style="color: #00FF88;">{{ usage.screen_record }}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #888; margin-bottom: 8px;">
+                        File Transfers: <span style="color: #00FF88;">{{ usage.file_transfer }}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #888; margin-bottom: 8px;">
+                        Image Sync: <span style="color: #00FF88;">{{ usage.image_sync }}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #888; margin-bottom: 8px;">
+                        App Launches: <span style="color: #00FF88;">{{ usage.app_launch }}</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -301,18 +346,48 @@ ADMIN_HTML = """
 </html>
 """
 
+@app.route('/api/track/feature', methods=['POST'])
+def track_feature():
+    load_data()
+    feature = request.json.get("feature")
+    if feature in hub_state['feature_usage']:
+        hub_state['feature_usage'][feature] += 1
+        save_data()
+    return jsonify({"success": True}), 200
+
 @app.route('/master')
 def master_panel():
     load_data()
+
+    # 1. Total reported installs
     win_installs = len([i for i in hub_state['installs'] if i.get('platform') == 'windows'])
     android_installs = len([i for i in hub_state['installs'] if i.get('platform') == 'android'])
 
+    # 2. Advanced Retention Calculation
     unique_devices = hub_state.get('unique_devices', {})
+    now = datetime.now()
+    day_ago = now - timedelta(hours=24)
+    week_ago = now - timedelta(days=7)
+
+    active_today = 0
+    active_this_week = 0
+
+    for dev_ip, data in unique_devices.items():
+        if not isinstance(data, dict): continue
+        try:
+            last_seen = datetime.strptime(data.get('at', ''), "%Y-%m-%d %H:%M")
+            if last_seen > day_ago: active_today += 1
+            if last_seen > week_ago: active_this_week += 1
+        except: continue
+
     win_active = len([d for d in unique_devices.values() if isinstance(d, dict) and d.get('platform') == 'windows'])
     android_active = len([d for d in unique_devices.values() if isinstance(d, dict) and d.get('platform') == 'android'])
 
     total_win = max(win_installs, win_active)
     total_android = max(android_installs, android_active)
+
+    # Feature engagement
+    usage = hub_state.get('feature_usage', {})
 
     return render_template_string(
         ADMIN_HTML,
@@ -320,6 +395,9 @@ def master_panel():
         win_count=total_win,
         android_count=total_android,
         active_count=len(unique_devices),
+        active_today=active_today,
+        active_week=active_this_week,
+        usage=usage,
         visits=hub_state['site_visits'],
         b=hub_state['broadcast'],
         m=hub_state['metadata'],

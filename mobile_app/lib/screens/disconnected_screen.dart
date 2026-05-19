@@ -81,7 +81,10 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with TickerProv
 
     try {
       final response = await http
-          .get(Uri.parse('http://${widget.pcIpAddress}:5000/ping'))
+          .get(
+            Uri.parse('http://${widget.pcIpAddress}:5000/ping'),
+            headers: {'X-Auth-Token': widget.authToken},
+          )
           .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
@@ -103,29 +106,32 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with TickerProv
       _discovery!.addListener(() async {
         for (var service in _discovery!.services) {
           final String? newIp = service.host;
-          if (newIp != null && newIp != widget.pcIpAddress) {
-            // Try the new IP
-            try {
-              final resp = await http.get(Uri.parse('http://$newIp:5000/ping'))
-                  .timeout(const Duration(seconds: 3));
-              if (resp.statusCode == 200) {
-                // FOUND! Update storage
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('pc_ip_address', newIp);
-                
-                if (mounted) {
-                   _handleSuccess();
-                   await _stopDiscovery();
-                   return;
+          if (newIp != null && (newIp != widget.pcIpAddress || !newIp.contains("."))) {
+            // Persistent retry on found services
+            for (int attempt = 0; attempt < 3; attempt++) {
+              try {
+                final resp = await http.get(Uri.parse('http://$newIp:5000/ping'))
+                    .timeout(const Duration(seconds: 3));
+                if (resp.statusCode == 200) {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('pc_ip_address', newIp);
+                  
+                  if (mounted) {
+                     _handleSuccess();
+                     await _stopDiscovery();
+                     return;
+                  }
                 }
+              } catch (_) {
+                await Future.delayed(const Duration(seconds: 1));
               }
-            } catch (_) {}
+            }
           }
         }
       });
 
-      // Stop searching after 5 seconds to save battery
-      await Future.delayed(const Duration(seconds: 5));
+      // Search for 15 seconds instead of 5
+      await Future.delayed(const Duration(seconds: 15));
       await _stopDiscovery();
     } catch (e) {
       debugPrint("Discovery error: $e");

@@ -47,7 +47,12 @@ class CentralService {
           .timeout(const Duration(seconds: 5));
       
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        // [FIX] Strip potential UTF-8 BOM (Byte Order Mark) from GitHub file
+        String body = response.body;
+        if (body.startsWith('\uFEFF')) {
+          body = body.substring(1);
+        }
+        final data = jsonDecode(body);
         final remoteVersion = data['app_version'] ?? "1.0.0";
         
         if (remoteVersion != currentVersion) {

@@ -29,6 +29,10 @@ class _MasterControlScreenState extends State<MasterControlScreen> {
   bool isSendingBroadcast = false;
   bool isSendingMetadata = false;
 
+  // Stats Data
+  Map<String, dynamic> _fullStats = {};
+  bool _isStatsLoading = true;
+
   // Production URL for Emerald's Central Hub
   final String hubUrl = "https://cypher-3ctq.onrender.com";
   final String masterKey = "emerald-admin";
@@ -69,7 +73,8 @@ class _MasterControlScreenState extends State<MasterControlScreen> {
         });
       }
 
-      // Fetch Metadata
+      // Fetch Metadata & Stats (The Hub now sends stats inside metadata/master panel)
+      // AUDIT: We hit the master endpoint to get full stats
       final mRes = await http.get(Uri.parse('$hubUrl/api/metadata'));
       if (mRes.statusCode == 200) {
         final data = jsonDecode(mRes.body);
@@ -82,7 +87,27 @@ class _MasterControlScreenState extends State<MasterControlScreen> {
           passController.text = data['master_password'] ?? "emerald-admin";
         });
       }
+      
+      // Fetch Live Stats for Analytics Card
+      _fetchLiveStats();
     } catch (_) {}
+  }
+
+  Future<void> _fetchLiveStats() async {
+    setState(() => _isStatsLoading = true);
+    try {
+      final sRes = await http.get(Uri.parse('$hubUrl/api/stats')).timeout(const Duration(seconds: 8));
+      if (sRes.statusCode == 200) {
+        if (mounted) {
+          setState(() {
+            _fullStats = jsonDecode(sRes.body);
+            _isStatsLoading = false;
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isStatsLoading = false);
+    }
   }
 
   Future<void> _deployBroadcast() async {
@@ -161,6 +186,9 @@ class _MasterControlScreenState extends State<MasterControlScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text("MASTER CONTROL", style: GoogleFonts.outfit(fontWeight: FontWeight.w900, letterSpacing: 2)),
+        actions: [
+          IconButton(onPressed: _fetchData, icon: const Icon(Icons.refresh_rounded, color: Colors.white)),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -218,20 +246,67 @@ class _MasterControlScreenState extends State<MasterControlScreen> {
   }
 
   Widget _buildStatCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(20)),
-      child: Row(
-        children: [
-          const Text("📊", style: TextStyle(fontSize: 32)),
-          const SizedBox(width: 16),
-          Column(
+    if (_isStatsLoading) return const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)));
+
+    final usage = _fullStats['feature_usage'] ?? {};
+    
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(24)),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Project Health", style: GoogleFonts.outfit(color: Colors.grey, fontSize: 12)),
-              Text("Production", style: GoogleFonts.outfit(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              _buildMetricRow("TOTAL GROWTH", "${_fullStats['total_unique'] ?? 0}", "Unique IDs ever paired"),
+              const SizedBox(height: 24),
+              _buildMetricRow("DAILY ACTIVE", "${_fullStats['active_today'] ?? 0}", "Active in last 24h", color: const Color(0xFF00FF88)),
+              const SizedBox(height: 24),
+              _buildMetricRow("SITE TRAFFIC", "${_fullStats['site_visits'] ?? 0}", "Total Landing Page visits"),
+              
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Divider(color: Colors.white10),
+              ),
+              
+              Text("FEATURE ENGAGEMENT", style: GoogleFonts.outfit(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+              const SizedBox(height: 16),
+              _buildFeatureStat("Recorder", usage['screen_record'] ?? 0),
+              _buildFeatureStat("Transfers", usage['file_transfer'] ?? 0),
+              _buildFeatureStat("Syncs", usage['image_sync'] ?? 0),
+              _buildFeatureStat("App Ops", usage['app_launch'] ?? 0),
             ],
-          )
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricRow(String label, String value, String desc, {Color color = Colors.white}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: GoogleFonts.outfit(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            const SizedBox(height: 4),
+            Text(value, style: GoogleFonts.outfit(color: color, fontSize: 28, fontWeight: FontWeight.w900)),
+            Text(desc, style: GoogleFonts.outfit(color: Colors.white24, fontSize: 10)),
+          ],
+        ),
+        const Icon(Icons.analytics_outlined, color: Colors.white10, size: 40),
+      ],
+    );
+  }
+
+  Widget _buildFeatureStat(String name, int count) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(child: Text(name, style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13))),
+          Text("$count", style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontWeight: FontWeight.bold)),
         ],
       ),
     );

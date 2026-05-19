@@ -38,12 +38,12 @@ class FilesPanel(ctk.CTkFrame):
         title_box = ctk.CTkFrame(header, fg_color="transparent")
         title_box.pack(side="left")
         
-        ctk.CTkLabel(title_box, text="Shared Files", font=("Helvetica Neue", 20, "bold"), text_color="#FFFFFF").pack(anchor="w")
-        ctk.CTkLabel(title_box, text="These folders are visible to your phone", font=("Helvetica Neue", 13), text_color="#86868B").pack(anchor="w")
+        ctk.CTkLabel(title_box, text="Shared Files", font=("Segoe UI", 20, "bold"), text_color="#FFFFFF").pack(anchor="w")
+        ctk.CTkLabel(title_box, text="These folders are visible to your phone", font=("Segoe UI", 13), text_color="#86868B").pack(anchor="w")
         
         self.add_btn = ctk.CTkButton(
             header, text="+ Add Folder", fg_color="#6C63FF", hover_color="#5B52E0",
-            corner_radius=20, font=("Helvetica Neue", 13, "bold"), height=38,
+            corner_radius=20, font=("Segoe UI", 13, "bold"), height=38,
             command=self.browse_and_add
         )
         self.add_btn.pack(side="right")
@@ -53,7 +53,7 @@ class FilesPanel(ctk.CTkFrame):
         self.storage_container.pack(fill="x", padx=40, pady=(0, 30))
         self.storage_container.pack_propagate(False)
         
-        ctk.CTkLabel(self.storage_container, text="Storage", font=("Helvetica Neue", 14, "bold"), text_color="#FFFFFF").pack(anchor="w", padx=20, pady=(15, 5))
+        ctk.CTkLabel(self.storage_container, text="Storage", font=("Segoe UI", 14, "bold"), text_color="#FFFFFF").pack(anchor="w", padx=20, pady=(15, 5))
         
         self.progress_bar = ctk.CTkProgressBar(self.storage_container, fg_color="#2C2C2C", progress_color="#6C63FF", height=12, corner_radius=6)
         self.progress_bar.pack(fill="x", padx=20, pady=5)
@@ -62,10 +62,10 @@ class FilesPanel(ctk.CTkFrame):
         label_frame = ctk.CTkFrame(self.storage_container, fg_color="transparent")
         label_frame.pack(fill="x", padx=20, pady=(5, 15))
         
-        self.used_lbl = ctk.CTkLabel(label_frame, text="0 GB used", font=("Helvetica Neue", 12), text_color="#86868B")
+        self.used_lbl = ctk.CTkLabel(label_frame, text="0 GB used", font=("Segoe UI", 12), text_color="#86868B")
         self.used_lbl.pack(side="left")
         
-        self.free_lbl = ctk.CTkLabel(label_frame, text="0 GB free", font=("Helvetica Neue", 12), text_color="#86868B")
+        self.free_lbl = ctk.CTkLabel(label_frame, text="0 GB free", font=("Segoe UI", 12), text_color="#86868B")
         self.free_lbl.pack(side="right")
 
     def load_data(self):
@@ -132,8 +132,8 @@ class FilesPanel(ctk.CTkFrame):
         # Info
         info = ctk.CTkFrame(card, fg_color="transparent")
         info.pack(side="left", fill="y", pady=15)
-        ctk.CTkLabel(info, text=name, font=("Helvetica Neue", 14, "bold"), text_color="#FFFFFF").pack(anchor="w")
-        ctk.CTkLabel(info, text=path, font=("Helvetica Neue", 11), text_color="#86868B").pack(anchor="w")
+        ctk.CTkLabel(info, text=name, font=("Segoe UI", 14, "bold"), text_color="#FFFFFF").pack(anchor="w")
+        ctk.CTkLabel(info, text=path, font=("Segoe UI", 11), text_color="#86868B").pack(anchor="w")
 
         # Actions
         actions = ctk.CTkFrame(card, fg_color="transparent")
@@ -142,7 +142,7 @@ class FilesPanel(ctk.CTkFrame):
         ctk.CTkSwitch(actions, text="", progress_color="#6C63FF", width=40).pack(side="left", padx=10)
         
         remove_btn = ctk.CTkButton(
-            actions, text="Remove", font=("Helvetica Neue", 11), text_color="#86868B",
+            actions, text="Remove", font=("Segoe UI", 11), text_color="#86868B",
             fg_color="transparent", hover_color="transparent", width=50,
             command=lambda p=path: self.remove_folder(p)
         )
@@ -164,7 +164,7 @@ class FilesPanel(ctk.CTkFrame):
         inner.place(relx=0.5, rely=0.5, anchor="center")
         
         ctk.CTkLabel(inner, text="📁", font=("Arial", 20)).pack(side="left", padx=10)
-        ctk.CTkLabel(inner, text="Add a folder", font=("Helvetica Neue", 13), text_color="#86868B").pack(side="left")
+        ctk.CTkLabel(inner, text="Add a folder", font=("Segoe UI", 13), text_color="#86868B").pack(side="left")
         
         self.add_placeholder.bind("<Button-1>", lambda e: self.browse_and_add())
 

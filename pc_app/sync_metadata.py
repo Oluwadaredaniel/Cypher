@@ -8,7 +8,8 @@ HUB_URL = "https://cypher-3ctq.onrender.com"
 def sync():
     print(f"🔄 Fetching latest metadata from {HUB_URL}...")
     try:
-        response = requests.get(f"{HUB_URL}/api/metadata", timeout=10)
+        # [PRO FIX] Increased timeout to 30s to allow Render instance to wake up
+        response = requests.get(f"{HUB_URL}/api/metadata", timeout=30)
         if response.status_code == 200:
             metadata = response.json()
 
