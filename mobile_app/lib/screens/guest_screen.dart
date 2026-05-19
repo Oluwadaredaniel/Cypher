@@ -65,7 +65,8 @@ class _GuestScreenState extends State<GuestScreen> {
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
         setState(() {
-          _availableFolders = data.cast<Map<String, dynamic>>();
+          // Only show folders that are marked as 'is_shared' (user-selected folders)
+          _availableFolders = data.where((e) => e['is_shared'] == true).toList().cast<Map<String, dynamic>>();
           _selectedFolders = _availableFolders.map((e) => e['path'].toString()).toSet();
         });
       }
