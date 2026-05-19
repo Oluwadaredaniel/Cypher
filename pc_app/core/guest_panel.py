@@ -265,10 +265,16 @@ class GuestPanel(ctk.CTkFrame):
                 print(f"DEBUG UI: Server status: {r.status_code}")
                 print(f"DEBUG UI: Server raw response: '{r.text}'")
 
+                # Store text and status for lambda capture
+                raw_text = r.text
+                status_code = r.status_code
+
                 try:
                     data = r.json()
                 except Exception as json_err:
-                    self.after(0, lambda: self.qr_label.configure(text=f"JSON Error: {str(json_err)}\nRaw: {r.text[:50]}", text_color="#FF453A"))
+                    err_str = str(json_err)
+                    self.after(0, lambda e=err_str, t=raw_text: self.qr_label.configure(
+                        text=f"JSON Error: {e}\nRaw: {t[:50]}", text_color="#FF453A"))
                     return
 
                 if data.get("success"):
