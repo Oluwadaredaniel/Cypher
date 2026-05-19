@@ -85,7 +85,7 @@ SETTINGS_FILE = get_config_path("settings.json")
 PAIRED_DEVICES_FILE = get_config_path("paired_devices.json")
 PAIRING_CODE = str(random.randint(100000, 999999))
 paired_devices = {}
-valid_tokens = set()
+valid_tokens = {INTERNAL_TOKEN}
 
 # --- PERSISTENCE HELPERS ---
 def load_paired_devices():

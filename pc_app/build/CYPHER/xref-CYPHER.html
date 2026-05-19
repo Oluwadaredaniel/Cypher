@@ -9139,14 +9139,14 @@ imported by:
   <a target="code" href="///C:/Cypher/pc_app/core/__init__.py" type="text/plain"><tt>core</tt></a>
 <span class="moduletype">Package</span>  <div class="import">
 imports:
-    <a href="#core.discovery">core.discovery</a>
- &#8226;   <a href="#core.tray">core.tray</a>
+    <a href="#core.tray">core.tray</a>
 
   </div>
   <div class="import">
 imported by:
     <a href="#core.dashboard_screen">core.dashboard_screen</a>
  &#8226;   <a href="#core.discovery">core.discovery</a>
+ &#8226;   <a href="#core.guest_manager">core.guest_manager</a>
  &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
  &#8226;   <a href="#core.recording_overlay">core.recording_overlay</a>
  &#8226;   <a href="#core.server">core.server</a>
@@ -9210,8 +9210,29 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#core">core</a>
+    <a href="#core.server">core.server</a>
  &#8226;   <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="core.guest_manager"></a>
+  <a target="code" href="///C:/Cypher/pc_app/core/guest_manager.py" type="text/plain"><tt>core.guest_manager</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#core">core</a>
+ &#8226;   <a href="#datetime">datetime</a>
+ &#8226;   <a href="#secrets">secrets</a>
+ &#8226;   <a href="#threading">threading</a>
+ &#8226;   <a href="#time">time</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#core.server">core.server</a>
 
   </div>
 
@@ -9273,6 +9294,8 @@ imports:
  &#8226;   <a href="#base64">base64</a>
  &#8226;   <a href="#comtypes">comtypes</a>
  &#8226;   <a href="#core">core</a>
+ &#8226;   <a href="#core.discovery">core.discovery</a>
+ &#8226;   <a href="#core.guest_manager">core.guest_manager</a>
  &#8226;   <a href="#core.recording_overlay">core.recording_overlay</a>
  &#8226;   <a href="#core.utils">core.utils</a>
  &#8226;   <a href="#ctypes">ctypes</a>
@@ -9300,6 +9323,7 @@ imports:
  &#8226;   <a href="#threading">threading</a>
  &#8226;   <a href="#time">time</a>
  &#8226;   <a href="#uuid">uuid</a>
+ &#8226;   <a href="#webbrowser">webbrowser</a>
  &#8226;   <a href="#zipfile">zipfile</a>
 
   </div>
@@ -11047,6 +11071,7 @@ imported by:
  &#8226;   <a href="#calendar">calendar</a>
  &#8226;   <a href="#click.types">click.types</a>
  &#8226;   <a href="#comtypes.automation">comtypes.automation</a>
+ &#8226;   <a href="#core.guest_manager">core.guest_manager</a>
  &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#core.utils">core.utils</a>
  &#8226;   <a href="#email.utils">email.utils</a>
@@ -16156,6 +16181,7 @@ imports:
  &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib._bootstrap">importlib._bootstrap</a>
  &#8226;   <a href="#importlib._bootstrap_external">importlib._bootstrap_external</a>
+ &#8226;   <a href="#importlib.machinery">importlib.machinery</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#warnings">warnings</a>
 
@@ -16303,6 +16329,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#ctypes.util">ctypes.util</a>
+ &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib.abc">importlib.abc</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#packaging.tags">packaging.tags</a>
@@ -23368,7 +23395,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#core.server">core.server</a>
+    <a href="#core.guest_manager">core.guest_manager</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#multiprocessing.shared_memory">multiprocessing.shared_memory</a>
  &#8226;   <a href="#werkzeug.security">werkzeug.security</a>
 
@@ -28416,6 +28444,7 @@ imported by:
  &#8226;   <a href="#concurrent.futures.thread">concurrent.futures.thread</a>
  &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
  &#8226;   <a href="#core.discovery">core.discovery</a>
+ &#8226;   <a href="#core.guest_manager">core.guest_manager</a>
  &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
  &#8226;   <a href="#core.recording_overlay">core.recording_overlay</a>
  &#8226;   <a href="#core.server">core.server</a>
@@ -28488,6 +28517,7 @@ imported by:
  &#8226;   <a href="#concurrent.futures._base">concurrent.futures._base</a>
  &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
  &#8226;   <a href="#core.discovery">core.discovery</a>
+ &#8226;   <a href="#core.guest_manager">core.guest_manager</a>
  &#8226;   <a href="#core.guest_panel">core.guest_panel</a>
  &#8226;   <a href="#core.recording_overlay">core.recording_overlay</a>
  &#8226;   <a href="#core.server">core.server</a>
@@ -29249,6 +29279,7 @@ imported by:
  &#8226;   <a href="#comtypes.tools.typedesc">comtypes.tools.typedesc</a>
  &#8226;   <a href="#comtypes.tools.typedesc_base">comtypes.tools.typedesc_base</a>
  &#8226;   <a href="#comtypes.typeinfo">comtypes.typeinfo</a>
+ &#8226;   <a href="#core.guest_manager">core.guest_manager</a>
  &#8226;   <a href="#customtkinter.windows.ctk_input_dialog">customtkinter.windows.ctk_input_dialog</a>
  &#8226;   <a href="#customtkinter.windows.ctk_tk">customtkinter.windows.ctk_tk</a>
  &#8226;   <a href="#customtkinter.windows.ctk_toplevel">customtkinter.windows.ctk_toplevel</a>
@@ -31471,6 +31502,7 @@ imports:
 imported by:
     <a href="#click._termui_impl">click._termui_impl</a>
  &#8226;   <a href="#core.dashboard_screen">core.dashboard_screen</a>
+ &#8226;   <a href="#core.server">core.server</a>
  &#8226;   <a href="#mouseinfo">mouseinfo</a>
  &#8226;   <a href="#pydoc">pydoc</a>
 

@@ -171,35 +171,37 @@ class GuestPanel(ctk.CTkFrame):
     def generate_qr_logic(self):
         def _logic():
             try:
-                # 1. Get Code
-                r_code = requests.get(f"{BASE_URL}/connect-code").json()
-                code = r_code.get("code")
-                
-                # 2. Get Guest Token
-                ts = int(time.time())
-                self.guest_session_id = f"guest-session-{ts}"
-                pair_data = {"pairing_code": code, "device_id": self.guest_session_id, "device_name": "Guest Device"}
-                r_pair = requests.post(f"{BASE_URL}/pair_device", json=pair_data, headers=HEADERS).json()
-                
-                if r_pair.get("success"):
-                    token = r_pair.get("token")
-                    qr_payload = {
-                        "ip": self.get_pc_ip(),
-                        "port": 5000,
-                        "token": token,
-                        "folders": [p for p, v in self.selected_folders.items() if v.get()],
-                        "expires": ts + (self.selected_duration * 60)
-                    }
+                # 1. Prepare data for session creation
+                selected = [p for p, v in self.selected_folders.items() if v.get()]
+                if not selected:
+                    # If no folders selected, we can't really start a meaningful session
+                    return
+
+                payload = {
+                    "folders": selected,
+                    "duration_minutes": self.selected_duration
+                }
+
+                # 2. Call /guest/create to get a restricted guest URL
+                r = requests.post(f"{BASE_URL}/guest/create", json=payload, headers=HEADERS, timeout=5)
+                data = r.json()
+
+                if data.get("success"):
+                    guest_url = data.get("url")
+                    self.guest_session_token = data.get("token") # Store for status polling if needed
                     
-                    # Generate QR Image
+                    # 3. Generate QR Image for the URL (so browser can open it)
                     qr = qrcode.QRCode(box_size=10, border=2)
-                    qr.add_data(json.dumps(qr_payload))
+                    qr.add_data(guest_url)
                     qr.make(fit=True)
                     img = qr.make_image(fill_color="#6C63FF", back_color="#0D0D0D")
                     
                     # Convert to CTkImage
                     self.after(0, lambda: self.display_qr(img))
-            except: pass
+                else:
+                    print(f"Failed to create guest session: {data.get('error')}")
+            except Exception as e:
+                print(f"QR Generation Error: {e}")
         threading.Thread(target=_logic, daemon=True).start()
 
     def display_qr(self, pil_img):
@@ -227,35 +229,32 @@ class GuestPanel(ctk.CTkFrame):
         self.after(1000, self.countdown_tick)
 
     def poll_guest(self):
-        if self.current_state != "ACTIVE": return
+        if self.current_state != "ACTIVE" or not hasattr(self, 'guest_session_token'): return
         
         def _poll():
             try:
-                r = requests.get(f"{BASE_URL}/paired-devices", headers=HEADERS, timeout=2)
-                devices = r.json()
-                is_present = any(d.get('device_id') == self.guest_session_id for d in devices)
+                r = requests.get(f"{BASE_URL}/guest/session?token={self.guest_session_token}", timeout=2)
+                data = r.json()
                 
-                if is_present and not self.is_guest_connected:
-                    self.is_guest_connected = True
-                    self.after(0, self.flash_banner)
+                if data.get("success"):
+                    session = data
+                    # Check if access count has increased
+                    if session.get('access_count', 0) > 0 and not self.is_guest_connected:
+                        self.is_guest_connected = True
+                        self.after(0, self.flash_banner)
+                else:
+                    # Session might have ended or expired
+                    pass
             except: pass
             
         threading.Thread(target=_poll, daemon=True).start()
         self.after(3000, self.poll_guest)
 
-    def flash_banner(self):
-        self.status_banner.configure(fg_color="#30D158")
-        self.status_text.configure(text_color="#FFFFFF", text="📱 Guest has connected!")
-        self.after(2000, lambda: self.status_banner.configure(fg_color="#0D2818"))
-        self.after(2000, lambda: self.status_text.configure(text_color="#30D158", text="Guest session is active"))
-
-    def start_session(self):
-        self.show_state("ACTIVE")
-
     def end_session(self):
         def _unpair():
             try:
-                requests.post(f"{BASE_URL}/unpair", json={"device_id": self.guest_session_id}, headers=HEADERS)
+                if hasattr(self, 'guest_session_token'):
+                    requests.post(f"{BASE_URL}/guest/end?token={self.guest_session_token}", headers=HEADERS)
             except: pass
             self.after(0, lambda: self.show_state("NO_SESSION"))
         
