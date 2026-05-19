@@ -14,6 +14,9 @@ import threading
 import queue
 import re
 import mimetypes
+import cv2
+import numpy as np
+import mss
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -582,11 +585,17 @@ def kill_process():
     pid = request.json.get("pid")
     try:
         proc = psutil.Process(pid)
+        # Prevent killing self or system critical processes (simple check)
+        if proc.pid == os.getpid():
+            return jsonify({"success": False, "error": "Cannot kill CYPHER core process"}), 403
+
         proc.terminate()
-        gone, alive = psutil.wait_procs([proc], timeout=1)
+        gone, alive = psutil.wait_procs([proc], timeout=2)
         if alive:
             proc.kill()
         return jsonify({"success": True, "pid": pid})
+    except psutil.NoSuchProcess:
+        return jsonify({"success": True, "note": "Process already gone"})
     except psutil.AccessDenied:
         return jsonify({"success": False, "error": "Access Denied: Try running CYPHER as Admin"}), 403
     except Exception as e:
@@ -1769,6 +1778,45 @@ def guest_list_sessions():
     sessions = guest_manager.get_all_active_sessions(host_device_id=token)
     return jsonify({"success": True, "sessions": sessions}), 200
 
+# --- SCREEN RECORDING ENGINE ---
+
+def recording_worker():
+    global recording_state
+    try:
+        with mss.mss() as sct:
+            # Get screen dimensions
+            monitor = sct.monitors[1] # Primary monitor
+            width = monitor["width"]
+            height = monitor["height"]
+
+            # Define the codec and create VideoWriter object
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(recording_state["filepath"], fourcc, 10.0, (width, height))
+
+            last_time = time.time()
+
+            while recording_state["is_recording"]:
+                if recording_state["is_paused"]:
+                    time.sleep(0.5)
+                    continue
+
+                # Capture screen
+                img = sct.grab(monitor)
+                frame = np.array(img)
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+
+                # Write frame
+                out.write(frame)
+
+                # Control FPS (Roughly 10 FPS)
+                time.sleep(max(0, 0.1 - (time.time() - last_time)))
+                last_time = time.time()
+
+            out.release()
+    except Exception as e:
+        print(f"Recording Error: {e}")
+        recording_state["is_recording"] = False
+
 # --- SCREEN RECORDING ---
 
 @app.route('/recording/start', methods=['POST'])
@@ -1776,16 +1824,28 @@ def start_recording():
     global recording_state
     if recording_state["is_recording"]:
         return jsonify({"success": False, "error": "Recording already in progress"}), 400
-    data = request.json
+
+    data = request.json or {}
     source = data.get("source", "fullscreen")
+
     record_dir = Path.home() / "Videos" / "CYPHER"
     record_dir.mkdir(parents=True, exist_ok=True)
+
     filename = f"Recording_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
     filepath = record_dir / filename
+
     recording_state.update({
-        "is_recording": True, "is_paused": False, "start_time": time.time(),
-        "filename": filename, "filepath": str(filepath), "source": source
+        "is_recording": True,
+        "is_paused": False,
+        "start_time": time.time(),
+        "filename": filename,
+        "filepath": str(filepath),
+        "source": source
     })
+
+    # Start the background recording thread
+    threading.Thread(target=recording_worker, daemon=True).start()
+
     log_to_ui(f"Recording Started: {source}")
     overlay_manager.start()
     return jsonify({"success": True, "filename": filename})
