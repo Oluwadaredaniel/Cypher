@@ -120,8 +120,15 @@ class GuestPanel(ctk.CTkFrame):
                       text_color="#6C63FF", hover_color="#1A1A1A", anchor="w",
                       command=lambda: self.show_state("DASHBOARD")).pack(anchor="w", pady=5)
 
-        # Folder Selection
-        ctk.CTkLabel(self.container, text="Which folders can they see?", font=("Segoe UI", 13, "bold"), text_color="#8E8E93").pack(anchor="w", pady=(15, 5))
+        # Folder Selection Header
+        folder_header = ctk.CTkFrame(self.container, fg_color="transparent")
+        folder_header.pack(fill="x", pady=(15, 5))
+
+        ctk.CTkLabel(folder_header, text="Which folders can they see?", font=("Segoe UI", 13, "bold"), text_color="#8E8E93").pack(side="left")
+
+        ctk.CTkButton(folder_header, text="+ Add New Folder", width=120, height=24, corner_radius=6,
+                      fg_color="#1A1A1A", hover_color="#6C63FF", font=("Segoe UI", 11, "bold"),
+                      command=self.browse_and_add_folder).pack(side="right")
         
         self.folder_scroll = ctk.CTkScrollableFrame(self.container, fg_color="#121216", height=150, corner_radius=16, border_width=1, border_color="#1D1D26")
         self.folder_scroll.pack(fill="x", pady=5)
@@ -194,13 +201,35 @@ class GuestPanel(ctk.CTkFrame):
 
         for f in self.available_folders:
             path = f['path']
-            var = ctk.BooleanVar(value=True)
-            self.selected_folders[path] = var
+            # Default to checked for new folders
+            if path not in self.selected_folders:
+                self.selected_folders[path] = ctk.BooleanVar(value=True)
+
+            var = self.selected_folders[path]
             row = ctk.CTkFrame(self.folder_scroll, fg_color="transparent")
             row.pack(fill="x", pady=2, padx=5)
             ctk.CTkCheckBox(row, text=f['name'], variable=var, border_color="#6C63FF",
                             checkmark_color="#6C63FF", font=("Segoe UI", 12)).pack(side="left")
             ctk.CTkLabel(row, text=os.path.dirname(path), font=("Arial", 9), text_color="#3F3F46").pack(side="right", padx=10)
+
+    def browse_and_add_folder(self):
+        """Opens a folder picker and adds it to the shared list immediately."""
+        from tkinter import filedialog
+        path = filedialog.askdirectory()
+        if path:
+            def _save():
+                try:
+                    # 1. Get current
+                    r = requests.get(f"{BASE_URL}/settings", headers=HEADERS, timeout=5)
+                    current = r.json().get("shared_folders", [])
+                    if path not in current:
+                        current.append(path)
+                        # 2. Save
+                        requests.post(f"{BASE_URL}/settings", json={"shared_folders": current}, headers=HEADERS, timeout=5)
+                    # 3. UI Refresh
+                    self.after(0, self.fetch_available_folders)
+                except: pass
+            threading.Thread(target=_save, daemon=True).start()
 
     # --- QR VIEW: Show the Code ---
     def render_qr_view(self):
