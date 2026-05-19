@@ -131,7 +131,7 @@ class GuestPanel(ctk.CTkFrame):
             self.selected_folders[path] = var
             row = ctk.CTkFrame(self.folder_scroll, fg_color="transparent")
             row.pack(fill="x", pady=2, padx=5)
-            ctk.CTkCheckBox(row, text=f['name'], variable=var, border_color="#6C63FF", checkcolor="#6C63FF").pack(side="left")
+            ctk.CTkCheckBox(row, text=f['name'], variable=var, border_color="#6C63FF", checkmark_color="#6C63FF").pack(side="left")
             ctk.CTkLabel(row, text=path, font=("Arial", 10), text_color="#86868B").pack(side="right")
 
     # --- STATE 3: ACTIVE ---
