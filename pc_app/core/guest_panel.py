@@ -110,6 +110,9 @@ class GuestPanel(ctk.CTkFrame):
 
     # --- SETUP: Choose Folders & Duration ---
     def render_setup(self):
+        # Reset selection state
+        self.selected_folders = {}
+
         ctk.CTkLabel(self.container, text="Setup Guest Access", font=("Segoe UI", 20, "bold"), text_color="#FFFFFF").pack(anchor="w")
         
         # Back Button
@@ -122,7 +125,11 @@ class GuestPanel(ctk.CTkFrame):
         
         self.folder_scroll = ctk.CTkScrollableFrame(self.container, fg_color="#121216", height=150, corner_radius=16, border_width=1, border_color="#1D1D26")
         self.folder_scroll.pack(fill="x", pady=5)
-        
+
+        # Display "Loading..." or "No Folders" inside the scroll
+        self.loading_label = ctk.CTkLabel(self.folder_scroll, text="Fetching shared folders...", font=("Segoe UI", 12), text_color="#3F3F46")
+        self.loading_label.pack(pady=20)
+
         # Duration Selection
         ctk.CTkLabel(self.container, text="Session duration", font=("Segoe UI", 13, "bold"), text_color="#8E8E93").pack(anchor="w", pady=(15, 10))
         duration_frame = ctk.CTkFrame(self.container, fg_color="transparent")
@@ -141,6 +148,7 @@ class GuestPanel(ctk.CTkFrame):
                       height=52, corner_radius=16, font=("Segoe UI", 14, "bold"),
                       command=self.start_session).pack(fill="x", pady=(25, 0), padx=40)
         
+        # Start fetching folders
         self.fetch_available_folders()
 
     def set_duration(self, mins):
@@ -151,22 +159,45 @@ class GuestPanel(ctk.CTkFrame):
     def fetch_available_folders(self):
         def _fetch():
             try:
+                # Add delay to ensure server is ready or handle rapid switching
+                time.sleep(0.5)
                 r = requests.get(f"{BASE_URL}/settings", headers=HEADERS, timeout=5)
                 if r.status_code == 200:
-                    shared_folders = r.json().get("shared_folders", [])
+                    data = r.json()
+                    shared_folders = data.get("shared_folders", [])
+                    print(f"DEBUG: Found {len(shared_folders)} shared folders")
                     self.available_folders = [{"name": os.path.basename(f) or f, "path": f} for f in shared_folders]
                     self.after(0, self.update_folder_list)
-            except: pass
+                else:
+                    self.after(0, lambda: self.loading_label.configure(text=f"Error: Server returned {r.status_code}"))
+            except Exception as e:
+                print(f"DEBUG: Fetch Error: {e}")
+                self.after(0, lambda: self.loading_label.configure(text="Error: Could not reach PC server"))
+
         threading.Thread(target=_fetch, daemon=True).start()
 
     def update_folder_list(self):
+        # Clear loading label
+        if hasattr(self, 'loading_label'):
+            self.loading_label.destroy()
+
+        for widget in self.folder_scroll.winfo_children():
+            widget.destroy()
+
+        if not self.available_folders:
+            ctk.CTkLabel(self.folder_scroll, text="No folders shared in Settings yet.",
+                        font=("Segoe UI", 12), text_color="#3F3F46").pack(pady=20)
+            return
+
         for f in self.available_folders:
             path = f['path']
             var = ctk.BooleanVar(value=True)
             self.selected_folders[path] = var
             row = ctk.CTkFrame(self.folder_scroll, fg_color="transparent")
             row.pack(fill="x", pady=2, padx=5)
-            ctk.CTkCheckBox(row, text=f['name'], variable=var, border_color="#6C63FF", checkmark_color="#6C63FF", font=("Segoe UI", 12)).pack(side="left")
+            ctk.CTkCheckBox(row, text=f['name'], variable=var, border_color="#6C63FF",
+                            checkmark_color="#6C63FF", font=("Segoe UI", 12)).pack(side="left")
+            ctk.CTkLabel(row, text=os.path.dirname(path), font=("Arial", 9), text_color="#3F3F46").pack(side="right", padx=10)
 
     # --- QR VIEW: Show the Code ---
     def render_qr_view(self):
