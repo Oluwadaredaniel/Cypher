@@ -58,15 +58,21 @@ class _GuestScreenState extends State<GuestScreen> {
 
   Future<void> _fetchFolders() async {
     try {
+      // Use the dedicated settings endpoint that now includes shared folders
       final response = await http.get(
-        Uri.parse('http://${widget.pcIpAddress}:5000/files'),
+        Uri.parse('http://${widget.pcIpAddress}:5000/settings'),
         headers: {"X-Auth-Token": widget.authToken},
       );
       if (response.statusCode == 200) {
-        final List data = json.decode(response.body);
+        final Map<String, dynamic> settings = json.decode(response.body);
+        final List sharedFolders = settings['shared_folders'] ?? [];
+        
         setState(() {
-          // Only show folders that are marked as 'is_shared' (user-selected folders)
-          _availableFolders = data.where((e) => e['is_shared'] == true).toList().cast<Map<String, dynamic>>();
+          // Shared folders from PC are already filtered for security
+          _availableFolders = sharedFolders.map((path) => {
+            'name': path.split(Platform.pathSeparator).last,
+            'path': path,
+          }).toList();
           _selectedFolders = _availableFolders.map((e) => e['path'].toString()).toSet();
         });
       }

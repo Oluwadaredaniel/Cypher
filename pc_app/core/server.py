@@ -294,7 +294,16 @@ def handle_settings():
     if request.method == 'GET':
         try:
             with open(SETTINGS_FILE, 'r') as f:
-                return jsonify(json.load(f))
+                settings = json.load(f)
+
+            # [NEW] Add shared folders to settings for the Guest Hub to see
+            try:
+                with open(SHARED_FOLDERS_FILE, 'r') as f:
+                    settings["shared_folders"] = json.load(f)
+            except:
+                settings["shared_folders"] = []
+
+            return jsonify(settings)
         except:
             return jsonify(DEFAULT_SETTINGS)
 
