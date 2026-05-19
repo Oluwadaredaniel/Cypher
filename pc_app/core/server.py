@@ -859,6 +859,45 @@ def browse_files():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/files/download/zip', methods=['POST'])
+def download_files_zip():
+    """Download multiple selected files as a single ZIP archive."""
+    incoming_token = request.headers.get("X-Auth-Token")
+    if not incoming_token or incoming_token not in valid_tokens:
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+
+    data = request.json or {}
+    paths = data.get('paths', [])
+
+    if not paths:
+        return jsonify({"success": False, "error": "No files selected"}), 400
+
+    try:
+        import zipfile
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for path in paths:
+                p = Path(path)
+                if p.exists() and p.is_file():
+                    # Check for system protected folders (basic check)
+                    path_low = str(p).lower()
+                    restricted = ["c:\\windows", "c:\\boot"]
+                    if any(path_low.startswith(r) for r in restricted):
+                        continue
+
+                    zf.write(str(p), arcname=p.name)
+
+        zip_buffer.seek(0)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'cypher_batch_{timestamp}.zip'
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/files/upload', methods=['POST'])
 def upload_file_stream():
     if 'file' not in request.files:

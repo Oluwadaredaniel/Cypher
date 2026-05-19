@@ -39,6 +39,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   bool _hasError = false;
   bool _isSearching = false;
   bool _isGridView = false;
+  bool _isSelectionMode = false;
+  Set<String> _selectedPaths = {};
   String _groupBy = "None"; // "None", "Date", "Type"
   final TextEditingController _searchController = TextEditingController();
 
@@ -125,6 +127,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
 
   // --- DELETE LOGIC ---
   Future<void> _handleDelete(String path, String name) async {
+    if (_isSelectionMode) return;
     final bool? confirm = await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -163,6 +166,126 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
           .where((item) => item['name'].toString().toLowerCase().contains(query.toLowerCase()))
           .toList();
     });
+  }
+
+  void _toggleSelection(String path) {
+    setState(() {
+      if (_selectedPaths.contains(path)) {
+        _selectedPaths.remove(path);
+        if (_selectedPaths.isEmpty) _isSelectionMode = false;
+      } else {
+        _selectedPaths.add(path);
+      }
+    });
+  }
+
+  void _enterSelectionMode(String path) {
+    HapticFeedback.heavyImpact();
+    setState(() {
+      _isSelectionMode = true;
+      _selectedPaths.add(path);
+    });
+  }
+
+  Future<void> _downloadSelected() async {
+    if (_selectedPaths.isEmpty) return;
+
+    final List<String> filesToZip = [];
+    for (var path in _selectedPaths) {
+      final item = _items.firstWhere((i) => i['path'] == path, orElse: () => null);
+      if (item != null && item['type'] != 'folder' && item['type'] != 'drive') {
+        filesToZip.add(path);
+      }
+    }
+
+    if (filesToZip.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Only files can be batch downloaded")));
+      return;
+    }
+
+    // If only one file, use regular download
+    if (filesToZip.length == 1) {
+      final item = _items.firstWhere((i) => i['path'] == filesToZip.first);
+      _startDownload(item);
+      setState(() {
+        _isSelectionMode = false;
+        _selectedPaths.clear();
+      });
+      return;
+    }
+
+    // Start Batch Download (Zip)
+    setState(() => _isDownloading = true);
+    
+    // We'll create a fake item for the ZIP progress UI
+    final zipName = "cypher_batch_${DateFormat('HHmmss').format(DateTime.now())}.zip";
+    final zipItem = {'name': zipName, 'path': 'batch_zip'};
+
+    late StateSetter setProgressState;
+    _showDownloadSheet(zipItem, (stateSetter) {
+      setProgressState = stateSetter;
+    });
+
+    try {
+      _downloadClient = http.Client();
+      final request = http.Request('POST', Uri.parse("$_baseUrl/files/download/zip"));
+      request.headers.addAll(_headers);
+      request.headers['Content-Type'] = 'application/json';
+      request.body = json.encode({"paths": filesToZip});
+
+      final response = await _downloadClient!.send(request);
+      final total = response.contentLength ?? 0;
+      int received = 0;
+      
+      Directory? dir;
+      if (Platform.isAndroid) {
+        dir = Directory('/storage/emulated/0/Download');
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+
+      final saveFile = File("${dir.path}/$zipName");
+      final IOSink sink = saveFile.openWrite();
+      final stopwatch = Stopwatch()..start();
+
+      _downloadSubscription = response.stream.listen((chunk) {
+        received += chunk.length;
+        sink.add(chunk);
+        final elapsed = stopwatch.elapsed.inSeconds;
+        double progress = total > 0 ? (received / total) : 0;
+        
+        setProgressState(() {
+          _downloadProgress = progress;
+          if (elapsed > 0) {
+            double mbps = (received / 1024 / 1024) / elapsed;
+            _downloadSpeed = "${mbps.toStringAsFixed(1)} MB/s";
+          }
+        });
+      }, onDone: () async {
+        await sink.close();
+        if (Platform.isAndroid) await MediaScanner.loadMedia(path: saveFile.path);
+        if (mounted) {
+          setProgressState(() { _downloadProgress = 1.0; _isDownloading = false; });
+          setState(() {
+            _isDownloading = false;
+            _isSelectionMode = false;
+            _selectedPaths.clear();
+          });
+        }
+      }, onError: (e) {
+        sink.close();
+        if (mounted) {
+          Navigator.pop(context);
+          setState(() => _isDownloading = false);
+        }
+      });
+
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        setState(() => _isDownloading = false);
+      }
+    }
   }
 
   String _getDateCategory(String? dateStr) {
@@ -376,6 +499,26 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   }
 
   PreferredSizeWidget _buildAppBar() {
+    if (_isSelectionMode) {
+      return AppBar(
+        backgroundColor: const Color(0xFF1A1A1A),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () => setState(() {
+            _isSelectionMode = false;
+            _selectedPaths.clear();
+          }),
+        ),
+        title: Text("${_selectedPaths.length} selected", style: GoogleFonts.outfit(color: Colors.white, fontSize: 18)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download_for_offline, color: Color(0xFF6C63FF)),
+            onPressed: _downloadSelected,
+          ),
+        ],
+      );
+    }
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -532,20 +675,37 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
 
   Widget _buildListItem(dynamic item) {
     bool isFolder = item['type'] == 'folder' || item['type'] == 'directory';
+    bool isSelected = _selectedPaths.contains(item['path']);
+    
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         ListTile(
-          contentPadding: EdgeInsets.zero,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          tileColor: isSelected ? const Color(0xFF6C63FF).withOpacity(0.1) : Colors.transparent,
           leading: _buildFileIcon(item['type'], item['name'], item['path']),
           title: Text(item['name'], style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis),
           subtitle: Text("${_formatSize(item['size'])} • ${item['modified'] ?? ''}", style: const TextStyle(color: Color(0xFF86868B), fontSize: 11)),
-          trailing: IconButton(
-            icon: Icon(isFolder ? Icons.chevron_right : Icons.more_vert, color: const Color(0xFF444444)),
-            onPressed: isFolder ? null : () => _showOptionsSheet(item),
-          ),
-          onTap: () => isFolder ? _navigateToFolder(item) : _navigateToFile(item),
-          onLongPress: () => _handleDelete(item['path'], item['name']),
+          trailing: _isSelectionMode 
+            ? Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked, color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF2C2C2C))
+            : IconButton(
+                icon: Icon(isFolder ? Icons.chevron_right : Icons.more_vert, color: const Color(0xFF444444)),
+                onPressed: isFolder ? null : () => _showOptionsSheet(item),
+              ),
+          onTap: () {
+            if (_isSelectionMode) {
+              _toggleSelection(item['path']);
+            } else {
+              isFolder ? _navigateToFolder(item) : _navigateToFile(item);
+            }
+          },
+          onLongPress: () {
+            if (!_isSelectionMode) {
+              _enterSelectionMode(item['path']);
+            } else {
+              _handleDelete(item['path'], item['name']);
+            }
+          },
         ),
         const Divider(color: Color(0xFF1A1A1A), height: 1),
       ],
@@ -607,23 +767,54 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
 
   Widget _buildGridItem(dynamic item) {
     bool isFolder = item['type'] == 'folder' || item['type'] == 'directory';
+    bool isSelected = _selectedPaths.contains(item['path']);
+
     return GestureDetector(
-      onTap: () => isFolder ? _navigateToFolder(item) : _navigateToFile(item),
-      onLongPress: () => _handleDelete(item['path'], item['name']),
-      child: Column(
-        children: [
-          Expanded(
-            child: _buildFileIcon(item['type'], item['name'], item['path'], large: true),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            item['name'],
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+      onTap: () {
+        if (_isSelectionMode) {
+          _toggleSelection(item['path']);
+        } else {
+          isFolder ? _navigateToFolder(item) : _navigateToFile(item);
+        }
+      },
+      onLongPress: () {
+        if (!_isSelectionMode) {
+          _enterSelectionMode(item['path']);
+        } else {
+          _handleDelete(item['path'], item['name']);
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF6C63FF).withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isSelected ? const Color(0xFF6C63FF) : Colors.transparent, width: 2),
+        ),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Expanded(
+                  child: _buildFileIcon(item['type'], item['name'], item['path'], large: true),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  item['name'],
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+            if (_isSelectionMode)
+              Positioned(
+                top: 8, right: 8,
+                child: Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked, 
+                  color: isSelected ? const Color(0xFF6C63FF) : Colors.white24, size: 20),
+              ),
+          ],
+        ),
       ),
     );
   }
