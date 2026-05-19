@@ -85,7 +85,8 @@ recording_state = {
 
 MACROS_FILE = get_config_path("macros.json")
 SETTINGS_FILE = get_config_path("settings.json")
-SHARED_FOLDERS_FILE = get_config_path("shared_folders.json")
+# [FIX] Use cypher_config.json as the master source for shared folders to match the UI
+SHARED_FOLDERS_FILE = get_config_path("cypher_config.json")
 PAIRED_DEVICES_FILE = get_config_path("paired_devices.json")
 PAIRING_CODE = str(random.randint(100000, 999999))
 paired_devices = {}
@@ -301,10 +302,12 @@ def handle_settings():
             try:
                 if SHARED_FOLDERS_FILE.exists():
                     with open(SHARED_FOLDERS_FILE, 'r') as f:
-                        settings["shared_folders"] = json.load(f)
+                        config_data = json.load(f)
+                        settings["shared_folders"] = config_data.get("shared_folders", [])
                 else:
                     settings["shared_folders"] = []
-            except:
+            except Exception as e:
+                print(f"DEBUG: Error reading shared folders: {e}")
                 settings["shared_folders"] = []
 
             return jsonify(settings)
@@ -316,8 +319,16 @@ def handle_settings():
         # Handle shared folders separately if they are in the request
         if "shared_folders" in new_settings:
             shared = new_settings.pop("shared_folders")
+            # Load existing config or start fresh
+            config_data = {}
+            if SHARED_FOLDERS_FILE.exists():
+                with open(SHARED_FOLDERS_FILE, 'r') as f:
+                    config_data = json.load(f)
+
+            config_data["shared_folders"] = shared
+
             with open(SHARED_FOLDERS_FILE, 'w') as f:
-                json.dump(shared, f, indent=4)
+                json.dump(config_data, f, indent=4)
 
         if not new_settings:
             return jsonify({"success": True})
