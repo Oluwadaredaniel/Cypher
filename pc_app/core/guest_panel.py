@@ -258,6 +258,9 @@ class GuestPanel(ctk.CTkFrame):
         threading.Thread(target=_poll, daemon=True).start()
         self.after(3000, self.poll_guest)
 
+    def start_session(self):
+        self.show_state("ACTIVE")
+
     def end_session(self):
         def _unpair():
             try:
