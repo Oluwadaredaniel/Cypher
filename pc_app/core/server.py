@@ -85,6 +85,7 @@ recording_state = {
 
 MACROS_FILE = get_config_path("macros.json")
 SETTINGS_FILE = get_config_path("settings.json")
+SHARED_FOLDERS_FILE = get_config_path("shared_folders.json")
 PAIRED_DEVICES_FILE = get_config_path("paired_devices.json")
 PAIRING_CODE = str(random.randint(100000, 999999))
 paired_devices = {}
@@ -298,8 +299,11 @@ def handle_settings():
 
             # [NEW] Add shared folders to settings for the Guest Hub to see
             try:
-                with open(SHARED_FOLDERS_FILE, 'r') as f:
-                    settings["shared_folders"] = json.load(f)
+                if SHARED_FOLDERS_FILE.exists():
+                    with open(SHARED_FOLDERS_FILE, 'r') as f:
+                        settings["shared_folders"] = json.load(f)
+                else:
+                    settings["shared_folders"] = []
             except:
                 settings["shared_folders"] = []
 
@@ -309,6 +313,15 @@ def handle_settings():
 
     new_settings = request.json
     try:
+        # Handle shared folders separately if they are in the request
+        if "shared_folders" in new_settings:
+            shared = new_settings.pop("shared_folders")
+            with open(SHARED_FOLDERS_FILE, 'w') as f:
+                json.dump(shared, f, indent=4)
+
+        if not new_settings:
+            return jsonify({"success": True})
+
         with open(SETTINGS_FILE, 'r+') as f:
             current = json.load(f)
 
