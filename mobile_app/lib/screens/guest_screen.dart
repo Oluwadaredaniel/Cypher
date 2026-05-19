@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 
 enum GuestState { setup, active, expired }
 
@@ -25,13 +26,14 @@ class GuestScreen extends StatefulWidget {
 class _GuestScreenState extends State<GuestScreen> {
   // State variables
   GuestState _currentState = GuestState.setup;
-  List<String> _availableFolders = [];
+  List<Map<String, dynamic>> _availableFolders = [];
   Set<String> _selectedFolders = {};
   int _selectedDurationMinutes = 15;
   bool _isLoading = false;
 
   // Active Session variables
   String? _guestToken;
+  String? _guestUrl;
   DateTime? _expiryTime;
   Timer? _countdownTimer;
   Timer? _pollTimer;
@@ -63,8 +65,8 @@ class _GuestScreenState extends State<GuestScreen> {
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
         setState(() {
-          _availableFolders = data.map((e) => e.toString()).toList();
-          _selectedFolders = Set.from(_availableFolders);
+          _availableFolders = data.cast<Map<String, dynamic>>();
+          _selectedFolders = _availableFolders.map((e) => e['path'].toString()).toSet();
         });
       }
     } catch (e) {
@@ -73,57 +75,55 @@ class _GuestScreenState extends State<GuestScreen> {
   }
 
   Future<void> _createGuestAccess() async {
+    if (_selectedFolders.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select at least one folder")),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      // 1. Get connect code from PC
-      final codeRes = await http.get(
-        Uri.parse('http://${widget.pcIpAddress}:5000/connect-code'),
-        headers: {"X-Auth-Token": widget.authToken},
+      final res = await http.post(
+        Uri.parse('http://${widget.pcIpAddress}:5000/guest/create'),
+        headers: {
+          "Content-Type": "application/json",
+          "X-Auth-Token": widget.authToken
+        },
+        body: json.encode({
+          "folders": _selectedFolders.toList(),
+          "duration_minutes": _selectedDurationMinutes,
+        }),
       );
 
-      if (codeRes.statusCode == 200) {
-        final code = json.decode(codeRes.body)['code'];
-        final deviceId = "GUEST-${DateTime.now().millisecondsSinceEpoch}";
-        final deviceName = "Guest Device (Limited)";
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        _guestToken = data['token'];
+        _guestUrl = data['url'];
+        _expiryTime = DateTime.now().add(Duration(minutes: _selectedDurationMinutes));
+        
+        setState(() {
+          _currentState = GuestState.active;
+          _isLoading = false;
+        });
 
-        // 2. Register Guest Session with PC server
-        final pairRes = await http.post(
-          Uri.parse('http://${widget.pcIpAddress}:5000/pair_device'),
-          headers: {"Content-Type": "application/json"},
-          body: json.encode({
-            "pairing_code": code,
-            "device_id": deviceId,
-            "device_name": deviceName,
-          }),
-        );
-
-        if (pairRes.statusCode == 200) {
-          final data = json.decode(pairRes.body);
-          _guestToken = data['token'];
-          _expiryTime = DateTime.now().add(Duration(minutes: _selectedDurationMinutes));
-          
-          setState(() {
-            _currentState = GuestState.active;
-            _isLoading = false;
-          });
-
-          _startCountdown();
-          _startPolling();
-        } else {
-          throw Exception("Failed to pair guest session");
-        }
+        _startCountdown();
+        _startPolling();
+      } else {
+        throw Exception("Failed to create guest session");
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to create guest access. Ensure PC is online.")),
+          SnackBar(content: Text("Error: ${e.toString()}")),
         );
       }
     }
   }
 
   void _startCountdown() {
+    _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_expiryTime == null) return;
       final remaining = _expiryTime!.difference(DateTime.now());
@@ -137,28 +137,20 @@ class _GuestScreenState extends State<GuestScreen> {
   }
 
   void _startPolling() {
+    _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       try {
         final res = await http.get(
-          Uri.parse('http://${widget.pcIpAddress}:5000/paired-devices'),
-          headers: {"X-Auth-Token": widget.authToken},
+          Uri.parse('http://${widget.pcIpAddress}:5000/guest/session?token=$_guestToken'),
         );
         if (res.statusCode == 200) {
-          final List devices = json.decode(res.body);
-          // Simple logic: if a new device appears or status changes
-          if (devices.isNotEmpty && !_isGuestConnected) {
-            setState(() => _isGuestConnected = true);
-          }
-        }
-        
-        // Also fetch history to update "files viewed"
-        final histRes = await http.get(
-          Uri.parse('http://${widget.pcIpAddress}:5000/history'),
-          headers: {"X-Auth-Token": widget.authToken},
-        );
-        if (histRes.statusCode == 200) {
-          final List history = json.decode(histRes.body);
-          setState(() => _filesAccessedCount = history.length);
+          final data = json.decode(res.body);
+          setState(() {
+            _filesAccessedCount = data['access_count'] ?? 0;
+            _isGuestConnected = _filesAccessedCount > 0;
+          });
+        } else if (res.statusCode == 401) {
+           _expireSession();
         }
       } catch (e) {
         debugPrint("Polling error: $e");
@@ -176,12 +168,48 @@ class _GuestScreenState extends State<GuestScreen> {
         setState(() => _backCountdown--);
       } else {
         timer.cancel();
-        if (mounted) Navigator.pop(context);
+        if (mounted && Navigator.canPop(context)) Navigator.pop(context);
       }
     });
   }
 
+  Future<void> _extendSession() async {
+    try {
+      final res = await http.post(
+        Uri.parse('http://${widget.pcIpAddress}:5000/guest/extend'),
+        headers: {
+          "Content-Type": "application/json",
+          "X-Auth-Token": widget.authToken
+        },
+        body: json.encode({
+          "guest_token": _guestToken,
+          "additional_minutes": 30
+        }),
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _expiryTime = _expiryTime?.add(const Duration(minutes: 30));
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Session extended by 30 mins")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Extend error: $e");
+    }
+  }
+
   Future<void> _endSessionManually() async {
+    try {
+      await http.post(
+        Uri.parse('http://${widget.pcIpAddress}:5000/guest/end'),
+        headers: {
+          "Content-Type": "application/json",
+          "X-Auth-Token": widget.authToken
+        },
+        body: json.encode({"guest_token": _guestToken}),
+      );
+    } catch (e) {}
     _expireSession();
   }
 
@@ -254,6 +282,11 @@ class _GuestScreenState extends State<GuestScreen> {
                     style: GoogleFonts.outfit(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 ..._availableFolders.map((folder) => _buildFolderRow(folder)),
+                if (_availableFolders.isEmpty)
+                   Padding(
+                     padding: const EdgeInsets.symmetric(vertical: 20),
+                     child: Center(child: Text("No folders found", style: GoogleFonts.outfit(color: Colors.white54))),
+                   )
               ],
             ),
           ),
@@ -285,14 +318,16 @@ class _GuestScreenState extends State<GuestScreen> {
     );
   }
 
-  Widget _buildFolderRow(String folder) {
-    bool isSelected = _selectedFolders.contains(folder);
+  Widget _buildFolderRow(Map<String, dynamic> folder) {
+    final path = folder['path'].toString();
+    final name = folder['name'].toString();
+    bool isSelected = _selectedFolders.contains(path);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
         onTap: () {
           setState(() {
-            isSelected ? _selectedFolders.remove(folder) : _selectedFolders.add(folder);
+            isSelected ? _selectedFolders.remove(path) : _selectedFolders.add(path);
           });
         },
         child: Row(
@@ -310,7 +345,7 @@ class _GuestScreenState extends State<GuestScreen> {
             const SizedBox(width: 12),
             const Text("📁", style: TextStyle(fontSize: 16)),
             const SizedBox(width: 8),
-            Text(folder, style: GoogleFonts.outfit(color: Colors.white, fontSize: 14)),
+            Expanded(child: Text(name, style: GoogleFonts.outfit(color: Colors.white, fontSize: 14), overflow: TextOverflow.ellipsis)),
           ],
         ),
       ),
@@ -371,12 +406,7 @@ class _GuestScreenState extends State<GuestScreen> {
                     child: Column(
                       children: [
                         QrImageView(
-                          data: json.encode({
-                            "ip": widget.pcIpAddress,
-                            "token": _guestToken,
-                            "folders": _selectedFolders.toList(),
-                            "expires": _expiryTime?.millisecondsSinceEpoch
-                          }),
+                          data: _guestUrl ?? "Invalid URL",
                           version: QrVersions.auto,
                           size: 200.0,
                           eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.white),
@@ -413,13 +443,13 @@ class _GuestScreenState extends State<GuestScreen> {
                 if (_isGuestConnected) 
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
-                    child: Text("$_filesAccessedCount files viewed", style: GoogleFonts.outfit(color: Colors.white, fontSize: 14)),
+                    child: Text("$_filesAccessedCount file operations recorded", style: GoogleFonts.outfit(color: Colors.white, fontSize: 14)),
                   ),
                 
                 const SizedBox(height: 40),
-                _buildGhostButton("Extend by 30 min", () {
-                  setState(() => _expiryTime = _expiryTime?.add(const Duration(minutes: 30)));
-                }),
+                _buildGhostButton("Extend by 30 min", _extendSession),
+                const SizedBox(height: 12),
+                _buildGhostButton("Share URL", () => Share.share(_guestUrl ?? "")),
                 const SizedBox(height: 12),
                 _buildPrimaryButton("End Session", _endSessionManually, color: Colors.red),
               ],

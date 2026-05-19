@@ -308,11 +308,13 @@ def handle_settings():
             # Ensure name changes are synced to discovery
             new_name = current.get("device_name")
             if new_name and new_name != old_name:
-                # Assuming get_discovery_instance() exists in discovery module
-                from .discovery import get_discovery_instance
-                disco = get_discovery_instance()
-                if disco:
-                    disco.update_name(new_name)
+                try:
+                    from .discovery import get_discovery_instance
+                    disco = get_discovery_instance()
+                    if disco:
+                        disco.update_name(new_name)
+                except ImportError:
+                    pass
 
             battery_threshold = current.get("battery_alert_threshold", battery_threshold)
 
@@ -359,7 +361,8 @@ def paste_from_phone():
                  header, encoded = phone_clipboard["content"].split(",", 1)
                  data = base64.b64decode(encoded)
                  img = Image.open(io.BytesIO(data))
-                 img.save("temp_clip.png")
+                 # [CHAOS FIX] Save to a proper path or use native clipboard
+                 img.save(get_app_data_dir() / "temp_clip.png")
             except: pass
 
         pyperclip.copy(phone_clipboard["content"])
@@ -1029,10 +1032,11 @@ def delete_file():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-# --- GUEST ACCESS ENDPOINTS ---
+# --- GUEST ACCESS ENDPOINTS (TIER 1, 2, 3) ---
 
 @app.route('/guest/create', methods=['POST'])
 def guest_create_session():
+    """TIER 1: Create a guest session from authenticated device."""
     token = request.headers.get("X-Auth-Token")
     if not token or token not in valid_tokens:
         return jsonify({"success": False, "error": "Unauthorized"}), 401
@@ -1053,24 +1057,431 @@ def guest_create_session():
 
 @app.route('/guest/access', methods=['GET'])
 def guest_landing():
+    """TIER 2: Guest landing page - HTML file browser."""
     token = request.args.get('token')
     session = guest_manager.validate_token(token)
     
     if not session:
         return jsonify({"error": "Invalid or expired token"}), 401
     
-    # [TRUNCATED FOR BREVITY IN MERGE - ASSUMED TO BE THE FULL HTML CONTENT FROM REMOTE]
-    # In practice, I would include the full HTML here.
-    return "Guest HTML Access Panel", 200, {'Content-Type': 'text/html; charset=utf-8'}
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+        <title>Cypher - Guest File Access</title>
+        <style>
+            :root {{
+                --accent: #6C63FF;
+                --bg: #0d0d0d;
+                --surface: #1a1a1a;
+                --text: #ffffff;
+                --text-dim: #86868b;
+                --glass: rgba(255, 255, 255, 0.05);
+            }}
+
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                -webkit-tap-highlight-color: transparent;
+            }}
+
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+                background: var(--bg);
+                color: var(--text);
+                line-height: 1.5;
+                padding-top: max(12px, env(safe-area-inset-top));
+                padding-bottom: max(12px, env(safe-area-inset-bottom));
+            }}
+
+            .container {{
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+            }}
+
+            .header {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+                padding: 16px;
+                background: var(--glass);
+                backdrop-filter: blur(20px);
+                border-radius: 20px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }}
+
+            .header h1 {{
+                font-size: 20px;
+                font-weight: 700;
+                letter-spacing: -0.5px;
+            }}
+
+            .timer {{
+                font-size: 14px;
+                font-weight: 600;
+                font-variant-numeric: tabular-nums;
+                color: var(--text-dim);
+                padding: 6px 12px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 100px;
+            }}
+
+            .timer.warning {{ color: #ff9500; background: rgba(255, 149, 0, 0.1); }}
+            .timer.critical {{ color: #ff3b30; background: rgba(255, 59, 48, 0.1); }}
+
+            .breadcrumb {{
+                display: flex;
+                gap: 8px;
+                margin-bottom: 20px;
+                overflow-x: auto;
+                padding-bottom: 4px;
+                scrollbar-width: none;
+            }}
+
+            .breadcrumb::-webkit-scrollbar {{ display: none; }}
+
+            .breadcrumb span {{
+                padding: 8px 16px;
+                background: var(--surface);
+                border-radius: 12px;
+                color: var(--accent);
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                white-space: nowrap;
+                transition: all 0.2s;
+                border: 1px solid rgba(255, 255, 255, 0.05);
+            }}
+
+            .breadcrumb span:last-child {{
+                color: var(--text-dim);
+                cursor: default;
+                background: transparent;
+            }}
+
+            .upload-card {{
+                background: var(--surface);
+                border: 2px dashed rgba(108, 99, 255, 0.3);
+                border-radius: 20px;
+                padding: 30px;
+                text-align: center;
+                margin-bottom: 24px;
+                transition: all 0.3s;
+                cursor: pointer;
+            }}
+
+            .upload-card:hover, .upload-card.dragover {{
+                border-color: var(--accent);
+                background: rgba(108, 99, 255, 0.05);
+            }}
+
+            .upload-card i {{
+                font-size: 32px;
+                display: block;
+                margin-bottom: 12px;
+            }}
+
+            .file-list {{
+                display: grid;
+                gap: 12px;
+            }}
+
+            .file-item {{
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                padding: 16px;
+                background: var(--surface);
+                border-radius: 18px;
+                transition: transform 0.2s, background 0.2s;
+                border: 1px solid rgba(255, 255, 255, 0.03);
+            }}
+
+            .file-item:active {{
+                transform: scale(0.98);
+                background: #252525;
+            }}
+
+            .file-icon {{
+                width: 48px;
+                height: 48px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 24px;
+            }}
+
+            .file-info {{
+                flex: 1;
+                min-width: 0;
+            }}
+
+            .file-name {{
+                font-weight: 600;
+                font-size: 15px;
+                margin-bottom: 2px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }}
+
+            .file-meta {{
+                font-size: 12px;
+                color: var(--text-dim);
+            }}
+
+            .download-btn {{
+                width: 40px;
+                height: 40px;
+                border-radius: 12px;
+                background: var(--accent);
+                border: none;
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 18px;
+                cursor: pointer;
+            }}
+
+            #alertBox {{
+                position: fixed;
+                top: 24px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 1000;
+                width: calc(100% - 40px);
+                max-width: 400px;
+            }}
+
+            .alert {{
+                padding: 16px 20px;
+                border-radius: 16px;
+                font-weight: 600;
+                font-size: 14px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                margin-bottom: 12px;
+            }}
+
+            .alert.success {{ background: #30d158; color: #000; }}
+            .alert.error {{ background: #ff3b30; color: #fff; }}
+
+            @keyframes slideDown {{
+                from {{ transform: translateY(-20px); opacity: 0; }}
+                to {{ transform: translateY(0); opacity: 1; }}
+            }}
+
+            #uploadInput {{ display: none; }}
+
+            .empty-state {{
+                text-align: center;
+                padding: 60px 20px;
+                color: var(--text-dim);
+            }}
+
+            .empty-state i {{ font-size: 48px; display: block; margin-bottom: 16px; }}
+        </style>
+    </head>
+    <body>
+        <div id="alertBox"></div>
+        <div class="container">
+            <div class="header">
+                <h1>Cypher Guest</h1>
+                <div class="timer" id="timerDisplay">--:--</div>
+            </div>
+
+            <div class="breadcrumb" id="breadcrumb">
+                <span onclick="navigateTo('')">Home</span>
+            </div>
+
+            <div id="uploadArea" class="upload-card">
+                <i>📁</i>
+                <p style="font-weight: 600;">Tap to upload files</p>
+                <p style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">to current folder</p>
+                <input type="file" id="uploadInput" multiple>
+            </div>
+
+            <div class="file-list" id="fileList"></div>
+        </div>
+
+        <script>
+            const TOKEN = "{token}";
+            const BASE_URL = window.location.origin;
+            let currentPath = "";
+
+            document.addEventListener('DOMContentLoaded', () => {{
+                loadFiles();
+                startTimer();
+                setupUpload();
+            }});
+
+            async function startTimer() {{
+                setInterval(updateTimer, 1000);
+                updateTimer();
+            }}
+
+            async function updateTimer() {{
+                try {{
+                    const res = await fetch(`${{BASE_URL}}/guest/session?token=${{TOKEN}}`);
+                    const data = await res.json();
+                    if (!data.success) window.location.reload();
+
+                    const seconds = data.time_remaining_seconds;
+                    const mins = Math.floor(seconds / 60);
+                    const secs = seconds % 60;
+                    const timeStr = `${{mins.toString().padStart(2, '0')}}:${{secs.toString().padStart(2, '0')}}`;
+
+                    const timer = document.getElementById('timerDisplay');
+                    timer.textContent = timeStr;
+                    timer.className = 'timer' + (seconds < 60 ? ' critical' : (seconds < 300 ? ' warning' : ''));
+                }} catch (e) {{}}
+            }}
+
+            async function loadFiles() {{
+                try {{
+                    const res = await fetch(`${{BASE_URL}}/guest/files?token=${{TOKEN}}&path=${{encodeURIComponent(currentPath)}}`);
+                    const data = await res.json();
+                    if (!data.success) return showAlert(data.error, 'error');
+                    renderFiles(data.files);
+                }} catch (e) {{ showAlert(e.message, 'error'); }}
+            }}
+
+            function renderFiles(files) {{
+                const list = document.getElementById('fileList');
+                if (!files || files.length === 0) {{
+                    list.innerHTML = '<div class="empty-state"><i>📂</i><p>This folder is empty</p></div>';
+                    return;
+                }}
+
+                list.innerHTML = files.map(file => {{
+                    const isDir = file.type === 'folder';
+                    return `
+                        <div class="file-item" onclick="handleFileClick('${{file.path.replace(/\\\\/g, '/')}}', ${{isDir}})">
+                            <div class="file-icon">${{isDir ? '📁' : getIcon(file.extension)}}</div>
+                            <div class="file-info">
+                                <div class="file-name">${{file.name}}</div>
+                                <div class="file-meta">${{isDir ? (file.item_count + ' items') : formatSize(file.size)}} • ${{file.modified}}</div>
+                            </div>
+                            ${{isDir ? '' : `<button class="download-btn" onclick="downloadFile(event, '${{file.path.replace(/\\\\/g, '/')}}')">↓</button>`}}
+                        </div>
+                    `;
+                }}).join('');
+            }}
+
+            function handleFileClick(path, isDir) {{
+                if (isDir) {{
+                    currentPath = path;
+                    loadFiles();
+                    updateBreadcrumb();
+                }}
+            }}
+
+            async function downloadFile(e, path) {{
+                e.stopPropagation();
+                const btn = e.target;
+                btn.innerHTML = '...';
+                try {{
+                    const res = await fetch(`${{BASE_URL}}/guest/files/download?token=${{TOKEN}}&path=${{encodeURIComponent(path)}}`);
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = path.split('/').pop();
+                    a.click();
+                    showAlert('Downloaded', 'success');
+                }} catch (e) {{ showAlert('Failed', 'error'); }}
+                btn.innerHTML = '↓';
+            }}
+
+            function updateBreadcrumb() {{
+                const bc = document.getElementById('breadcrumb');
+                const parts = currentPath.split('/').filter(p => p);
+                let html = '<span onclick="navigateTo(\\'\\')">Home</span>';
+                let runningPath = '';
+                for (const p of parts) {{
+                    runningPath += (runningPath ? '/' : '') + p;
+                    html += `<span onclick="navigateTo(\\'${{runningPath.replace(/\\\\/g, '/')}}\\' )">${{p}}</span>`;
+                }}
+                bc.innerHTML = html;
+            }}
+
+            function navigateTo(path) {{
+                currentPath = path;
+                loadFiles();
+                updateBreadcrumb();
+            }}
+
+            function setupUpload() {{
+                const area = document.getElementById('uploadArea');
+                const input = document.getElementById('uploadInput');
+                area.onclick = () => input.click();
+                input.onchange = (e) => handleUpload(e.target.files);
+                area.ondragover = (e) => {{ e.preventDefault(); area.classList.add('dragover'); }};
+                area.ondragleave = () => area.classList.remove('dragover');
+                area.ondrop = (e) => {{ e.preventDefault(); area.classList.remove('dragover'); handleUpload(e.dataTransfer.files); }};
+            }}
+
+            async function handleUpload(files) {{
+                if (!files.length) return;
+                const fd = new FormData();
+                for (const f of files) fd.append('file', f);
+                fd.append('destination', currentPath);
+                try {{
+                    const res = await fetch(`${{BASE_URL}}/guest/files/upload?token=${{TOKEN}}`, {{ method: 'POST', body: fd }});
+                    const data = await res.json();
+                    if (data.success) {{
+                        showAlert('Uploaded successfully', 'success');
+                        loadFiles();
+                    }} else showAlert(data.error, 'error');
+                }} catch (e) {{ showAlert(e.message, 'error'); }}
+            }}
+
+            function showAlert(msg, type) {{
+                const box = document.getElementById('alertBox');
+                const div = document.createElement('div');
+                div.className = 'alert ' + type;
+                div.textContent = msg;
+                box.appendChild(div);
+                setTimeout(() => div.remove(), 3000);
+            }}
+
+            function getIcon(ext) {{
+                const m = {{'.pdf':'📄','.jpg':'🖼️','.png':'🖼️','.mp4':'🎬','.zip':'📦','.mp3':'🎵','.txt':'📝'}};
+                return m[ext.toLowerCase()] || '📄';
+            }}
+
+            function formatSize(b) {{
+                if (!b) return '0 B';
+                const i = Math.floor(Math.log(b)/Math.log(1024));
+                return (b/Math.pow(1024,i)).toFixed(1) + ' ' + ['B','KB','MB','GB'][i];
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 @app.route('/guest/files', methods=['GET'])
 def guest_get_files():
+    """TIER 1: List files in allowed folders for guest."""
     token = request.args.get('token')
     path = request.args.get('path', '')
+
     session = guest_manager.validate_token(token)
-    if not session: return jsonify({"success": False, "error": "Invalid or expired token"}), 401
+    if not session:
+        return jsonify({"success": False, "error": "Invalid or expired token"}), 401
+
     try:
         if not path:
+            # Return allowed folders
             files = []
             for folder in session.allowed_folders:
                 if Path(folder).exists():
@@ -1084,34 +1495,240 @@ def guest_get_files():
                         "extension": ""
                     })
             return jsonify({"success": True, "files": files})
-        if not is_path_in_folders(path, session.allowed_folders): return jsonify({"success": False, "error": "Access denied"}), 403
+
+        # Validate path is in allowed folders
+        if not is_path_in_folders(path, session.allowed_folders):
+            return jsonify({"success": False, "error": "Access denied"}), 403
+
         p = Path(path)
-        if not p.exists(): return jsonify({"success": False, "error": "Path not found"}), 404
+        if not p.exists():
+            return jsonify({"success": False, "error": "Path not found"}), 404
+
         items = []
         for item in sorted(p.iterdir()):
             try:
                 stats = item.stat()
+                item_count = len(list(item.iterdir())) if item.is_dir() else 0
                 items.append({
                     "name": item.name,
                     "path": str(item.absolute()),
                     "type": "folder" if item.is_dir() else "file",
                     "size": stats.st_size if item.is_file() else 0,
+                    "item_count": item_count,
                     "modified": datetime.fromtimestamp(stats.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
                     "extension": item.suffix if item.is_file() else ""
                 })
-            except: continue
+                guest_manager.log_guest_access(token, str(item), "browse")
+            except:
+                continue
+
         return jsonify({"success": True, "files": items})
-    except Exception as e: return jsonify({"success": False, "error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/guest/files/search', methods=['GET'])
+def guest_search_files():
+    """TIER 2: Search files in allowed folders."""
+    token = request.args.get('token')
+    query = request.args.get('q', '').lower()
+
+    session = guest_manager.validate_token(token)
+    if not session or not query:
+        return jsonify({"success": False, "error": "Invalid request"}), 400
+
+    try:
+        results = []
+        for folder in session.allowed_folders:
+            folder_path = Path(folder)
+            if not folder_path.exists():
+                continue
+
+            for item in folder_path.rglob('*'):
+                if query in item.name.lower() and len(results) < 50:
+                    try:
+                        stats = item.stat()
+                        results.append({
+                            "name": item.name,
+                            "path": str(item.absolute()),
+                            "type": "folder" if item.is_dir() else "file",
+                            "size": stats.st_size if item.is_file() else 0,
+                            "modified": datetime.fromtimestamp(stats.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                            "extension": item.suffix if item.is_file() else ""
+                        })
+                        guest_manager.log_guest_access(token, str(item), "search")
+                    except:
+                        continue
+
+        return jsonify({"success": True, "results": results})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/guest/files/download', methods=['GET'])
 def guest_download_file():
+    """TIER 1: Download a file as guest."""
     token = request.args.get('token')
     path = request.args.get('path')
+
     session = guest_manager.validate_token(token)
-    if not session: return jsonify({"success": False, "error": "Invalid or expired token"}), 401
-    if not path or not is_path_in_folders(path, session.allowed_folders): return jsonify({"success": False, "error": "Access denied"}), 403
-    if not os.path.isfile(path): return jsonify({"success": False, "error": "File not found"}), 404
-    return send_file(path, as_attachment=True)
+    if not session:
+        return jsonify({"success": False, "error": "Invalid or expired token"}), 401
+
+    if not path or not is_path_in_folders(path, session.allowed_folders):
+        return jsonify({"success": False, "error": "Access denied"}), 403
+
+    if not os.path.isfile(path):
+        return jsonify({"success": False, "error": "File not found"}), 404
+
+    try:
+        guest_manager.log_guest_access(token, path, "download")
+        return send_file(path, as_attachment=True)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/guest/files/download/zip', methods=['POST'])
+def guest_download_zip():
+    """TIER 1: Download multiple files as ZIP."""
+    token = request.args.get('token')
+    data = request.json or {}
+    paths = data.get('paths', [])
+
+    session = guest_manager.validate_token(token)
+    if not session:
+        return jsonify({"success": False, "error": "Invalid or expired token"}), 401
+
+    if not paths:
+        return jsonify({"success": False, "error": "No files selected"}), 400
+
+    # Validate all paths
+    for path in paths:
+        if not is_path_in_folders(path, session.allowed_folders):
+            return jsonify({"success": False, "error": "Access denied"}), 403
+
+    try:
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for path in paths:
+                if os.path.isfile(path):
+                    zf.write(path, arcname=os.path.basename(path))
+                    guest_manager.log_guest_access(token, path, "zip-download")
+
+        zip_buffer.seek(0)
+        return send_file(zip_buffer, mimetype='application/zip', as_attachment=True, download_name='files.zip')
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/guest/files/upload', methods=['POST'])
+def guest_upload_files():
+    """TIER 1: Upload files as guest."""
+    token = request.args.get('token')
+    session = guest_manager.validate_token(token)
+
+    if not session:
+        return jsonify({"success": False, "error": "Invalid or expired token"}), 401
+
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "No file part"}), 400
+
+    files = request.files.getlist('file')
+    dest = request.form.get('destination', session.allowed_folders[0] if session.allowed_folders else str(Path.home() / "Downloads"))
+
+    if not is_path_in_folders(dest, session.allowed_folders):
+        return jsonify({"success": False, "error": "Access denied"}), 403
+
+    results = []
+    for file in files:
+        try:
+            target_path = get_unique_path(os.path.join(dest, file.filename))
+            file.save(target_path)
+            guest_manager.log_guest_access(token, target_path, "upload")
+            results.append({"name": file.filename, "status": "success"})
+        except Exception as e:
+            results.append({"name": file.filename, "status": "error", "message": str(e)})
+
+    return jsonify({"success": True, "files": results}), 200
+
+@app.route('/guest/files/preview', methods=['GET'])
+def guest_preview_file():
+    """TIER 2: Preview file without downloading."""
+    token = request.args.get('token')
+    path = request.args.get('path')
+
+    session = guest_manager.validate_token(token)
+    if not session:
+        return jsonify({"success": False, "error": "Invalid or expired token"}), 401
+
+    if not path or not is_path_in_folders(path, session.allowed_folders):
+        return jsonify({"success": False, "error": "Access denied"}), 403
+
+    if not os.path.exists(path):
+        return jsonify({"success": False, "error": "File not found"}), 404
+
+    try:
+        guest_manager.log_guest_access(token, path, "preview")
+        return send_file(path, as_attachment=False)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/guest/session', methods=['GET'])
+def guest_get_session():
+    """TIER 2: Get session info including timer."""
+    token = request.args.get('token')
+    session = guest_manager.validate_token(token)
+
+    if not session:
+        return jsonify({"success": False, "error": "Invalid or expired token"}), 401
+
+    return jsonify({
+        "success": True,
+        "token": token,
+        "created_at": session.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        "expires_at": session.expires_at.strftime("%Y-%m-%d %H:%M:%S"),
+        "time_remaining_seconds": max(0, int((session.expires_at - datetime.now()).total_seconds())),
+        "access_count": session.access_count,
+        "allowed_folders": session.allowed_folders,
+        "is_active": session.is_active
+    }), 200
+
+@app.route('/guest/extend', methods=['POST'])
+def guest_extend_session():
+    """TIER 3: Extend guest session from host."""
+    token = request.headers.get("X-Auth-Token")
+    if not token or token not in valid_tokens:
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+
+    data = request.json
+    guest_token = data.get("guest_token")
+    additional_minutes = data.get("additional_minutes", 30)
+
+    if guest_manager.extend_session(guest_token, additional_minutes):
+        return jsonify({"success": True, "action": "extended"}), 200
+
+    return jsonify({"success": False, "error": "Session not found"}), 404
+
+@app.route('/guest/end', methods=['POST'])
+def guest_end_session():
+    """TIER 3: End guest session immediately."""
+    token = request.headers.get("X-Auth-Token")
+    if not token or token not in valid_tokens:
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+
+    data = request.json
+    guest_token = data.get("guest_token")
+
+    if guest_manager.end_session(guest_token):
+        return jsonify({"success": True, "action": "ended"}), 200
+
+    return jsonify({"success": False, "error": "Session not found"}), 404
+
+@app.route('/guest/sessions', methods=['GET'])
+def guest_list_sessions():
+    """TIER 3: List all active guest sessions for authenticated device."""
+    token = request.headers.get("X-Auth-Token")
+    if not token or token not in valid_tokens:
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+
+    sessions = guest_manager.get_all_active_sessions(host_device_id=token)
+    return jsonify({"success": True, "sessions": sessions}), 200
 
 # --- SCREEN RECORDING ---
 
@@ -1195,6 +1812,20 @@ def handle_pc_clipboard():
     pyperclip.copy(text)
     return jsonify({"success": True, "action": "clipboard_set"})
 
+@app.route('/open-link', methods=['POST'])
+def open_remote_link():
+    """Support for 'Open Link' feature from mobile clipboard."""
+    url = request.json.get("url", "")
+    if not url:
+        return jsonify({"success": False, "error": "No URL provided"}), 400
+    try:
+        import webbrowser
+        webbrowser.open(url)
+        log_to_ui(f"Opened: {url[:30]}...")
+        return jsonify({"success": True, "action": "link_opened"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/type', methods=['POST'])
 def remote_type():
     if not WINDOWS or not pyautogui:
@@ -1214,6 +1845,23 @@ def remote_hotkey():
         pyautogui.hotkey(*keys)
         return jsonify({"success": True, "keys": keys})
     return jsonify({"success": False, "error": "No keys provided"}), 400
+
+@app.route('/mouse/move', methods=['POST'])
+def mouse_move():
+    if not WINDOWS or not pyautogui:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
+    data = request.json
+    dx, dy = data.get('x', 0), data.get('y', 0)
+    pyautogui.moveRel(dx, dy)
+    return jsonify({"success": True})
+
+@app.route('/mouse/click', methods=['POST'])
+def mouse_click():
+    if not WINDOWS or not pyautogui:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
+    btn = request.json.get('button', 'left')
+    pyautogui.click(button=btn)
+    return jsonify({"success": True})
 
 @app.route('/media/volume/set', methods=['POST'])
 def volume_set_exact():
@@ -1244,6 +1892,20 @@ def media_generic_control(action):
         return jsonify({"success": True})
     return jsonify({"success": False, "error": "Invalid media action"}), 400
 
+@app.route('/media/volumeup', methods=['POST'])
+def volume_up():
+    if not WINDOWS or not AudioUtilities:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
+    set_volume(0.05)
+    return jsonify({"success": True})
+
+@app.route('/media/volumedown', methods=['POST'])
+def volume_down():
+    if not WINDOWS or not AudioUtilities:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
+    set_volume(-0.05)
+    return jsonify({"success": True})
+
 @app.route('/battery/status', methods=['GET'])
 def get_battery_status():
     batt = psutil.sensors_battery()
@@ -1253,9 +1915,86 @@ def get_battery_status():
         "alert_threshold": battery_threshold, "is_critical": percent <= battery_threshold
     })
 
+@app.route('/battery/threshold', methods=['POST'])
+def set_battery_threshold():
+    global battery_threshold
+    battery_threshold = request.json.get("threshold", 20)
+    return jsonify({"success": True})
+
 @app.route('/history', methods=['GET'])
 def get_history():
     return jsonify(command_history)
+
+# --- NOTIFICATIONS & MACROS ---
+
+@app.route('/notifications', methods=['GET'])
+def get_notifications():
+    return jsonify(notifications_list)
+
+@app.route('/notifications/add', methods=['POST'])
+def add_notification():
+    data = request.json
+    new_notif = {
+        "id": str(uuid.uuid4()),
+        "title": data.get("title", "No Title"),
+        "message": data.get("message", ""),
+        "app_name": data.get("app_name", "System"),
+        "timestamp": datetime.now().strftime("%H:%M:%S")
+    }
+    notifications_list.append(new_notif)
+    if len(notifications_list) > 20: notifications_list.pop(0)
+    return jsonify({"success": True})
+
+@app.route('/macros', methods=['GET'])
+def get_macros():
+    try:
+        with open(MACROS_FILE, 'r') as f: return jsonify(json.load(f))
+    except:
+        return jsonify([])
+
+@app.route('/macros/create', methods=['POST'])
+def create_macro():
+    data = request.json
+    try:
+        with open(MACROS_FILE, 'r+') as f:
+            macros = json.load(f)
+            macros.append({"name": data.get("name"), "actions": data.get("actions", [])})
+            f.seek(0)
+            json.dump(macros, f, indent=4); f.truncate()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/macros/run', methods=['POST'])
+def run_macro():
+    if not WINDOWS:
+        return jsonify({"success": False, "error": "Not available on this platform"}), 400
+    macro_name = request.json.get("name")
+    try:
+        with open(MACROS_FILE, 'r') as f: macros = json.load(f)
+        macro = next((m for m in macros if m["name"] == macro_name), None)
+        if not macro: return jsonify({"success": False, "error": "Macro not found"}), 404
+        for action in macro["actions"]:
+            a_type, val = action["type"], action.get("value")
+            if a_type == "open_app" and WINDOWS: os.startfile(val)
+            elif a_type == "lock" and WINDOWS and ctypes: ctypes.windll.user32.LockWorkStation()
+            elif a_type == "volume_up": set_volume(0.05)
+            elif a_type == "wait": time.sleep(float(val))
+        return jsonify({"success": True, "action": f"Executed: {macro_name}"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/macros/delete', methods=['DELETE'])
+def delete_macro():
+    macro_name = request.json.get("name")
+    try:
+        with open(MACROS_FILE, 'r+') as f:
+            macros = json.load(f)
+            macros = [m for m in macros if m["name"] != macro_name]
+            f.seek(0); json.dump(macros, f, indent=4); f.truncate()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     local_ip = get_local_ip()
@@ -1263,5 +2002,6 @@ if __name__ == '__main__':
     print("CYPHER PC SERVER")
     print(f"IP: {local_ip}")
     print(f"PAIRING KEY: {PAIRING_CODE}")
+    print(f"INTERNAL BYPASS TOKEN: {INTERNAL_TOKEN}")
     print("-" * 50)
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

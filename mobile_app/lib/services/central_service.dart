@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class CentralService {
   // Production URL for Emerald's Central Hub
   static const String _baseUrl = "https://cypher-3ctq.onrender.com/api";
+  static const String _currentVersion = "1.0.0";
 
   static Future<void> reportInstall() async {
     final prefs = await SharedPreferences.getInstance();
@@ -40,14 +41,13 @@ class CentralService {
 
   static Future<Map<String, dynamic>?> checkForUpdates() async {
     const String githubMetaUrl = "https://raw.githubusercontent.com/Oluwadaredaniel/Cypher/main/pc_app/metadata.json";
-    const String currentVersion = "1.0.0"; // Local version
 
     try {
       final response = await http.get(Uri.parse(githubMetaUrl))
           .timeout(const Duration(seconds: 5));
       
       if (response.statusCode == 200) {
-        // [FIX] Strip potential UTF-8 BOM (Byte Order Mark) from GitHub file
+        // Strip potential UTF-8 BOM (Byte Order Mark) from GitHub file
         String body = response.body;
         if (body.startsWith('\uFEFF')) {
           body = body.substring(1);
@@ -55,7 +55,7 @@ class CentralService {
         final data = jsonDecode(body);
         final remoteVersion = data['app_version'] ?? "1.0.0";
         
-        if (remoteVersion != currentVersion) {
+        if (_isVersionNewer(_currentVersion, remoteVersion)) {
           return {
             "update_available": true,
             "version": remoteVersion,
@@ -65,5 +65,21 @@ class CentralService {
       }
     } catch (_) {}
     return null;
+  }
+
+  static bool _isVersionNewer(String current, String remote) {
+    try {
+      List<String> cParts = current.split('.');
+      List<String> rParts = remote.split('.');
+      
+      for (int i = 0; i < 3; i++) {
+        int c = i < cParts.length ? int.parse(cParts[i]) : 0;
+        int r = i < rParts.length ? int.parse(rParts[i]) : 0;
+        
+        if (r > c) return true;
+        if (r < c) return false;
+      }
+    } catch (_) {}
+    return false;
   }
 }
