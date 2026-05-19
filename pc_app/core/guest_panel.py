@@ -259,8 +259,17 @@ class GuestPanel(ctk.CTkFrame):
                 self.after(0, lambda: self.qr_label.configure(text="Generating QR...", text_color="#8E8E93"))
 
                 payload = {"folders": selected, "duration_minutes": self.selected_duration}
+                print(f"DEBUG UI: Calling /guest/create with payload: {payload}")
                 r = requests.post(f"{BASE_URL}/guest/create", json=payload, headers=HEADERS, timeout=5)
-                data = r.json()
+
+                print(f"DEBUG UI: Server status: {r.status_code}")
+                print(f"DEBUG UI: Server raw response: '{r.text}'")
+
+                try:
+                    data = r.json()
+                except Exception as json_err:
+                    self.after(0, lambda: self.qr_label.configure(text=f"JSON Error: {str(json_err)}\nRaw: {r.text[:50]}", text_color="#FF453A"))
+                    return
 
                 if data.get("success"):
                     guest_url = data.get("url")

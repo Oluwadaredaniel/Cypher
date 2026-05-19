@@ -6,6 +6,7 @@ import 'package:nsd/nsd.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher_string.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
@@ -173,7 +174,6 @@ class _SetupScreenState extends State<SetupScreen> {
      // This would ideally open a restricted guest file browser in-app 
      // or just launch the browser if we want total convenience.
      // For now, let's launch the browser as it's the "Ultimate Convenience" path.
-     import 'package:url_launcher/url_launcher_string.dart';
      launchUrlString("http://$ip:5000/guest/access?token=$token");
   }
 

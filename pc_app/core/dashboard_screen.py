@@ -6,6 +6,7 @@ import socket
 import json
 import qrcode
 import webbrowser
+import os
 from PIL import Image
 from pathlib import Path
 from core.server import ui_queue, INTERNAL_TOKEN
