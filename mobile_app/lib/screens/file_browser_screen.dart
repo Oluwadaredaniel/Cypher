@@ -190,102 +190,47 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   Future<void> _downloadSelected() async {
     if (_selectedPaths.isEmpty) return;
 
-    final List<String> filesToZip = [];
+    final List<Map<String, dynamic>> filesToDownload = [];
     for (var path in _selectedPaths) {
       final item = _items.firstWhere((i) => i['path'] == path, orElse: () => null);
       if (item != null && item['type'] != 'folder' && item['type'] != 'drive') {
-        filesToZip.add(path);
+        filesToDownload.add(item);
       }
     }
 
-    if (filesToZip.isEmpty) {
+    if (filesToDownload.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Only files can be batch downloaded")));
       return;
     }
 
-    // If only one file, use regular download
-    if (filesToZip.length == 1) {
-      final item = _items.firstWhere((i) => i['path'] == filesToZip.first);
-      _startDownload(item);
-      setState(() {
-        _isSelectionMode = false;
-        _selectedPaths.clear();
-      });
-      return;
-    }
+    final int totalFiles = filesToDownload.length;
+    int currentFileIndex = 0;
 
-    // Start Batch Download (Zip)
-    setState(() => _isDownloading = true);
-    
-    // We'll create a fake item for the ZIP progress UI
-    final zipName = "cypher_batch_${DateFormat('HHmmss').format(DateTime.now())}.zip";
-    final zipItem = {'name': zipName, 'path': 'batch_zip'};
-
-    late StateSetter setProgressState;
-    _showDownloadSheet(zipItem, (stateSetter) {
-      setProgressState = stateSetter;
+    setState(() {
+      _isSelectionMode = false;
+      _selectedPaths.clear();
     });
 
-    try {
-      _downloadClient = http.Client();
-      final request = http.Request('POST', Uri.parse("$_baseUrl/files/download/zip"));
-      request.headers.addAll(_headers);
-      request.headers['Content-Type'] = 'application/json';
-      request.body = json.encode({"paths": filesToZip});
-
-      final response = await _downloadClient!.send(request);
-      final total = response.contentLength ?? 0;
-      int received = 0;
+    // Loop through and start individual downloads
+    for (var file in filesToDownload) {
+      currentFileIndex++;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Downloading $currentFileIndex of $totalFiles: ${file['name']}"),
+          duration: const Duration(seconds: 1),
+        ),
+      );
       
-      Directory? dir;
-      if (Platform.isAndroid) {
-        dir = Directory('/storage/emulated/0/Download');
-      } else {
-        dir = await getApplicationDocumentsDirectory();
-      }
-
-      final saveFile = File("${dir.path}/$zipName");
-      final IOSink sink = saveFile.openWrite();
-      final stopwatch = Stopwatch()..start();
-
-      _downloadSubscription = response.stream.listen((chunk) {
-        received += chunk.length;
-        sink.add(chunk);
-        final elapsed = stopwatch.elapsed.inSeconds;
-        double progress = total > 0 ? (received / total) : 0;
-        
-        setProgressState(() {
-          _downloadProgress = progress;
-          if (elapsed > 0) {
-            double mbps = (received / 1024 / 1024) / elapsed;
-            _downloadSpeed = "${mbps.toStringAsFixed(1)} MB/s";
-          }
-        });
-      }, onDone: () async {
-        await sink.close();
-        if (Platform.isAndroid) await MediaScanner.loadMedia(path: saveFile.path);
-        if (mounted) {
-          setProgressState(() { _downloadProgress = 1.0; _isDownloading = false; });
-          setState(() {
-            _isDownloading = false;
-            _isSelectionMode = false;
-            _selectedPaths.clear();
-          });
-        }
-      }, onError: (e) {
-        sink.close();
-        if (mounted) {
-          Navigator.pop(context);
-          setState(() => _isDownloading = false);
-        }
-      });
-
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        setState(() => _isDownloading = false);
-      }
+      // Trigger individual download logic
+      await _startDownload(file);
+      
+      // Small delay between starting downloads to prevent UI/Network overlap
+      await Future.delayed(const Duration(milliseconds: 500));
     }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("All $totalFiles downloads complete!"), backgroundColor: Colors.green),
+    );
   }
 
   String _getDateCategory(String? dateStr) {
