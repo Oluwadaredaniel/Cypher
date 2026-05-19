@@ -189,21 +189,35 @@ class GuestPanel(ctk.CTkFrame):
         def _logic():
             try:
                 selected = [p for p, v in self.selected_folders.items() if v.get()]
+                if not selected:
+                    self.after(0, lambda: self.qr_label.configure(text="Error: No folders selected", text_color="#FF453A"))
+                    return
+
+                self.after(0, lambda: self.qr_label.configure(text="Generating QR...", text_color="#8E8E93"))
+
                 payload = {"folders": selected, "duration_minutes": self.selected_duration}
                 r = requests.post(f"{BASE_URL}/guest/create", json=payload, headers=HEADERS, timeout=5)
                 data = r.json()
+
                 if data.get("success"):
                     guest_url = data.get("url")
-                    qr = qrcode.QRCode(box_size=10, border=2)
+                    qr = qrcode.QRCode(version=1, box_size=10, border=2)
                     qr.add_data(guest_url)
                     qr.make(fit=True)
-                    img = qr.make_image(fill_color="#6C63FF", back_color="#0D0D0D")
+
+                    # Use standard colors first for debugging, or high-contrast purple
+                    img = qr.make_image(fill_color="#6C63FF", back_color="#FFFFFF")
                     self.after(0, lambda: self.display_qr(img))
-            except: pass
+                else:
+                    err = data.get("error", "Unknown server error")
+                    self.after(0, lambda: self.qr_label.configure(text=f"Server Error: {err}", text_color="#FF453A"))
+            except Exception as e:
+                self.after(0, lambda: self.qr_label.configure(text=f"Connection Error: {str(e)}", text_color="#FF453A"))
         threading.Thread(target=_logic, daemon=True).start()
 
     def display_qr(self, pil_img):
-        ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(180, 180))
+        self.qr_label.configure(text="") # Clear "Generating..." text
+        ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(200, 200))
         self.qr_label.configure(image=ctk_img)
 
     # --- ACTIONS ---
