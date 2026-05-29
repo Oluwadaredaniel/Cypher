@@ -1,382 +1,386 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
-import 'package:media_scanner/media_scanner.dart';
-import '../services/permission_service.dart';
+import 'package:provider/provider.dart';
+import 'package:percent_indicator/percent_indicator.dart';
+import '../services/theme_service.dart';
+import '../widgets/glass_container.dart';
 
 class ControlsScreen extends StatefulWidget {
   final String pcIpAddress;
   final String authToken;
 
-  const ControlsScreen({
-    super.key,
-    required this.pcIpAddress,
-    required this.authToken,
-  });
+  const ControlsScreen({super.key, required this.pcIpAddress, required this.authToken});
 
   @override
   State<ControlsScreen> createState() => _ControlsScreenState();
 }
 
 class _ControlsScreenState extends State<ControlsScreen> {
-  Timer? _statusTimer;
-  String _activeWindow = "Nothing open";
-  String _pcClipboard = "PC clipboard is empty";
-  double _currentVolume = 50;
-  Uint8List? _screenshotBytes;
-  String? _screenshotTime;
-  bool _isTakingScreenshot = false;
-  bool _isDisconnected = false;
+  double _volume = 50;
+  double _micLevel = 45;
+  String _activeWindow = "HOME";
+  bool _isPlaying = false;
+  bool _isLoading = false;
 
-  final TextEditingController _typeController = TextEditingController();
+  Map<String, dynamic> _systemStats = {"cpu_percent": 0.0, "ram_percent": 0.0};
+  Timer? _statsTimer;
 
   @override
   void initState() {
     super.initState();
-    
-    // Slight delay to allow navigation animation to finish smoothly
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (mounted) {
-        _fetchStatusUpdates();
-        // Background polling for window title and clipboard
-        _statusTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-          if (mounted) _fetchStatusUpdates();
-        });
-      }
+    _fetchActiveWindow();
+    _fetchStats();
+    _statsTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      _fetchActiveWindow();
+      _fetchStats();
     });
   }
 
   @override
   void dispose() {
-    _statusTimer?.cancel();
-    _typeController.dispose();
+    _statsTimer?.cancel();
     super.dispose();
   }
 
-  String get _baseUrl => "http://${widget.pcIpAddress}:5000";
-  Map<String, String> get _headers => {
-        "X-Auth-Token": widget.authToken,
-        "Content-Type": "application/json",
-      };
-
-  // --- API LOGIC ---
-
-  Future<void> _fetchStatusUpdates() async {
+  Future<void> _fetchActiveWindow() async {
     try {
-      final windowResp = await http.get(Uri.parse('$_baseUrl/activewindow'), headers: _headers).timeout(const Duration(seconds: 3));
-      final clipboardResp = await http.get(Uri.parse('$_baseUrl/clipboard'), headers: _headers).timeout(const Duration(seconds: 3));
-
-      if (mounted) {
-        setState(() {
-          _isDisconnected = false;
-          if (windowResp.statusCode == 200) {
-            final data = jsonDecode(windowResp.body);
-            _activeWindow = data['window_title']?.toString().isNotEmpty == true ? data['window_title'] : "Nothing open";
-          }
-          if (clipboardResp.statusCode == 200) {
-            final data = jsonDecode(clipboardResp.body);
-            _pcClipboard = data['content']?.toString().isNotEmpty == true ? data['content'] : "PC clipboard is empty";
-          }
-        });
+      final res = await http.get(Uri.parse('http://${widget.pcIpAddress}:5000/activewindow'), headers: {'X-Auth-Token': widget.authToken});
+      if (res.statusCode == 200) {
+        if (mounted) setState(() => _activeWindow = jsonDecode(res.body)['window_title'] ?? "HOME");
       }
-    } catch (e) {
-      if (mounted) setState(() => _isDisconnected = true);
-    }
+    } catch (_) {}
   }
 
-  Future<void> _executeAction(String endpoint, {Map? body, bool isGet = false}) async {
-    HapticFeedback.mediumImpact();
+  Future<void> _fetchStats() async {
     try {
-      final url = Uri.parse('$_baseUrl$endpoint');
-      final response = isGet 
-          ? await http.get(url, headers: _headers).timeout(const Duration(seconds: 8))
-          : await http.post(url, headers: _headers, body: body != null ? jsonEncode(body) : null).timeout(const Duration(seconds: 8));
-
-      if (response.statusCode != 200) throw Exception();
-    } catch (e) {
-      _showToast("Couldn't complete action. Try again.", isError: true);
-    }
+      final res = await http.get(Uri.parse('http://${widget.pcIpAddress}:5000/system-stats'), headers: {'X-Auth-Token': widget.authToken});
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (mounted) {
+          setState(() {
+            _systemStats = {
+              "cpu_percent": (data['cpu_percent'] ?? 0.0).toDouble(),
+              "ram_percent": (data['ram_percent'] ?? 0.0).toDouble(),
+            };
+          });
+        }
+      }
+    } catch (_) {}
   }
 
-  Future<void> _takeScreenshot() async {
-    HapticFeedback.mediumImpact();
-    setState(() => _isTakingScreenshot = true);
+  Future<void> _sendCommand(String endpoint, [Map<String, dynamic>? body]) async {
     try {
-      final resp = await http.get(Uri.parse('$_baseUrl/screenshot'), headers: _headers).timeout(const Duration(seconds: 15));
-      
-      if (resp.statusCode == 200) {
-        setState(() {
-          _screenshotBytes = resp.bodyBytes;
-          _screenshotTime = DateFormat('h:mm a').format(DateTime.now());
-          _isTakingScreenshot = false;
-        });
-        _showToast("Screenshot captured");
+      final res = await http.post(
+        Uri.parse('http://${widget.pcIpAddress}:5000$endpoint'),
+        headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
+        body: body != null ? jsonEncode(body) : null,
+      ).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Command executed"), duration: Duration(seconds: 1)),
+          );
+        }
       } else {
-        throw Exception();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Action failed. Check PC app."), backgroundColor: Colors.orange),
+          );
+        }
       }
-    } catch (e) {
-      if (mounted) setState(() => _isTakingScreenshot = false);
-      _showToast("Failed to capture screen.", isError: true);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Connection error"), backgroundColor: Colors.redAccent),
+        );
+      }
     }
   }
-
-  Widget _buildHotkeyGrid() {
-    final hotkeys = [
-      {"label": "Alt + Tab", "keys": ["alt", "tab"], "icon": Icons.tab_unselected_rounded},
-      {"label": "Show Desktop", "keys": ["win", "d"], "icon": Icons.desktop_windows_rounded},
-      {"label": "File Explorer", "keys": ["win", "e"], "icon": Icons.folder_copy_rounded},
-      {"label": "Task Manager", "keys": ["ctrl", "shift", "esc"], "icon": Icons.list_alt_rounded},
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 2.2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-      ),
-      itemCount: hotkeys.length,
-      itemBuilder: (context, index) {
-        final hk = hotkeys[index];
-        return ScaleTap(
-          onPressed: () => _executeAction("/keyboard/hotkey", body: {"keys": hk['keys']}),
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(hk['icon'] as IconData, color: const Color(0xFF6C63FF), size: 18),
-                const SizedBox(width: 10),
-                Text(hk['label'] as String, style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showToast(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500)),
-        backgroundColor: isError ? Colors.redAccent : const Color(0xFF6C63FF),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  // --- UI COMPONENTS ---
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
-      appBar: _buildAppBar(),
-      body: FadeInUp(
-        duration: const Duration(milliseconds: 300),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_isDisconnected) _buildDisconnectBanner(),
-              _buildSectionLabel("POWER"),
-              _buildPowerGrid(),
-              _buildSectionLabel("MEDIA"),
-              _buildMediaCard(),
-              _buildSectionLabel("SYSTEM TOOLS"),
-              _buildSystemToolsGrid(),
-              _buildSectionLabel("CLIPBOARD"),
-              _buildClipboardCard(),
-              _buildSectionLabel("REMOTE HOTKEYS"),
-              _buildHotkeyGrid(),
-              _buildSectionLabel("KEYBOARD"),
-              _buildKeyboardCard(),
-              _buildSectionLabel("SCREENSHOT"),
-              _buildScreenshotSection(),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+    final theme = Provider.of<ThemeService>(context);
+    final isDark = theme.isDarkMode;
+    final accent = const Color(0xFF6C63FF);
 
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: const Color(0xFF0D0D0D),
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-        onPressed: () => Navigator.pop(context),
-      ),
-      centerTitle: true,
-      title: Text("Controls", style: GoogleFonts.outfit(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: Center(
-            child: SizedBox(
-              width: 100,
-              child: Text(
-                _activeWindow,
-                textAlign: TextAlign.right,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 11),
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(24, 80, 24, 120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(isDark),
+                  const SizedBox(height: 32),
+
+                  // Media Player Card
+                  _buildMediaCard(accent, isDark),
+                  const SizedBox(height: 24),
+
+                  // Volume Card
+                  _buildVolumeCard(accent, isDark),
+                  const SizedBox(height: 24),
+
+                  // Quick Actions Grid
+                  _buildSystemActions(isDark),
+                  const SizedBox(height: 24),
+
+                  // Health Section
+                  _buildHealthStatus(accent, isDark),
+                  const SizedBox(height: 24),
+
+                  // Specialized Tools
+                  _buildSpecializedTools(accent, isDark),
+                ],
               ),
             ),
           ),
-        )
-      ],
-    );
-  }
-
-  Widget _buildDisconnectBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.signal_wifi_off, color: Colors.redAccent, size: 16),
-          const SizedBox(width: 8),
-          Text("PC Unreachable", style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+          _buildFloatingHeader(accent, isDark),
+          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
         ],
       ),
     );
   }
 
-  Widget _buildSectionLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 24, bottom: 12, left: 4),
-      child: Text(label, style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-    );
-  }
-
-  Widget _buildPowerGrid() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 1.9,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      children: [
-        _buildPowerCard("Shut Down", "🔴", const Color(0xFF1A0A0A), const Color(0xFFFF453A), "/power/shutdown", "Shut down your PC entirely?"),
-        _buildPowerCard("Restart", "🔄", const Color(0xFF1A1400), const Color(0xFFFF9F0A), "/power/restart", "Reboot your system now?"),
-        _buildPowerCard("Sleep", "😴", const Color(0xFF001020), const Color(0xFF0A84FF), "/power/sleep", "Put the PC into low-power sleep mode?"),
-        _buildPowerCard("Hibernate", "🌙", const Color(0xFF0D0A1A), const Color(0xFF6C63FF), "/power/hibernate", "Save state and power down?"),
-        _buildPowerCard("Lock Screen", "🔒", const Color(0xFF1A1A1A), Colors.white, "/power/lock", "Lock the Windows session?"),
-      ],
-    );
-  }
-
-  Widget _buildPowerCard(String label, String emoji, Color bg, Color iconColor, String route, String desc) {
-    return ScaleTap(
-      onPressed: () => _showConfirmSheet(label, desc, iconColor, () => _executeAction(route)),
-      onLongPress: () => _executeAction(route),
+  Widget _buildFloatingHeader(Color accent, bool isDark) {
+    return Positioned(
+      top: 0, left: 0, right: 0,
       child: Container(
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20), border: Border.all(color: iconColor.withOpacity(0.1))),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        decoration: BoxDecoration(
+          color: (isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7)).withOpacity(0.8),
+          border: Border(bottom: BorderSide(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05))),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 22)),
-            const SizedBox(height: 6),
-            Text(label, style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+            Row(
+              children: [
+                IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 20), onPressed: () => Navigator.pop(context)),
+                Text("TOOLS", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
+              ],
+            ),
+            Icon(Icons.grid_view_rounded, color: accent),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMediaCard() {
-    bool isMedia = ["Spotify", "VLC", "Chrome", "YouTube", "Netflix"].any((e) => _activeWindow.toLowerCase().contains(e.toLowerCase()));
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(24)),
+  Widget _buildHeader(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("System Tools", style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
+        const SizedBox(height: 6),
+        Text("Manage apps, screenshots, and power.", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4))),
+      ],
+    );
+  }
+
+  Widget _buildMediaCard(Color accent, bool isDark) {
+    return GlassContainer(
+      padding: const EdgeInsets.all(24),
+      height: 280,
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: isMedia ? Colors.greenAccent.withOpacity(0.1) : const Color(0xFF2C2C2C), shape: BoxShape.circle),
-                child: Icon(Icons.music_note, color: isMedia ? Colors.greenAccent : Colors.white24, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(isMedia ? _activeWindow : "No media detected", 
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(color: isMedia ? Colors.white : const Color(0xFF86868B), fontSize: 14, fontWeight: FontWeight.bold)),
-                    if (isMedia) Text("Active Session", style: GoogleFonts.outfit(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildMediaBtn(Icons.skip_previous, 50, const Color(0xFF2C2C2C), () => _executeAction("/media/prev")),
-              const SizedBox(width: 20),
-              _buildMediaBtn(Icons.play_arrow, 65, const Color(0xFF6C63FF), () => _executeAction("/media/playpause")),
-              const SizedBox(width: 20),
-              _buildMediaBtn(Icons.skip_next, 50, const Color(0xFF2C2C2C), () => _executeAction("/media/next")),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              const Icon(Icons.volume_mute, color: Color(0xFF86868B), size: 16),
-              Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 4,
-                    activeTrackColor: const Color(0xFF6C63FF),
-                    inactiveTrackColor: const Color(0xFF2C2C2C),
-                    thumbColor: Colors.white,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                  ),
-                  child: Slider(
-                    value: _currentVolume.clamp(0.0, 100.0),
-                    min: 0,
-                    max: 100,
-                    onChanged: (v) => setState(() => _currentVolume = v),
-                    onChangeEnd: (v) => _executeAction("/media/volume/set", body: {"level": v.toInt()}),
-                  ),
-                ),
-              ),
-              const Icon(Icons.volume_up, color: Color(0xFF86868B), size: 16),
-            ],
-          ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SizedBox(width: 32),
-              Text("${_currentVolume.toInt()}%", style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 12, fontWeight: FontWeight.bold)),
-              _buildMutePill(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(100)),
+                child: Text("NOW PLAYING", style: GoogleFonts.roboto(fontSize: 9, fontWeight: FontWeight.bold, color: accent)),
+              ),
+              _buildActiveTag(isDark),
+            ],
+          ),
+          Column(
+            children: [
+              Text("Current Track", style: GoogleFonts.roboto(fontSize: 22, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+              Text(_activeWindow, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4))),
+            ],
+          ),
+          Column(
+            children: [
+              LinearPercentIndicator(
+                lineHeight: 4.0,
+                percent: 0.65,
+                progressColor: accent,
+                backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                barRadius: const Radius.circular(10),
+                padding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(icon: Icon(Icons.skip_previous_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4), size: 32), onPressed: () => _sendCommand('/media/prev')),
+                  const SizedBox(width: 32),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() => _isPlaying = !_isPlaying);
+                      _sendCommand('/media/playpause');
+                    },
+                    child: Container(
+                      width: 64, height: 64,
+                      decoration: BoxDecoration(color: accent, shape: BoxShape.circle, boxShadow: [BoxShadow(color: accent.withOpacity(0.3), blurRadius: 20)]),
+                      child: Icon(_isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 40),
+                    ),
+                  ),
+                  const SizedBox(width: 32),
+                  IconButton(icon: Icon(Icons.skip_next_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4), size: 32), onPressed: () => _sendCommand('/media/next')),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveTag(bool isDark) {
+    final accent = const Color(0xFF6C63FF);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(color: (isDark ? Colors.white : Colors.black).withOpacity(0.03), borderRadius: BorderRadius.circular(100), border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05))),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 6, height: 6, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 80),
+            child: Text(_activeWindow, overflow: TextOverflow.ellipsis, style: GoogleFonts.roboto(fontSize: 9, fontWeight: FontWeight.bold, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4))),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVolumeCard(Color accent, bool isDark) {
+    return GlassContainer(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("SOUND CONTROL", style: GoogleFonts.roboto(fontSize: 10, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), letterSpacing: 2)),
+              Icon(Icons.volume_up_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), size: 20),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildSliderItem("Volume", _volume, (v) {
+            setState(() => _volume = v);
+          }, (v) => _sendCommand('/media/volume/set', {'level': v.toInt()}), accent, isDark),
+          const SizedBox(height: 24),
+          _buildSliderItem("Mic Level", _micLevel, (v) {
+            setState(() => _micLevel = v);
+          }, (v) {}, const Color(0xFFFFB786), isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSliderItem(String label, double value, Function(double) onChanging, Function(double) onChangeEnd, Color color, bool isDark) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7))),
+            Text("${value.toInt()}%", style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SliderTheme(
+          data: SliderThemeData(
+            trackHeight: 4,
+            activeTrackColor: color,
+            inactiveTrackColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+            thumbColor: isDark ? Colors.white : color,
+            overlayColor: color.withOpacity(0.1),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+          ),
+          child: Slider(
+            value: value,
+            min: 0, max: 100,
+            onChanged: onChanging,
+            onChangeEnd: onChangeEnd,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSystemActions(bool isDark) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      childAspectRatio: 1.5,
+      children: [
+        _buildActionBtn("Mute Audio", Icons.volume_off_rounded, Colors.teal, () => _sendCommand('/media/mute'), isDark),
+        _buildActionBtn("Lock screen", Icons.lock_rounded, const Color(0xFFC0C6DB), () => _sendCommand('/power/lock'), isDark),
+        _buildActionBtn("Hibernate", Icons.snooze_rounded, const Color(0xFFADC6FF), () => _sendCommand('/power/hibernate'), isDark),
+        _buildActionBtn("Restart", Icons.restart_alt_rounded, const Color(0xFFFFB786), () => _sendCommand('/power/restart'), isDark),
+        _buildActionBtn("Shutdown", Icons.power_settings_new_rounded, Colors.redAccent, () => _sendCommand('/power/shutdown'), isDark),
+      ],
+    );
+  }
+
+  Widget _buildActionBtn(String label, IconData icon, Color color, VoidCallback tap, bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        tap();
+      },
+      child: GlassContainer(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7)))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHealthStatus(Color accent, bool isDark) {
+    return GlassContainer(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("SYSTEM STATUS", style: GoogleFonts.roboto(fontSize: 10, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), letterSpacing: 2)),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildHealthMetric("PROCESSOR", "${_systemStats['cpu_percent'].toInt()}%", accent, isDark),
+              Container(width: 1, height: 30, color: (isDark ? Colors.white : Colors.black).withOpacity(0.1)),
+              _buildHealthMetric("MEMORY", "${_systemStats['ram_percent'].toInt()}%", accent, isDark),
             ],
           )
         ],
@@ -384,359 +388,158 @@ class _ControlsScreenState extends State<ControlsScreen> {
     );
   }
 
-  Widget _buildMediaBtn(IconData icon, double size, Color color, VoidCallback tap) {
-    return ScaleTap(
-      onPressed: tap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle, 
-          boxShadow: color != const Color(0xFF2C2C2C) ? [BoxShadow(color: color.withOpacity(0.3), blurRadius: 12, spreadRadius: 2)] : null),
-        child: Icon(icon, color: Colors.white, size: size * 0.45),
-      ),
-    );
-  }
-
-  Widget _buildMutePill() {
-    return ScaleTap(
-      onPressed: () => _executeAction("/media/mute"),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(color: const Color(0xFF2C2C2C), borderRadius: BorderRadius.circular(100), border: Border.all(color: Colors.white10)),
-        child: Text("Mute PC", style: GoogleFonts.outfit(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
-
-  Widget _buildSystemToolsGrid() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 2.2,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
+  Widget _buildHealthMetric(String label, String val, Color color, bool isDark, {String unit = ""}) {
+    return Column(
       children: [
-        _buildToolCard("Processes", Icons.memory_rounded, () {
-          Navigator.pushNamed(context, '/processes', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken});
-        }),
-        _buildToolCard("Launch Apps", Icons.rocket_launch_rounded, () {
-          Navigator.pushNamed(context, '/apps_launcher', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken});
-        }),
+        Text(label, style: GoogleFonts.roboto(fontSize: 9, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(val, style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7))),
+            if (unit.isNotEmpty) Text(" $unit", style: GoogleFonts.roboto(fontSize: 9, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
+          ],
+        ),
       ],
     );
   }
 
-  Widget _buildToolCard(String label, IconData icon, VoidCallback tap) {
-    return ScaleTap(
-      onPressed: tap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.05)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: const Color(0xFF6C63FF), size: 20),
-            const SizedBox(width: 12),
-            Text(label, style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
-    );
+  Future<void> _takeScreenshot() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _isLoading = true);
+    try {
+      final res = await http.get(
+        Uri.parse('http://${widget.pcIpAddress}:5000/screenshot'),
+        headers: {'X-Auth-Token': widget.authToken},
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 200) {
+        if (mounted) {
+          Navigator.pushNamed(context, '/image_editor', arguments: {
+            'imageFile': res.bodyBytes,
+            'pcIpAddress': widget.pcIpAddress,
+            'authToken': widget.authToken,
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to capture screen")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  Widget _buildClipboardCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(24)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.paste_rounded, color: Color(0xFF86868B), size: 14),
-              const SizedBox(width: 6),
-              Text("PC CLIPBOARD", style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 10, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _pcClipboard,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.outfit(color: _pcClipboard.contains("empty") ? const Color(0xFF3A3A3C) : Colors.white, fontSize: 14, fontStyle: FontStyle.italic),
-          ),
-          const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(child: _buildPillBtn("Copy to Phone", const Color(0xFF6C63FF), () {
-                    Clipboard.setData(ClipboardData(text: _pcClipboard));
-                    _showToast("Synced to phone");
-                  })),
-                  const SizedBox(width: 12),
-                  if (_pcClipboard.startsWith("http"))
-                    Expanded(child: _buildPillBtn("Open Link", Colors.green, () {
-                      _executeAction("/open-link", body: {"url": _pcClipboard});
-                    })),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildPillBtn("Send Text", Colors.transparent, _showTextInputSheet, isGhost: true)),
-                ],
-              )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKeyboardCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(24)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _typeController,
-            style: GoogleFonts.outfit(color: Colors.white),
-            cursorColor: const Color(0xFF6C63FF),
-            decoration: InputDecoration(
-              hintText: "Remote keyboard type...",
-              hintStyle: GoogleFonts.outfit(color: const Color(0xFF3A3A3C), fontSize: 14),
-              filled: true,
-              fillColor: const Color(0xFF0D0D0D),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-              suffixIcon: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: IconButton(
-                  icon: const Icon(Icons.send_rounded, color: Color(0xFF6C63FF)),
-                  onPressed: () {
-                    if (_typeController.text.trim().isEmpty) return;
-                    _executeAction("/type", body: {"text": _typeController.text});
-                    _typeController.clear();
-                    FocusScope.of(context).unfocus();
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScreenshotSection() {
+  Widget _buildSpecializedTools(Color accent, bool isDark) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text("SPECIALIZED TOOLS", style: GoogleFonts.roboto(fontSize: 10, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), letterSpacing: 2)),
+        const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildPillBtn("Capture Screen", const Color(0xFF6C63FF), _takeScreenshot)),
-            if (_screenshotBytes != null) ...[
-              const SizedBox(width: 12),
-              Expanded(child: _buildPillBtn("Save to Phone", Colors.transparent, _saveScreenshotToGallery, isGhost: true)),
-            ]
+            Expanded(child: _buildToolTile("Screenshot", Icons.screenshot_monitor_rounded, _takeScreenshot, isDark)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildToolTile("Recording", Icons.videocam_rounded, () => Navigator.pushNamed(context, '/recorder', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
           ],
         ),
         const SizedBox(height: 16),
-        Container(
-          width: double.infinity,
-          height: 210,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A), 
-            borderRadius: BorderRadius.circular(24), 
-            border: Border.all(color: const Color(0xFF2C2C2C))
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: _isTakingScreenshot
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF), strokeWidth: 2))
-                : _screenshotBytes != null
-                    ? InteractiveViewer(child: Image.memory(_screenshotBytes!, fit: BoxFit.contain))
-                    : Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.monitor_rounded, color: Color(0xFF2C2C2C), size: 40),
-                            const SizedBox(height: 8),
-                            Text("No Preview", style: GoogleFonts.outfit(color: const Color(0xFF3A3A3C), fontSize: 12, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-          ),
+        Row(
+          children: [
+            Expanded(child: _buildToolTile("App Manager", Icons.apps_rounded, () => Navigator.pushNamed(context, '/apps_launcher', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildToolTile("Keyboard", Icons.keyboard_rounded, () => Navigator.pushNamed(context, '/keyboard', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+          ],
         ),
-        if (_screenshotTime != null) 
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text("Last updated: $_screenshotTime", style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 11)),
-          ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildToolTile("Processes", Icons.list_rounded, () => Navigator.pushNamed(context, '/processes', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildToolTile("Tasks", Icons.task_alt_rounded, () => Navigator.pushNamed(context, '/active_tasks', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildToolTile("Clipboard", Icons.assignment_return_rounded, () => Navigator.pushNamed(context, '/clipboard', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildToolTile("Phone Files", Icons.phone_android_rounded, () => Navigator.pushNamed(context, '/phone_browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildToolTile("Alerts", Icons.notifications_active_rounded, () => Navigator.pushNamed(context, '/notifications', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildToolTile("Guest Mode", Icons.person_add_rounded, () => Navigator.pushNamed(context, '/guest', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildToolTile("Editor", Icons.edit_note_rounded, () => Navigator.pushNamed(context, '/image_editor', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildToolTile("Remote View", Icons.visibility_rounded, () => Navigator.pushNamed(context, '/remote_view', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+          ],
+        ),
       ],
     );
   }
 
-  Future<void> _saveScreenshotToGallery() async {
-    if (_screenshotBytes == null) return;
-    
-    // Request Storage Permission
-    if (Platform.isAndroid) {
-      await PermissionService.requestAllPermissions();
-    }
-
-    try {
-      final dir = Directory('/storage/emulated/0/Download');
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      final name = "CYPHER_Screenshot_${DateTime.now().millisecondsSinceEpoch}.jpg";
-      final file = File("${dir.path}/$name");
-      await file.writeAsBytes(_screenshotBytes!);
-      
-      // CRITICAL: Notify Media Scanner so it shows up in Gallery/Google Photos
-      if (Platform.isAndroid) {
-        await MediaScanner.loadMedia(path: file.path);
-      }
-
-      _showToast("Saved to Downloads");
-    } catch (e) {
-      _showToast("Failed to save", isError: true);
-    }
-  }
-
-  Widget _buildPillBtn(String label, Color color, VoidCallback tap, {bool isGhost = false}) {
-    return ScaleTap(
-      onPressed: tap,
-      child: Container(
-        height: 52,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(100),
-          border: isGhost ? Border.all(color: const Color(0xFF2C2C2C), width: 1.5) : null,
-        ),
-        child: Center(child: Text(label, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
-      ),
-    );
-  }
-
-  // --- BOTTOM SHEETS ---
-
-  void _showConfirmSheet(String title, String desc, Color color, VoidCallback onConfirm) {
-    HapticFeedback.heavyImpact();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(10))),
-            const SizedBox(height: 30),
-            Icon(Icons.power_settings_new_rounded, color: color, size: 48),
-            const SizedBox(height: 16),
-            Text(title, style: GoogleFonts.outfit(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Text(desc, textAlign: TextAlign.center, style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 14)),
-            const SizedBox(height: 32),
-            Row(
-              children: [
-                Expanded(child: _buildPillBtn("Cancel", const Color(0xFF2C2C2C), () => Navigator.pop(context))),
-                const SizedBox(width: 12),
-                Expanded(child: _buildPillBtn("Execute", color, () {
-                  Navigator.pop(context);
-                  onConfirm();
-                })),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showTextInputSheet() {
-    final sheetController = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Send to PC Clipboard", style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            TextField(
-              controller: sheetController,
-              maxLines: 4,
-              autofocus: true,
-              style: GoogleFonts.outfit(color: Colors.white, fontSize: 14),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: const Color(0xFF0D0D0D),
-                hintText: "Paste link or text here...",
-                hintStyle: GoogleFonts.outfit(color: const Color(0xFF3A3A3C)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildPillBtn("Push to PC", const Color(0xFF6C63FF), () {
-              if (sheetController.text.isNotEmpty) {
-                _executeAction("/clipboard", body: {"text": sheetController.text});
-              }
-              Navigator.pop(context);
-              _showToast("Clipboard updated");
-            }),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Custom Tap Component
-class ScaleTap extends StatefulWidget {
-  final Widget child;
-  final VoidCallback onPressed;
-  final VoidCallback? onLongPress;
-  const ScaleTap({super.key, required this.child, required this.onPressed, this.onLongPress});
-
-  @override
-  State<ScaleTap> createState() => _ScaleTapState();
-}
-
-class _ScaleTapState extends State<ScaleTap> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 100));
-    _scale = Tween<double>(begin: 1.0, end: 0.94).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildToolTile(String label, IconData icon, VoidCallback tap, bool isDark, {bool wide = false}) {
     return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) => _controller.reverse(),
-      onTapCancel: () => _controller.reverse(),
-      onTap: widget.onPressed,
-      onLongPress: widget.onLongPress,
-      child: ScaleTransition(scale: _scale, child: widget.child),
+      onTap: tap,
+      child: GlassContainer(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: wide ? MainAxisAlignment.center : MainAxisAlignment.start,
+          children: [
+            Icon(icon, color: const Color(0xFF6C63FF), size: 20),
+            const SizedBox(width: 12),
+            Text(label, style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.bold, color: (isDark ? Colors.white : Colors.black).withOpacity(0.8))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
+    return GlassContainer(
+      height: 90,
+      borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context), isDark),
+          _navItem(Icons.folder_copy_rounded, "Files", false, () => Navigator.pushReplacementNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+          _navItem(Icons.grid_view_rounded, "Tools", true, null, isDark),
+          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushReplacementNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
+    final accent = const Color(0xFF6C63FF);
+    return GestureDetector(
+      onTap: tap,
+      child: Opacity(
+        opacity: active ? 1.0 : 0.4,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: active ? accent : (isDark ? Colors.white : Colors.black), size: 24),
+            const SizedBox(height: 4),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : (isDark ? Colors.white : Colors.black))),
+          ],
+        ),
+      ),
     );
   }
 }

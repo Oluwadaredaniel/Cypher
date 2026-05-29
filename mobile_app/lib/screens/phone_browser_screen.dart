@@ -147,7 +147,7 @@ class _PhoneBrowserScreenState extends State<PhoneBrowserScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Phone Storage", style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text("Phone Storage", style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: 18)),
             Text(_currentDir?.path ?? "", style: const TextStyle(fontSize: 10, color: Colors.grey)),
           ],
         ),

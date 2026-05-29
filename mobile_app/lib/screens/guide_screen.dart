@@ -1,124 +1,158 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
+import '../widgets/glass_container.dart';
 
-class GuideScreen extends StatefulWidget {
+class GuideScreen extends StatelessWidget {
   const GuideScreen({super.key});
-
-  @override
-  State<GuideScreen> createState() => _GuideScreenState();
-}
-
-class _GuideScreenState extends State<GuideScreen> {
-  String _markdownContent = "";
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadGuide();
-  }
-
-  Future<void> _loadGuide() async {
-    setState(() => _isLoading = true);
-    try {
-      // In a real app, this would be a remote URL like https://cypher.app/api/guide.md
-      // This allows you to update instructions without pushing a new app update.
-      final response = await http.get(Uri.parse("https://raw.githubusercontent.com/example/cypher/main/GUIDE.md"))
-          .timeout(const Duration(seconds: 5));
-      
-      if (response.statusCode == 200) {
-        setState(() => _markdownContent = response.body);
-      } else {
-        throw Exception();
-      }
-    } catch (e) {
-      // Fallback to local instructions if offline
-      setState(() => _markdownContent = _fallbackGuide);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
+      backgroundColor: const Color(0xFF080F17),
+      body: SafeArea(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            _buildSliverAppBar(context),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Welcome to", style: GoogleFonts.roboto(fontSize: 16, color: Colors.white38)),
+                    Text("CYPHER ECOSYSTEM", style: GoogleFonts.roboto(fontSize: 32, fontWeight: FontWeight.w800, color: const Color(0xFF6C63FF))),
+                    const SizedBox(height: 12),
+                    Text("Control your computer from your phone easily and securely.",
+                      style: GoogleFonts.roboto(fontSize: 14, color: Colors.white24, height: 1.5)),
+                    const SizedBox(height: 40),
+
+                    _buildStep(
+                      "01",
+                      "LINK YOUR PC",
+                      "Open CYPHER on your computer. It will show a 6-digit code. Enter that code on your phone to connect the two devices.",
+                      Icons.qr_code_scanner_rounded
+                    ),
+
+                    _buildStep(
+                      "02",
+                      "FILE SHARING",
+                      "Browse your computer's files instantly. Hold down on any file to download it, or send photos and documents from your phone directly to your PC.",
+                      Icons.sync_alt_rounded
+                    ),
+
+                    _buildStep(
+                      "03",
+                      "REMOTE COMMANDS",
+                      "Use the 'Controls' tab to trigger system power states (Shutdown, Sleep, Lock) or manage active Windows processes in real-time.",
+                      Icons.terminal_rounded
+                    ),
+
+                    _buildStep(
+                      "04",
+                      "GUEST ACCESS",
+                      "Need to share a file with someone nearby? Generate a temporary Guest Link. They can scan your phone's QR code to access specific folders without needing the app.",
+                      Icons.person_add_alt_1_rounded
+                    ),
+
+                    const SizedBox(height: 40),
+                    _buildSupportCard(),
+                    const SizedBox(height: 100),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-        title: Text("User Guide", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
-        : Markdown(
-            data: _markdownContent,
-            styleSheet: MarkdownStyleTheme.dark(context),
-          ),
     );
   }
 
-  final String _fallbackGuide = """
-# 📗 The Ultimate CYPHER Guide
+  Widget _buildSliverAppBar(BuildContext context) {
+    return SliverAppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+        onPressed: () => Navigator.pop(context),
+      ),
+      expandedHeight: 60,
+      floating: true,
+    );
+  }
 
-Welcome to your new digital command center. CYPHER is designed to make the boundary between your PC and Phone disappear.
+  Widget _buildStep(String number, String title, String description, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 32),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6C63FF).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.2))
+                ),
+                child: Center(child: Text(number, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF6C63FF)))),
+              ),
+              Container(width: 1, height: 100, color: Colors.white.withOpacity(0.05)),
+            ],
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: GlassContainer(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(icon, color: const Color(0xFF6C63FF), size: 20),
+                      const SizedBox(width: 12),
+                      Text(title, style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(description, style: GoogleFonts.roboto(fontSize: 13, color: Colors.white38, height: 1.6)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
----
-
-### 1. 📋 Universal Clipboard
-Stop emailing links to yourself. 
-- **Send to PC**: Copy text on your phone, go to the **Clipboard** tab, and tap **"Send to PC"**. It will instantly be ready to paste on your PC using `Ctrl + V`.
-- **Get from PC**: Anything you copy on your PC can be fetched by tapping **"Fetch from PC"** on your phone.
-
-### 2. 📂 Windows-Style File Browsing
-The Browser is now more powerful than ever.
-- **View Modes**: Toggle between **List** and **Grid** views (Windows Explorer style) using the top icon.
-- **Smart Grouping**: Tap the filter icon to group files by **Date** (Today, Last Week, etc.) or **Type**.
-- **Deep Rendering**: We now show **ALL** file types including `.exe`, `.apk`, and system files. Large folders with thousands of items now load smoothly.
-- **Live Thumbnails**: See small previews of your images directly in the list, just like on your PC.
-
-### 3. 🎞️ Pro Previews & Editing
-- **Media**: Instant playback for Video and Audio.
-- **Documents**: View **PDFs** and **Code Files** (Python, JS, Dart, etc.) with full syntax highlighting without downloading.
-- **Auto-Open**: For Word, Excel, and APKs, just tap download. Once finished, Cypher will automatically ask to open them in your preferred app.
-
-### 4. 👥 Secure Guest Access
-Perfect for sharing files with visitors without sharing your Wi-Fi password or giving full PC access.
-- **PC Dashboard**: Go to the **Security** tab on your PC app.
-- **Setup Permissions**: You can choose exactly which folders the guest can see. By default, they only see a temporary "Public" folder, but you can add your "Downloads" or "Pictures" for specific sessions.
-- **Access Control**: You can set a timer (e.g., 30 minutes). Once the time is up, their connection is automatically severed by the PC.
-- **Connect**: The guest just needs to scan the **QR Code** generated on your screen. They don't need to install the app; they can use their browser!
-- **Useful for**: Sharing study materials, office documents, or party photos without handing over your unlocked phone.
-
-### 5. 🌐 Troubleshooting Connection (Hotspots & Wi-Fi)
-If you see "Lost Connection to PC" while on a hotspot or public Wi-Fi:
-- **AP Isolation**: Some routers (and phone hotspots) prevent devices from "talking" to each other for security. Check your hotspot settings for "Allow devices to see each other".
-- **Windows Firewall**: Your PC might be blocking incoming connections on a "Public" network. Try setting your hotspot network to **"Private"** in Windows Network Settings.
-- **IP Change**: Hotspots often change your PC's address. If connection fails, check the **PC Address** on the dashboard and ensure it matches what the app is looking for.
-- **Mum's Hotspot Tip**: Ensure "Data Saver" isn't killing background processes on either the phone or the PC.
-
----
-*Version 1.1.0 • Built for Power Users • Emerald Dev*
-""";
-}
-
-class MarkdownStyleTheme {
-  static MarkdownStyleSheet dark(BuildContext context) {
-    return MarkdownStyleSheet(
-      p: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 15, height: 1.6),
-      h1: GoogleFonts.outfit(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-      h3: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-      listBullet: GoogleFonts.outfit(color: const Color(0xFF6C63FF)),
-      code: GoogleFonts.firaCode(backgroundColor: const Color(0xFF1A1A1A), color: const Color(0xFF6C63FF)),
-      blockquote: GoogleFonts.outfit(color: Colors.white70),
-      blockquoteDecoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(8),
+  Widget _buildSupportCard() {
+    return GlassContainer(
+      padding: const EdgeInsets.all(24),
+      color: const Color(0xFF6C63FF),
+      opacity: 0.05,
+      child: Column(
+        children: [
+          const Icon(Icons.help_outline_rounded, color: Color(0xFF6C63FF), size: 32),
+          const SizedBox(height: 16),
+          Text("Need Technical Support?", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text("Visit our documentation or join the community discord for real-time help.",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.roboto(fontSize: 12, color: Colors.white24)),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C63FF),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+              ),
+              child: const Text("VISIT HUB"),
+            ),
+          )
+        ],
       ),
     );
   }

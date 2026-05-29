@@ -1,18 +1,19 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher_string.dart';
-import '../services/central_service.dart';
-import '../services/permission_service.dart';
-import 'setup_screen.dart';
+import 'package:http/http.dart' as http;
+import '../services/theme_service.dart';
+import '../widgets/glass_container.dart';
 
 class SettingsScreen extends StatefulWidget {
   final String pcIpAddress;
   final String authToken;
+
   const SettingsScreen({super.key, required this.pcIpAddress, required this.authToken});
 
   @override
@@ -20,298 +21,448 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  Map<String, dynamic> _settings = {};
-  bool _isLoading = true;
-  bool _isSaving = false;
-  bool _hapticEnabled = true;
-  bool _batteryAlertEnabled = false;
-  bool _connectionAlertsEnabled = true;
-  double _batteryThreshold = 20;
-
-  String get _baseUrl => 'http://${widget.pcIpAddress}:5000';
-  Map<String, String> get _headers => {
-    'X-Auth-Token': widget.authToken,
-    'Content-Type': 'application/json',
-  };
+  bool _autoClipboard = false;
+  double _batteryAlert = 20;
+  bool _biometricActive = true;
+  bool _tunnelingActive = false;
+  List<String> _availableFolders = [];
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _loadLocalSettings();
+    _fetchFolders();
   }
 
-  Future<void> _loadSettings() async {
+  Future<void> _fetchFolders() async {
     try {
-      final resp = await http.get(Uri.parse('$_baseUrl/settings'), headers: _headers).timeout(const Duration(seconds: 8));
-      if (resp.statusCode == 200 && mounted) {
-        final data = jsonDecode(resp.body);
+      final res = await http.get(
+        Uri.parse('http://${widget.pcIpAddress}:5000/settings'),
+        headers: {'X-Auth-Token': widget.authToken},
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
         setState(() {
-          _settings = data;
-          _batteryThreshold = (data['battery_alert_threshold'] ?? 20).toDouble();
-          _batteryAlertEnabled = data['battery_alert_enabled'] ?? false;
-          _isLoading = false;
+          _availableFolders = List<String>.from(data['shared_folders'] ?? []);
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    } catch (_) {}
   }
 
-  Future<void> _saveSettings() async {
-    setState(() => _isSaving = true);
+  Future<void> _loadLocalSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _autoClipboard = prefs.getBool('auto_clipboard') ?? false;
+      _batteryAlert = prefs.getDouble('battery_threshold') ?? 20;
+    });
+  }
+
+  Future<void> _savePreference(String key, dynamic value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value is bool) await prefs.setBool(key, value);
+    if (value is double) await prefs.setDouble(key, value);
+  }
+
+  Future<void> _syncToPC() async {
     try {
-      final name = _settings['device_name'] ?? _settings['pc_name'] ?? 'My PC';
       await http.post(
-        Uri.parse('$_baseUrl/settings'),
-        headers: _headers,
+        Uri.parse('http://${widget.pcIpAddress}:5000/settings'),
+        headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
         body: jsonEncode({
-          ..._settings,
-          'device_name': name,
-          'pc_name': name, // Send both to be safe
-          'battery_alert_threshold': _batteryThreshold.toInt(),
-          'battery_alert_enabled': _batteryAlertEnabled,
+          'auto_clipboard_sync': _autoClipboard,
+          'battery_alert_threshold': _batteryAlert.toInt(),
         }),
-      ).timeout(const Duration(seconds: 8));
-      _showToast('Settings saved ✓');
-    } catch (_) {
-      _showToast('Could not save. Check connection.', success: false);
-    }
-    if (mounted) setState(() => _isSaving = false);
-  }
-
-  Future<void> _forgetPC() async {
-    final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF1A1A1A),
-      title: Text('Forget this PC?', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
-      content: Text('You will need to enter the PC address and connect code again.', style: GoogleFonts.outfit(color: const Color(0xFF86868B))),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.outfit(color: const Color(0xFF86868B)))),
-        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Forget', style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.bold))),
-      ],
-    ));
-    if (confirm == true) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-      if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const SetupScreen()), (_) => false);
-    }
-  }
-
-  void _showToast(String msg, {bool success = true}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.outfit(color: Colors.white)),
-      backgroundColor: success ? const Color(0xFF6C63FF) : Colors.redAccent,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
-    ));
-  }
-
-  Widget _buildSection(String title) => Padding(
-    padding: const EdgeInsets.only(top: 28, bottom: 10),
-    child: Text(title, style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
-  );
-
-  Widget _buildRow(String label, String? value, {VoidCallback? onTap, bool danger = false}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        margin: const EdgeInsets.only(bottom: 2),
-        decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(16)),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: GoogleFonts.outfit(color: danger ? Colors.redAccent : Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
-            if (value != null) Text(value, style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 14)),
-            if (onTap != null && value == null) const Icon(Icons.arrow_forward_ios, color: Color(0xFF444444), size: 14),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToggleRow(String label, String desc, bool value, ValueChanged<bool> onChanged) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      margin: const EdgeInsets.only(bottom: 2),
-      decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(16)),
-      child: Row(
-        children: [
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: GoogleFonts.outfit(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
-              Text(desc, style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 12)),
-            ],
-          )),
-          Switch(value: value, onChanged: (v) { if (_hapticEnabled) HapticFeedback.lightImpact(); onChanged(v); }, activeColor: const Color(0xFF6C63FF)),
-        ],
-      ),
-    );
+      );
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeService>(context);
+    final isDark = theme.isDarkMode;
+    final accent = const Color(0xFF6C63FF);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0D0D0D),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Settings', style: GoogleFonts.outfit(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-      ),
-      body: _isLoading
-        ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
-        : ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-          children: [
-            FadeInUp(duration: const Duration(milliseconds: 300), child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
               children: [
-                _buildSection('YOUR CONNECTION'),
-                _buildRow('PC Address', widget.pcIpAddress),
-                _buildRow('Identity Label', _settings['device_name'] ?? _settings['pc_name'] ?? 'My PC'),
-                _buildSection('ALERTS'),
-                _buildToggleRow('Battery alert', 'Get notified when PC battery is low', _batteryAlertEnabled, (v) => setState(() => _batteryAlertEnabled = v)),
-                if (_batteryAlertEnabled) Container(
-                  padding: const EdgeInsets.all(18),
-                  margin: const EdgeInsets.only(bottom: 2),
-                  decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(16)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Alert when battery reaches ${_batteryThreshold.toInt()}%', style: GoogleFonts.outfit(color: Colors.white, fontSize: 14)),
-                      Slider(value: _batteryThreshold, min: 5, max: 50, divisions: 9, activeColor: const Color(0xFF6C63FF),
-                        onChanged: (v) => setState(() => _batteryThreshold = v)),
-                    ],
+                _buildTopBar(accent),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(isDark),
+                        const SizedBox(height: 32),
+                        _buildCoreControls(theme, accent, isDark),
+                        const SizedBox(height: 24),
+                        _buildBatteryThreshold(accent, isDark),
+                        const SizedBox(height: 24),
+                        _buildSharedFolders(accent, isDark),
+                        const SizedBox(height: 24),
+                        _buildSecurityParameters(accent, isDark),
+                        const SizedBox(height: 24),
+                        _buildAboutSection(accent, isDark),
+                        const SizedBox(height: 48),
+                        _buildFooterActions(accent, isDark),
+                        const SizedBox(height: 120),
+                      ],
+                    ),
                   ),
                 ),
-                _buildToggleRow('Connection alerts', 'Notify when PC connects or disconnects', _connectionAlertsEnabled, (v) => setState(() => _connectionAlertsEnabled = v)),
-                _buildSection('APPEARANCE'),
-                _buildToggleRow('Haptic feedback', 'Vibrate on actions', _hapticEnabled, (v) => setState(() => _hapticEnabled = v)),
-                _buildSection('ABOUT CYPHER'),
-                _buildRow('Version', '1.0.0 (Production)'),
-                _buildRow('Software License', 'Standard User Agreement'),
-                _buildRow('Check for Updates', 'Manual Check', onTap: _checkForUpdates),
-                _buildRow('System Permissions', '🛠 Configure All', onTap: _requestPermissions),
-                _buildSection('DANGER ZONE'),
-                _buildRow('Forget this PC', null, onTap: _forgetPC, danger: true),
               ],
-            )),
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: _saveSettings,
-              child: Container(
-                width: double.infinity, height: 52,
-                decoration: BoxDecoration(color: const Color(0xFF6C63FF), borderRadius: BorderRadius.circular(100)),
-                child: Center(child: _isSaving
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text('Save Changes', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
-              ),
             ),
-          ],
-        ),
+          ),
+          _buildFloatingHeader(accent, isDark),
+          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav(accent, isDark)),
+        ],
+      ),
     );
   }
 
-  void _showNameEditSheet() {
-    final currentName = _settings['device_name'] ?? _settings['pc_name'] ?? 'My PC';
-    final controller = TextEditingController(text: currentName);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildFloatingHeader(Color accent, bool isDark) {
+    return Positioned(
+      top: 0, left: 0, right: 0,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        decoration: BoxDecoration(
+          color: (isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7)).withOpacity(0.8),
+          border: Border(bottom: BorderSide(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05))),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Edit PC Name", style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text("This name will be shown during discovery.", style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 13)),
-            const SizedBox(height: 24),
-            TextField(
-              controller: controller,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: const Color(0xFF0D0D0D),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
+            Row(
+              children: [
+                IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 20), onPressed: () => Navigator.pop(context)),
+                Text("SETTINGS", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
+              ],
             ),
-            const SizedBox(height: 24),
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  _settings['device_name'] = controller.text.trim();
-                  _settings['pc_name'] = controller.text.trim();
-                });
-                Navigator.pop(context);
-                _saveSettings();
-              },
-              child: Container(
-                width: double.infinity,
-                height: 52,
-                decoration: BoxDecoration(color: const Color(0xFF6C63FF), borderRadius: BorderRadius.circular(100)),
-                child: Center(
-                  child: Text("Save & Update", style: GoogleFonts.outfit(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
+            Icon(Icons.sensors_rounded, color: accent),
           ],
         ),
       ),
     );
   }
 
-  Future<void> _checkForUpdates() async {
-    _showToast('Checking for updates...');
-    final update = await CentralService.checkForUpdates();
-    if (update != null && update['update_available'] == true) {
-      _showUpdateDialog(update['version'], update['url']);
-    } else {
-      _showToast('App is already up to date! ✨');
-    }
+  Widget _buildTopBar(Color accent) => const SizedBox(height: 64);
+
+  Widget _buildHeader(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("System Settings", style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
+        const SizedBox(height: 8),
+        Text("Configure your security protocol and bridge behavior.", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
+      ],
+    );
   }
 
-  Future<void> _requestPermissions() async {
-    _showToast('Requesting system permissions...');
-    await PermissionService.requestAllPermissions();
-    _showToast('Permissions updated ✓');
+  Widget _buildCoreControls(ThemeService theme, Color accent, bool isDark) {
+    return Row(
+      children: [
+        Expanded(
+          child: _bentoToggle(
+            "Night Protocol",
+            "Toggle visual layers",
+            Icons.dark_mode_rounded,
+            theme.isDarkMode,
+            (v) => theme.toggleTheme(),
+            accent,
+            isDark
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _bentoToggle(
+            "Auto-Sync",
+            "Real-time parity",
+            Icons.sync_rounded,
+            _autoClipboard,
+            (v) {
+              setState(() => _autoClipboard = v);
+              _savePreference('auto_clipboard', v);
+              _syncToPC();
+            },
+            const Color(0xFFFFB786),
+            isDark
+          ),
+        ),
+      ],
+    );
   }
 
-  void _showUpdateDialog(String version, String url) {
+  Widget _bentoToggle(String title, String sub, IconData icon, bool val, Function(bool) tap, Color color, bool isDark) {
+    return GlassContainer(
+      padding: const EdgeInsets.all(20),
+      height: 160,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              Switch.adaptive(value: val, onChanged: tap, activeColor: color),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+              Text(sub, style: GoogleFonts.roboto(fontSize: 11, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSecurityParameters(Color accent, bool isDark) {
+    return GlassContainer(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Icon(Icons.verified_user_rounded, color: accent, size: 20),
+                const SizedBox(width: 12),
+                Text("Access & Privacy", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          _securityItem("Technical Guide", "Learn how to use Cypher", Icons.menu_book_rounded, true, (v){}, isDark, onTap: () => Navigator.pushNamed(context, '/guide')),
+          _securityItem("Macro Builder", "Automate complex tasks", Icons.bolt_rounded, true, (v){}, isDark, onTap: () => Navigator.pushNamed(context, '/guide')),
+          _securityItem("Battery Alert", "Threshold for PC alerts", Icons.battery_charging_full_rounded, true, (v){}, isDark, onTap: () => _showBatteryThresholdDialog(context, isDark)),
+          Divider(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05), height: 1),
+          _securityItem("Biometric Unlock", "Use FaceID/Fingerprint for access", Icons.fingerprint_rounded, _biometricActive, (v) => setState(() => _biometricActive = v), isDark),
+          _securityItem("End-to-End Tunneling", "Enforce AES-256 bridge traffic", Icons.vpn_lock_rounded, _tunnelingActive, (v) => setState(() => _tunnelingActive = v), isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _securityItem(String title, String sub, IconData icon, bool val, Function(bool) tap, bool isDark, {VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: ListTile(
+        leading: Icon(icon, color: (isDark ? Colors.white : Colors.black).withOpacity(0.38), size: 20),
+        title: Text(title, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7))),
+        subtitle: Text(sub, style: GoogleFonts.roboto(fontSize: 11, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
+        trailing: Icon(Icons.chevron_right_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.1), size: 18),
+        onTap: onTap ?? () {
+          HapticFeedback.lightImpact();
+        },
+      ),
+    );
+  }
+
+  Widget _buildSharedFolders(Color accent, bool isDark) {
+    return GlassContainer(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.folder_copy_rounded, color: accent, size: 20),
+                    const SizedBox(width: 12),
+                    Text("Shared Locations", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Divider(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05), height: 1),
+          if (_availableFolders.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text("No folders configured in Core.", style: GoogleFonts.roboto(fontSize: 12, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
+            )
+          else
+            ..._availableFolders.map((f) => ListTile(
+              leading: Icon(Icons.folder_open_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), size: 18),
+              title: Text(f.split('/').last.split('\\').last, style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7))),
+              subtitle: Text(f, style: GoogleFonts.roboto(fontSize: 8, color: (isDark ? Colors.white : Colors.black).withOpacity(0.1))),
+            )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBatteryThreshold(Color accent, bool isDark) {
+    return GlassContainer(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("BATTERY ALERT", style: GoogleFonts.roboto(fontSize: 9, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), fontWeight: FontWeight.bold, letterSpacing: 2)),
+              Text("${_batteryAlert.toInt()}%", style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFFFFB786))),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 2,
+              activeTrackColor: const Color(0xFFFFB786),
+              inactiveTrackColor: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+              thumbColor: isDark ? Colors.white : const Color(0xFFFFB786),
+              overlayColor: const Color(0xFFFFB786).withOpacity(0.1),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+            ),
+            child: Slider(
+              value: _batteryAlert,
+              min: 5, max: 50,
+              onChanged: (v) {
+                setState(() => _batteryAlert = v);
+                _savePreference('battery_threshold', v);
+              },
+              onChangeEnd: (v) => _syncToPC(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text("Notify when PC battery drops below this level.", style: GoogleFonts.roboto(fontSize: 11, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAboutSection(Color accent, bool isDark) {
+    return GlassContainer(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          _securityItem("CYPHER Core", "Version 1.0.0-PRO (Stable)", Icons.info_outline_rounded, true, (v) {}, isDark),
+          _securityItem("Technical Guide", "Documentation & Hotkeys", Icons.help_outline_rounded, true, (v) {
+            Navigator.pushNamed(context, '/guide');
+          }, isDark),
+          _securityItem("Bridge Connection", widget.pcIpAddress, Icons.lan_rounded, true, (v) {}, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _footerBtn(String label, Color color, VoidCallback tap, {bool outline = false, required bool isDark}) {
+    return GestureDetector(
+      onTap: tap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: outline ? Colors.transparent : color,
+          borderRadius: BorderRadius.circular(16),
+          border: outline ? Border.all(color: color.withOpacity(0.2)) : null,
+          boxShadow: !outline ? [BoxShadow(color: color.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 8))] : null,
+        ),
+        child: Center(
+          child: Text(label, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: outline ? color : Colors.white)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooterActions(Color accent, bool isDark) {
+    return Column(
+      children: [
+        _footerBtn("Export Activity Log", accent, () {}, isDark: isDark),
+        const SizedBox(height: 12),
+        _footerBtn("Disconnect & Factory Reset", Colors.redAccent, () async {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.clear();
+          if (mounted) Navigator.pushReplacementNamed(context, '/setup');
+        }, outline: true, isDark: isDark),
+      ],
+    );
+  }
+
+  void _showBatteryThresholdDialog(BuildContext context, bool isDark) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text('New Version Available!', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("Battery Threshold", style: GoogleFonts.roboto(fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Version v$version is ready for download.', style: GoogleFonts.outfit(color: Colors.white)),
-            const SizedBox(height: 12),
-            Text('This update includes stability improvements and new features.', style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 13)),
+            Text("Alert me when PC battery is below:", style: GoogleFonts.roboto(fontSize: 14, color: isDark ? Colors.white70 : Colors.black54)),
+            const SizedBox(height: 20),
+            _batteryOption(10, isDark, ctx),
+            _batteryOption(20, isDark, ctx),
+            _batteryOption(30, isDark, ctx),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Later', style: GoogleFonts.outfit(color: const Color(0xFF86868B)))),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              launchUrlString(url);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: const StadiumBorder()),
-            child: Text('Get APK', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
+      ),
+    );
+  }
+
+  Widget _batteryOption(int value, bool isDark, BuildContext ctx) {
+    return ListTile(
+      title: Text("$value%", style: GoogleFonts.roboto(color: isDark ? Colors.white : Colors.black)),
+      onTap: () async {
+        try {
+          await http.post(
+            Uri.parse('http://${widget.pcIpAddress}:5000/battery/threshold'),
+            headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
+            body: jsonEncode({'threshold': value}),
+          );
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Threshold set to $value%")));
+        } catch (_) {}
+        Navigator.pop(ctx);
+      },
+    );
+  }
+
+  Widget _buildBottomNav(Color accent, bool isDark) {
+    return GlassContainer(
+      height: 90,
+      borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context), isDark),
+          _navItem(Icons.folder_copy_rounded, "Files", false, () => Navigator.pushReplacementNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+          _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushReplacementNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+          _navItem(Icons.tune_rounded, "Settings", true, null, isDark),
         ],
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
+    final accent = const Color(0xFF6C63FF);
+    return GestureDetector(
+      onTap: tap,
+      child: Opacity(
+        opacity: active ? 1.0 : 0.4,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: active ? accent : (isDark ? Colors.white : Colors.black), size: 24),
+            const SizedBox(height: 4),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : (isDark ? Colors.white : Colors.black))),
+          ],
+        ),
       ),
     );
   }

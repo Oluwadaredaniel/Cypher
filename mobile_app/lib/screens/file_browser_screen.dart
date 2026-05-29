@@ -1,1015 +1,530 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
-import 'package:shimmer/shimmer.dart';
-import 'dart:convert';
-import 'package:media_scanner/media_scanner.dart';
+import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:intl/intl.dart';
-import 'file_preview_screen.dart'; // IMPORTED FOR FLOW
-import '../services/permission_service.dart';
+import 'package:path_provider/path_provider.dart';
+import '../services/theme_service.dart';
+import '../widgets/glass_container.dart';
 
 class FileBrowserScreen extends StatefulWidget {
   final String pcIpAddress;
   final String authToken;
   final String? initialPath;
 
-  const FileBrowserScreen({
-    super.key,
-    required this.pcIpAddress,
-    required this.authToken,
-    this.initialPath,
-  });
+  const FileBrowserScreen({super.key, required this.pcIpAddress, required this.authToken, this.initialPath});
 
   @override
   State<FileBrowserScreen> createState() => _FileBrowserScreenState();
 }
 
 class _FileBrowserScreenState extends State<FileBrowserScreen> {
-  // Navigation State
+  bool _isLoading = true;
   List<dynamic> _items = [];
   List<dynamic> _filteredItems = [];
-
-  // UI State
-  bool _isLoading = true;
-  bool _hasError = false;
-  bool _isSearching = false;
-  bool _isGridView = false;
-  bool _isSelectionMode = false;
-  Set<String> _selectedPaths = {};
-  String _groupBy = "None"; // "None", "Date", "Type"
+  List<dynamic> _drives = [];
+  String? _currentPath;
   final TextEditingController _searchController = TextEditingController();
 
-  // Download State
-  double _downloadProgress = 0.0;
-  String _downloadSpeed = "0 KB/s";
-  String _timeLeft = "";
-  http.Client? _downloadClient;
-  StreamSubscription? _downloadSubscription;
-  bool _isDownloading = false;
+  // Selection Mode Logic
+  final Set<String> _selectedPaths = {};
 
   @override
   void initState() {
     super.initState();
-    _refresh();
+    _currentPath = widget.initialPath;
+    _fetchFiles();
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _downloadSubscription?.cancel();
-    _downloadClient?.close();
-    super.dispose();
-  }
+  Future<void> _fetchFiles() async {
+    setState(() { _isLoading = true; _selectedPaths.clear(); });
+    final headers = {'X-Auth-Token': widget.authToken};
+    final baseUrl = 'http://${widget.pcIpAddress}:5000';
 
-  String get _baseUrl => "http://${widget.pcIpAddress}:5000";
-  Map<String, String> get _headers => {"X-Auth-Token": widget.authToken};
-
-  // --- API LOGIC ---
-
-  Future<void> _refresh() async {
-    if (widget.initialPath != null) {
-      await _fetchFolderContents(widget.initialPath!);
-    } else {
-      await _fetchRoots();
-    }
-  }
-
-  Future<void> _fetchRoots() async {
-    if (!mounted) return;
-    setState(() { _isLoading = true; _hasError = false; });
     try {
-      final response = await http.get(Uri.parse("$_baseUrl/files"), headers: _headers).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        if (!mounted) return;
-        setState(() {
-          _items = jsonDecode(response.body);
+      if (_currentPath == null) {
+        final res = await http.get(Uri.parse('$baseUrl/files'), headers: headers).timeout(const Duration(seconds: 10));
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body) as List;
+          _drives = data.where((i) => i['type'] == 'drive').toList();
+          _items = data.where((i) => i['type'] != 'drive').toList();
           _filteredItems = _items;
-          _isLoading = false;
-        });
-      } else {
-        throw Exception();
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() { _isLoading = false; _hasError = true; });
-    }
-  }
-
-  Future<void> _fetchFolderContents(String path) async {
-    if (!mounted) return;
-    setState(() { _isLoading = true; _hasError = false; });
-    try {
-      final encodedPath = Uri.encodeComponent(path);
-      final response = await http.get(
-          Uri.parse("$_baseUrl/files/browse?path=$encodedPath"),
-          headers: _headers
-      ).timeout(const Duration(seconds: 15));
-      if (response.statusCode == 200) {
-        if (!mounted) return;
-        setState(() {
-          _items = jsonDecode(response.body);
-          _filteredItems = _items;
-          _isLoading = false;
-        });
-      } else {
-        throw Exception();
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() { _isLoading = false; _hasError = true; });
-    }
-  }
-
-  // --- DELETE LOGIC ---
-  Future<void> _handleDelete(String path, String name) async {
-    if (_isSelectionMode) return;
-    final bool? confirm = await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Delete Item", style: GoogleFonts.outfit(color: Colors.white)),
-        content: Text("Delete $name permanently from your PC?", style: const TextStyle(color: Colors.grey)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text("Delete", style: TextStyle(color: Colors.redAccent))
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        final url = Uri.parse("$_baseUrl/files/delete?path=${Uri.encodeComponent(path)}");
-        final response = await http.delete(url, headers: _headers).timeout(const Duration(seconds: 10));
-        if (response.statusCode == 200) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Deleted successfully")));
-          _refresh();
+        } else {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Unauthorized or access denied"), backgroundColor: Colors.orange));
         }
-      } catch (e) {
-        debugPrint("Delete error: $e");
+      } else {
+        final res = await http.get(Uri.parse('$baseUrl/files/browse?path=${Uri.encodeComponent(_currentPath!)}'), headers: headers).timeout(const Duration(seconds: 10));
+        if (res.statusCode == 200) {
+          _items = jsonDecode(res.body) as List;
+          _filteredItems = _items;
+        } else {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Unable to list folder contents"), backgroundColor: Colors.orange));
+        }
       }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Network error: Check your computer"), backgroundColor: Colors.redAccent));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _onSearch(String query) {
     setState(() {
-      _filteredItems = _items
-          .where((item) => item['name'].toString().toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      _filteredItems = _items.where((i) => i['name'].toString().toLowerCase().contains(query.toLowerCase())).toList();
     });
   }
 
-  void _toggleSelection(String path) {
+  void _toggleSelect(String path) {
     setState(() {
       if (_selectedPaths.contains(path)) {
         _selectedPaths.remove(path);
-        if (_selectedPaths.isEmpty) _isSelectionMode = false;
       } else {
         _selectedPaths.add(path);
       }
     });
   }
 
-  void _enterSelectionMode(String path) {
-    HapticFeedback.heavyImpact();
-    setState(() {
-      _isSelectionMode = true;
-      _selectedPaths.add(path);
-    });
-  }
-
-  Future<void> _downloadSelected() async {
-    if (_selectedPaths.isEmpty) return;
-
-    final List<Map<String, dynamic>> filesToDownload = [];
-    for (var path in _selectedPaths) {
-      final item = _items.firstWhere((i) => i['path'] == path, orElse: () => null);
-      if (item != null && item['type'] != 'folder' && item['type'] != 'drive') {
-        filesToDownload.add(item);
-      }
-    }
-
-    if (filesToDownload.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Only files can be batch downloaded")));
-      return;
-    }
-
-    final int totalFiles = filesToDownload.length;
-    int currentFileIndex = 0;
-
-    setState(() {
-      _isSelectionMode = false;
-      _selectedPaths.clear();
-    });
-
-    // Loop through and start individual downloads
-    for (var file in filesToDownload) {
-      currentFileIndex++;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Downloading $currentFileIndex of $totalFiles: ${file['name']}"),
-          duration: const Duration(seconds: 1),
-        ),
-      );
-      
-      // Trigger individual download logic
-      await _startDownload(file);
-      
-      // Small delay between starting downloads to prevent UI/Network overlap
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("All $totalFiles downloads complete!"), backgroundColor: Colors.green),
-    );
-  }
-
-  String _getDateCategory(String? dateStr) {
-    if (dateStr == null) return "Unknown";
-    try {
-      DateTime date = DateTime.parse(dateStr);
-      DateTime now = DateTime.now();
-      DateTime today = DateTime(now.year, now.month, now.day);
-      DateTime yesterday = today.subtract(const Duration(days: 1));
-      DateTime thisWeekStart = today.subtract(Duration(days: today.weekday - 1));
-      DateTime lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
-      
-      if (date.isAfter(today)) return "Today";
-      if (date.isAfter(yesterday)) return "Yesterday";
-      if (date.isAfter(thisWeekStart)) return "Earlier this week";
-      if (date.isAfter(lastWeekStart)) return "Last week";
-      if (date.year == now.year && date.month == now.month) return "Earlier this month";
-      if (date.year == now.year && date.month == now.month - 1) return "Last month";
-      if (date.year == now.year) return "Earlier this year";
-      return "Long ago";
-    } catch (e) {
-      return "Unknown";
-    }
-  }
-
-  Map<String, List<dynamic>> _getGroupedItems() {
-    Map<String, List<dynamic>> groups = {};
-    for (var item in _filteredItems) {
-      String key = "Other";
-      if (_groupBy == "Date") {
-        key = _getDateCategory(item['modified']);
-      } else if (_groupBy == "Type") {
-        key = item['type'] == 'folder' ? "Folders" : (item['extension']?.toString().toUpperCase() ?? "Files");
-      }
-      
-      if (!groups.containsKey(key)) groups[key] = [];
-      groups[key]!.add(item);
-    }
-    return groups;
-  }
-
-  // --- NAVIGATION ---
-
-  void _navigateToFolder(Map item) {
-    // FLOW: Folder tap -> FileBrowserScreen (new path)
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => FileBrowserScreen(
-          pcIpAddress: widget.pcIpAddress,
-          authToken: widget.authToken,
-          initialPath: item['path'],
-        ),
-      ),
-    );
-  }
-
-  void _navigateToFile(Map item) {
-    // FLOW: File tap -> FilePreviewScreen
-    Navigator.push(context, MaterialPageRoute(
-      builder: (context) => FilePreviewScreen(
-        pcIpAddress: widget.pcIpAddress,
-        authToken: widget.authToken,
-        filePath: item['path'] ?? '',
-        fileName: item['name'] ?? '',
-        fileSize: (item['size'] ?? 0) as int,
-        fileExtension: item['extension'] ?? (item['name'].toString().contains('.') ? ".${item['name'].toString().split('.').last}" : ""),
-      ),
-    ));
-  }
-
-  // --- DOWNLOAD LOGIC (Fallback) ---
-
-  Future<void> _startDownload(Map file) async {
-    Navigator.pop(context); // Close options sheet
-
-    // Request Storage Permission
-    if (Platform.isAndroid) {
-      await PermissionService.requestAllPermissions();
-    }
-
-    late StateSetter setProgressState;
-    setState(() => _isDownloading = true);
-
-    _showDownloadSheet(file, (stateSetter) {
-      setProgressState = stateSetter;
-    });
-
-    try {
-      _downloadClient = http.Client();
-      final request = http.Request('GET', Uri.parse("$_baseUrl/files/download/chunked?path=${Uri.encodeComponent(file['path'])}"));
-      request.headers.addAll(_headers);
-
-      final response = await _downloadClient!.send(request);
-      final total = response.contentLength ?? 0;
-      int received = 0;
-      
-      Directory? dir;
-      if (Platform.isAndroid) {
-        dir = Directory('/storage/emulated/0/Download');
-      } else {
-        dir = await getApplicationDocumentsDirectory();
-      }
-
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-
-      final saveFile = File("${dir.path}/${file['name']}");
-      final IOSink sink = saveFile.openWrite();
-
-      final stopwatch = Stopwatch()..start();
-
-      _downloadSubscription = response.stream.listen((chunk) {
-        received += chunk.length;
-        sink.add(chunk);
-
-        final elapsed = stopwatch.elapsed.inSeconds;
-
-        double progress = total > 0 ? (received / total) : 0;
-        String speed = "0 KB/s";
-        String time = "";
-
-        if (elapsed > 0) {
-          double mbps = (received / 1024 / 1024) / elapsed;
-          speed = "${mbps.toStringAsFixed(1)} MB/s";
-          if (mbps > 0) {
-            int secondsLeft = ((total - received) / 1024 / 1024 / mbps).round();
-            time = "About $secondsLeft seconds left";
-          }
-        }
-
-        setProgressState(() {
-          _downloadProgress = progress;
-          _downloadSpeed = speed;
-          _timeLeft = time;
-        });
-
-      }, onDone: () async {
-        await sink.close();
-        
-        if (!_isDownloading) {
-          if (await saveFile.exists()) await saveFile.delete();
-          return;
-        }
-
-        // Notify Media Scanner
-        if (Platform.isAndroid) {
-          await MediaScanner.loadMedia(path: saveFile.path);
-        }
-
-        if (mounted) {
-          setProgressState(() { _downloadProgress = 1.0; _isDownloading = false; });
-          setState(() => _isDownloading = false);
-        }
-        _downloadClient?.close();
-      }, onError: (e) async {
-        await sink.close();
-        if (await saveFile.exists()) await saveFile.delete();
-        _downloadClient?.close();
-        if (mounted) {
-          Navigator.pop(context);
-          setState(() => _isDownloading = false);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Download Failed")));
-      }, cancelOnError: true);
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        setState(() => _isDownloading = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Download Failed")));
-      }
-    }
-  }
-
-  void _cancelBrowserDownload() async {
-    await _downloadSubscription?.cancel();
-    _downloadClient?.close();
-    try {
-      http.post(Uri.parse("$_baseUrl/files/download/cancel"), headers: _headers);
-    } catch (_) {}
-    if (mounted) {
-      setState(() => _isDownloading = false);
-      Navigator.pop(context);
-    }
-  }
-
-  // --- UI BUILDING ---
-
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeService>(context);
+    final isDark = theme.isDarkMode;
+    final accent = const Color(0xFF6C63FF);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
-      appBar: _buildAppBar(),
-      body: Column(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Stack(
         children: [
-          _buildSearchBar(),
-          _buildBreadcrumbs(),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _refresh,
-              color: const Color(0xFF6C63FF),
-              child: _hasError
-                  ? _buildErrorState()
-                  : (_isLoading ? _buildShimmer() : (_isGridView ? _buildGrid() : _buildList())),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar() {
-    if (_isSelectionMode) {
-      return AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => setState(() {
-            _isSelectionMode = false;
-            _selectedPaths.clear();
-          }),
-        ),
-        title: Text("${_selectedPaths.length} selected", style: GoogleFonts.outfit(color: Colors.white, fontSize: 18)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.download_for_offline, color: Color(0xFF6C63FF)),
-            onPressed: _downloadSelected,
-          ),
-        ],
-      );
-    }
-    return AppBar(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-        onPressed: () => Navigator.pop(context), // FLOW: Back arrow
-      ),
-      title: Text(widget.initialPath == null ? "Browser" : widget.initialPath!.split(Platform.pathSeparator).last, 
-        style: GoogleFonts.outfit(color: Colors.white, fontSize: 18)),
-      actions: [
-        IconButton(
-          icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view, color: Colors.white, size: 20),
-          onPressed: () => setState(() => _isGridView = !_isGridView),
-        ),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.filter_list, color: Colors.white, size: 20),
-          onSelected: (val) {
-            setState(() {
-              if (val.startsWith("group:")) {
-                _groupBy = val.split(":").last;
-              }
-            });
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(value: "group:None", child: Text("Don't Group")),
-            const PopupMenuItem(value: "group:Date", child: Text("Group by Date")),
-            const PopupMenuItem(value: "group:Type", child: Text("Group by Type")),
-          ],
-        ),
-        IconButton(
-          icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.white),
-          onPressed: () => setState(() {
-            _isSearching = !_isSearching;
-            if (!_isSearching) {
-              _searchController.clear();
-              _filteredItems = _items;
-            }
-          }),
-        )
-      ],
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: _isSearching ? 70 : 0,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: _isSearching
-          ? FadeInDown(
-        duration: const Duration(milliseconds: 200),
-        child: TextField(
-          controller: _searchController,
-          onChanged: _onSearch,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: "Search files...",
-            hintStyle: const TextStyle(color: Color(0xFF444444)),
-            prefixIcon: const Icon(Icons.search, color: Color(0xFF6C63FF)),
-            filled: true,
-            fillColor: const Color(0xFF1A1A1A),
-            contentPadding: const EdgeInsets.symmetric(vertical: 0),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: BorderSide.none),
-          ),
-        ),
-      )
-          : const SizedBox.shrink(),
-    );
-  }
-
-  Widget _buildBreadcrumbs() {
-    List<String> parts = [];
-    if (widget.initialPath != null) {
-      parts = widget.initialPath!.split(RegExp(r'[/\\]')).where((s) => s.isNotEmpty).toList();
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      width: double.infinity,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            const Icon(Icons.computer, size: 16, color: Color(0xFF6C63FF)),
-            const SizedBox(width: 8),
-            GestureDetector(
-                onTap: () {
-                  // FLOW: Breadcrumb tap (Root)
-                  if(widget.initialPath != null) {
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-                  }
-                },
-                child: Text("PC", style: GoogleFonts.outfit(color: parts.isEmpty ? Colors.white : const Color(0xFF86868B)))
-            ),
-            if (parts.isNotEmpty)
-              for (var i = 0; i < parts.length; i++) ...[
-                const Icon(Icons.chevron_right, size: 16, color: Color(0xFF2C2C2C)),
-                GestureDetector(
-                  onTap: () {
-                    // FLOW: Breadcrumb level tap
-                    int backSteps = parts.length - 1 - i;
-                    for(int j = 0; j < backSteps; j++) Navigator.pop(context);
-                  },
-                  child: Text(
-                    parts[i],
-                    style: GoogleFonts.outfit(
-                      color: i == parts.length - 1 ? Colors.white : const Color(0xFF86868B),
-                      fontWeight: i == parts.length - 1 ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
+          SafeArea(
+            child: Column(
+              children: [
+                _buildTopBar(accent),
+                _buildSearchSection(isDark),
+                Expanded(
+                  child: _isLoading
+                    ? Center(child: CircularProgressIndicator(color: accent))
+                    : _buildContent(accent, isDark),
                 ),
               ],
+            ),
+          ),
+
+          // Selection Action Bar
+          if (_selectedPaths.isNotEmpty) _buildSelectionBar(isDark),
+
+          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
+        ],
+      ),
+      floatingActionButton: _currentPath != null ? FloatingActionButton(
+        onPressed: () {},
+        backgroundColor: accent,
+        child: const Icon(Icons.cloud_upload_rounded, color: Colors.white),
+      ) : null,
+    );
+  }
+
+  Widget _buildTopBar(Color accent) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 20),
+                onPressed: () {
+                  if (_currentPath != null) {
+                    setState(() { _currentPath = null; });
+                    _fetchFiles();
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+              Text("CYPHER", style: GoogleFonts.roboto(fontSize: 24, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
+            ],
+          ),
+          Icon(Icons.sensors_rounded, color: accent),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchSection(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
+        child: Row(
+          children: [
+            Icon(Icons.search_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.3)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearch,
+                style: GoogleFonts.roboto(color: isDark ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: _currentPath == null ? "Search drives and folders..." : "Search in this folder...",
+                  hintStyle: GoogleFonts.roboto(color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), fontSize: 14),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildList() {
-    if (_filteredItems.isEmpty) return _buildEmptyState();
+  Widget _buildContent(Color accent, bool isDark) {
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        if (_currentPath == null && _drives.isNotEmpty)
+          _buildSectionTitle("Locations", isDark),
+        if (_currentPath == null && _drives.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            sliver: SliverGrid.count(
+              crossAxisCount: 1,
+              mainAxisSpacing: 12,
+              childAspectRatio: 3.5,
+              children: _drives.map((d) => _buildDriveCard(d, accent, isDark)).toList(),
+            ),
+          ),
 
-    if (_groupBy != "None") {
-      final groups = _getGroupedItems();
-      final List<dynamic> flattenedItems = [];
-      groups.forEach((key, items) {
-        flattenedItems.add({'isHeader': true, 'headerName': key});
-        flattenedItems.addAll(items);
-      });
-
-      return ListView.builder(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
-        itemCount: flattenedItems.length,
-        itemBuilder: (context, index) {
-          final item = flattenedItems[index];
-          if (item is Map && item['isHeader'] == true) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text(item['headerName'], style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontWeight: FontWeight.bold, fontSize: 13)),
-            );
-          }
-          return _buildListItem(item);
-        },
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
-      itemCount: _filteredItems.length,
-      itemBuilder: (context, index) {
-        return _buildListItem(_filteredItems[index]);
-      },
-    );
-  }
-
-  Widget _buildListItem(dynamic item) {
-    bool isFolder = item['type'] == 'folder' || item['type'] == 'directory';
-    bool isSelected = _selectedPaths.contains(item['path']);
-    
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-          tileColor: isSelected ? const Color(0xFF6C63FF).withOpacity(0.1) : Colors.transparent,
-          leading: _buildFileIcon(item['type'], item['name'], item['path']),
-          title: Text(item['name'], style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis),
-          subtitle: Text("${_formatSize(item['size'])} • ${item['modified'] ?? ''}", style: const TextStyle(color: Color(0xFF86868B), fontSize: 11)),
-          trailing: _isSelectionMode 
-            ? Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked, color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF2C2C2C))
-            : IconButton(
-                icon: Icon(isFolder ? Icons.chevron_right : Icons.more_vert, color: const Color(0xFF444444)),
-                onPressed: isFolder ? null : () => _showOptionsSheet(item),
-              ),
-          onTap: () {
-            if (_isSelectionMode) {
-              _toggleSelection(item['path']);
-            } else {
-              isFolder ? _navigateToFolder(item) : _navigateToFile(item);
-            }
-          },
-          onLongPress: () {
-            if (!_isSelectionMode) {
-              _enterSelectionMode(item['path']);
-            } else {
-              _handleDelete(item['path'], item['name']);
-            }
-          },
+        _buildSectionTitle(_currentPath == null ? "System Folders" : "Files", isDark),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final item = _filteredItems[index];
+                return _buildFileRow(item, isDark);
+              },
+              childCount: _filteredItems.length,
+            ),
+          ),
         ),
-        const Divider(color: Color(0xFF1A1A1A), height: 1),
+        const SliverToBoxAdapter(child: SizedBox(height: 150)),
       ],
     );
   }
 
-  Widget _buildGrid() {
-    if (_filteredItems.isEmpty) return _buildEmptyState();
-
-    if (_groupBy != "None") {
-      final groups = _getGroupedItems();
-      final sortedKeys = groups.keys.toList();
-      return ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: sortedKeys.length,
-        itemBuilder: (context, gIdx) {
-          String key = sortedKeys[gIdx];
-          List items = groups[key]!;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Text(key, style: GoogleFonts.outfit(color: const Color(0xFF6C63FF), fontWeight: FontWeight.bold, fontSize: 13)),
-              ),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 15,
-                  mainAxisSpacing: 15,
-                  childAspectRatio: 0.8,
-                ),
-                itemCount: items.length,
-                itemBuilder: (context, i) => _buildGridItem(items[i]),
-              ),
-              const SizedBox(height: 20),
-            ],
-          );
-        },
-      );
-    }
-
-    return GridView.builder(
-      padding: const EdgeInsets.all(20),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 15,
-        mainAxisSpacing: 15,
-        childAspectRatio: 0.8,
+  Widget _buildSectionTitle(String title, bool isDark) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(28, 32, 24, 16),
+        child: Text(title, style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
       ),
-      itemCount: _filteredItems.length,
-      itemBuilder: (context, index) {
-        return _buildGridItem(_filteredItems[index]);
-      },
     );
   }
 
-  Widget _buildGridItem(dynamic item) {
-    bool isFolder = item['type'] == 'folder' || item['type'] == 'directory';
-    bool isSelected = _selectedPaths.contains(item['path']);
+  Widget _buildDriveCard(dynamic drive, Color accent, bool isDark) {
+    final double percent = ((drive['percent'] ?? 0) as num).toDouble() / 100;
+    return GestureDetector(
+      onTap: () {
+        setState(() { _currentPath = drive['path']; });
+        _fetchFiles();
+      },
+      child: GlassContainer(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Container(
+              width: 50, height: 50,
+              decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+              child: Icon(Icons.storage_rounded, color: accent, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(drive['name'], style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                      Text("${(percent * 100).toInt()}%", style: GoogleFonts.roboto(fontSize: 10, color: accent)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(value: percent, minHeight: 2, backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05), valueColor: AlwaysStoppedAnimation(accent)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFileRow(dynamic item, bool isDark) {
+    final isFolder = item['type'] == 'folder';
+    final path = item['path'];
+    final isSelected = _selectedPaths.contains(path);
+    final accent = const Color(0xFF6C63FF);
 
     return GestureDetector(
       onTap: () {
-        if (_isSelectionMode) {
-          _toggleSelection(item['path']);
+        if (_selectedPaths.isNotEmpty) {
+          _toggleSelect(path);
+          return;
+        }
+        if (isFolder) {
+          setState(() { _currentPath = item['path']; });
+          _fetchFiles();
         } else {
-          isFolder ? _navigateToFolder(item) : _navigateToFile(item);
+          Navigator.pushNamed(context, '/preview', arguments: {
+            'pcIpAddress': widget.pcIpAddress,
+            'authToken': widget.authToken,
+            'filePath': item['path'],
+            'fileName': item['name'],
+            'fileSize': item['size'],
+            'fileExtension': item['extension'],
+          });
         }
       },
-      onLongPress: () {
-        if (!_isSelectionMode) {
-          _enterSelectionMode(item['path']);
-        } else {
-          _handleDelete(item['path'], item['name']);
-        }
-      },
+      onLongPress: () => _toggleSelect(path),
       child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        margin: const EdgeInsets.only(bottom: 2),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6C63FF).withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isSelected ? const Color(0xFF6C63FF) : Colors.transparent, width: 2),
+          color: isSelected ? accent.withOpacity(0.05) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border(bottom: BorderSide(color: (isDark ? Colors.white : Colors.black).withOpacity(0.03))),
         ),
-        child: Stack(
+        child: Row(
           children: [
-            Column(
-              children: [
-                Expanded(
-                  child: _buildFileIcon(item['type'], item['name'], item['path'], large: true),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  item['name'],
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+            Icon(
+              isFolder ? Icons.folder_rounded : Icons.description_rounded,
+              color: isFolder ? const Color(0xFFFFB786) : accent,
+              size: 24,
             ),
-            if (_isSelectionMode)
-              Positioned(
-                top: 8, right: 8,
-                child: Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked, 
-                  color: isSelected ? const Color(0xFF6C63FF) : Colors.white24, size: 20),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item['name'], style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.w500, color: isSelected ? accent : (isDark ? Colors.white : Colors.black)), overflow: TextOverflow.ellipsis),
+                  if (!isFolder)
+                    Text(_formatSize(item['size']), style: GoogleFonts.roboto(fontSize: 10, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
+                ],
               ),
+            ),
+            if (isSelected) const Icon(Icons.check_circle_rounded, color: Color(0xFF6C63FF), size: 18)
+            else Icon(Icons.chevron_right_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.1), size: 18),
           ],
         ),
       ),
     );
   }
 
-  String _formatSize(dynamic size) {
-    if (size == null || size == 0) return "";
-    int bytes = (size is int) ? size : int.tryParse(size.toString()) ?? 0;
-    if (bytes == 0) return "";
+  Future<void> _downloadSelectedFiles() async {
+    if (Platform.isAndroid) {
+      if (!await Permission.manageExternalStorage.request().isGranted &&
+          !await Permission.storage.request().isGranted) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Storage permission required")));
+        return;
+      }
+    }
+
+    int successCount = 0;
+    final List<String> paths = _selectedPaths.toList();
+    setState(() => _isLoading = true);
+
+    for (var path in paths) {
+      try {
+        final fileName = path.split(Platform.isWindows ? '\\' : '/').last;
+        final res = await http.get(
+          Uri.parse('http://${widget.pcIpAddress}:5000/files/download?path=${Uri.encodeComponent(path)}'),
+          headers: {'X-Auth-Token': widget.authToken},
+        ).timeout(const Duration(minutes: 5));
+
+        if (res.statusCode == 200) {
+          Directory? dir = Platform.isAndroid ? Directory('/storage/emulated/0/Download') : await getDownloadsDirectory();
+          if (dir == null || !await dir.exists()) dir = await getApplicationDocumentsDirectory();
+
+          final file = File('${dir.path}/$fileName');
+          await file.writeAsBytes(res.bodyBytes);
+          successCount++;
+        }
+      } catch (_) {}
+    }
+
+    setState(() {
+      _isLoading = false;
+      _selectedPaths.clear();
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Downloaded $successCount files to Downloads folder"),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteSelectedFiles() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("Delete Items?", style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text("Are you sure you want to permanently delete ${_selectedPaths.length} items from your PC?", style: GoogleFonts.roboto(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text("CANCEL", style: GoogleFonts.roboto(color: Colors.white24))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text("DELETE"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    int successCount = 0;
+    for (var path in _selectedPaths) {
+      try {
+        final res = await http.delete(
+          Uri.parse('http://${widget.pcIpAddress}:5000/files/delete?path=${Uri.encodeComponent(path)}'),
+          headers: {'X-Auth-Token': widget.authToken},
+        ).timeout(const Duration(seconds: 5));
+        if (res.statusCode == 200) successCount++;
+      } catch (_) {}
+    }
+
+    setState(() {
+      _isLoading = false;
+      _selectedPaths.clear();
+    });
+    _fetchFiles();
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Deleted $successCount items"), backgroundColor: Colors.redAccent));
+  }
+
+  Future<void> _zipAndDownload() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await http.post(
+        Uri.parse('http://${widget.pcIpAddress}:5000/files/download/zip'),
+        headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
+        body: jsonEncode({'paths': _selectedPaths.toList()}),
+      ).timeout(const Duration(minutes: 5));
+
+      if (res.statusCode == 200) {
+        Directory? dir = Platform.isAndroid ? Directory('/storage/emulated/0/Download') : await getDownloadsDirectory();
+        if (dir == null || !await dir.exists()) dir = await getApplicationDocumentsDirectory();
+
+        final fileName = "cypher_bundle_${DateTime.now().millisecondsSinceEpoch}.zip";
+        final file = File('${dir.path}/$fileName');
+        await file.writeAsBytes(res.bodyBytes);
+
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zip bundle saved to Downloads"), backgroundColor: Color(0xFF10B981)));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zip operation failed"), backgroundColor: Colors.redAccent));
+    }
+    setState(() {
+      _isLoading = false;
+      _selectedPaths.clear();
+    });
+  }
+
+  Widget _buildSelectionBar(bool isDark) {
+    return Positioned(
+      bottom: 110, left: 20, right: 20,
+      child: FadeInUp(
+        duration: const Duration(milliseconds: 300),
+        child: GlassContainer(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          borderRadius: BorderRadius.circular(24),
+          color: isDark ? Colors.black : Colors.white,
+          opacity: 0.9,
+          child: Row(
+            children: [
+              Text("${_selectedPaths.length} SELECTED", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF6C63FF))),
+              const Spacer(),
+              _selectionAction(Icons.download_rounded, "Sync", isDark, onTap: _downloadSelectedFiles),
+              const SizedBox(width: 16),
+              _selectionAction(Icons.folder_zip_rounded, "Zip", isDark, onTap: _zipAndDownload),
+              const SizedBox(width: 16),
+              _selectionAction(Icons.delete_outline_rounded, "Delete", isDark, color: Colors.redAccent, onTap: _deleteSelectedFiles),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _selectionAction(IconData icon, String label, bool isDark, {Color? color, VoidCallback? onTap}) {
+    final c = color ?? (isDark ? Colors.white : Colors.black);
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: c.withOpacity(0.8), size: 20),
+          const SizedBox(height: 2),
+          Text(label, style: GoogleFonts.roboto(fontSize: 8, color: c.withOpacity(0.4))),
+        ],
+      ),
+    );
+  }
+
+  String _formatSize(int? bytes) {
+    if (bytes == null) return "0 B";
     if (bytes < 1024) return "$bytes B";
     if (bytes < 1024 * 1024) return "${(bytes / 1024).toStringAsFixed(1)} KB";
     if (bytes < 1024 * 1024 * 1024) return "${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB";
     return "${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB";
   }
 
-  Widget _buildFileIcon(String type, String name, String path, {bool large = false}) {
-    Color color = const Color(0xFF86868B);
-    IconData icon = Icons.insert_drive_file;
-    String ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
-    bool isImage = ['jpg', 'png', 'jpeg', 'gif', 'bmp'].contains(ext);
-    bool isFolder = type == 'folder' || type == 'directory' || type == 'drive';
-
-    if (isFolder) {
-      color = const Color(0xFF6C63FF);
-      icon = type == 'drive' ? Icons.storage_rounded : Icons.folder;
-    } else {
-      if (isImage) { color = Colors.greenAccent; icon = Icons.image; }
-      else if (['mp4', 'mkv', 'mov'].contains(ext)) { color = Colors.blueAccent; icon = Icons.movie; }
-      else if (['pdf'].contains(ext)) { color = Colors.redAccent; icon = Icons.picture_as_pdf; }
-      else if (['zip', 'rar'].contains(ext)) { color = Colors.amberAccent; icon = Icons.archive; }
-      else if (['exe', 'msi', 'apk'].contains(ext)) { color = Colors.orangeAccent; icon = Icons.terminal; }
-      else if (['doc', 'docx', 'xlsx', 'xls', 'ppt', 'pptx'].contains(ext)) { color = Colors.lightBlueAccent; icon = Icons.description; }
-    }
-
-    // Windows Style Folder Peek
-    if (isFolder && large) {
-      return Container(
-        width: double.infinity, height: double.infinity,
-        decoration: BoxDecoration(color: color.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withOpacity(0.1))),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned(top: 15, child: Icon(icon, color: color.withOpacity(0.2), size: 64)),
-            Positioned(bottom: 25, child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildSmallPeek(Colors.white24),
-                const SizedBox(width: 4),
-                _buildSmallPeek(Colors.white24),
-              ],
-            )),
-          ],
-        ),
-      );
-    }
-
-    Widget iconWidget = Icon(icon, color: color, size: large ? 32 : 20);
-
-    if (isImage) {
-      iconWidget = Image.network(
-        "$_baseUrl/files/thumbnail?path=${Uri.encodeComponent(path)}",
-        headers: _headers,
-        width: large ? double.infinity : 40,
-        height: large ? double.infinity : 40,
-        cacheWidth: large ? 300 : 120, // Optimization for memory
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Icon(icon, color: color, size: large ? 32 : 20),
-      );
-      
-      if (large) {
-        iconWidget = ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: iconWidget,
-        );
-      } else {
-        iconWidget = ClipOval(child: iconWidget);
-      }
-    }
-
-    return Container(
-      width: large ? double.infinity : 40,
-      height: large ? double.infinity : 40,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        shape: large ? BoxShape.rectangle : BoxShape.circle,
-        borderRadius: large ? BorderRadius.circular(12) : null,
-      ),
-      child: Center(child: iconWidget),
-    );
-  }
-
-  Widget _buildSmallPeek(Color color) {
-    return Container(width: 14, height: 18, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)));
-  }
-
-  void _showOptionsSheet(Map item) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))),
-            const SizedBox(height: 20),
-            Text(item['name'], style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-            const SizedBox(height: 25),
-            ListTile(
-              leading: const Icon(Icons.file_download, color: Color(0xFF6C63FF)),
-              title: const Text("Download to Phone", style: TextStyle(color: Colors.white)),
-              onTap: () => _startDownload(item),
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-              title: const Text("Delete from PC", style: TextStyle(color: Colors.redAccent)),
-              onTap: () {
-                Navigator.pop(context);
-                _handleDelete(item['path'], item['name']);
-              },
-            ),
-            const SizedBox(height: 10),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showDownloadSheet(Map item, Function(StateSetter) onStateReady) {
-    showModalBottomSheet(
-      context: context,
-      isDismissible: false,
-      enableDrag: false,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) => StatefulBuilder(
-          builder: (context, setSheetState) {
-            onStateReady(setSheetState);
-            return Padding(
-              padding: const EdgeInsets.all(30),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_downloadProgress < 1.0) ...[
-                    Text("Downloading File", style: GoogleFonts.outfit(color: Colors.white)),
-                    const SizedBox(height: 15),
-                    Text("${(_downloadProgress * 100).toInt()}%", style: const TextStyle(color: Color(0xFF6C63FF), fontSize: 40, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(value: _downloadProgress, backgroundColor: Colors.white12, color: const Color(0xFF6C63FF), minHeight: 10),
-                    ),
-                    const SizedBox(height: 20),
-                    if (_downloadProgress < 1.0)
-                      TextButton(
-                        onPressed: _cancelBrowserDownload,
-                        child: const Text("Cancel Download", style: TextStyle(color: Color(0xFFFF453A), fontWeight: FontWeight.bold)),
-                      ),
-                  ] else ...[
-                    ZoomIn(child: const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 70)),
-                    const SizedBox(height: 15),
-                    const Text("Download Complete", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 25),
-                    SizedBox(
-                      width: double.infinity, height: 50,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() { _downloadProgress = 0.0; }); // Reset for next
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: const StadiumBorder()),
-                        child: const Text("Close", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            );
-          }
-      ),
-    );
-  }
-
-  Widget _buildShimmer() {
-    return Shimmer.fromColors(
-      baseColor: const Color(0xFF1A1A1A),
-      highlightColor: const Color(0xFF2C2C2C),
-      child: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: 10,
-        itemBuilder: (_, __) => Padding(
-          padding: const EdgeInsets.only(bottom: 20),
-          child: Row(
-            children: [
-              const CircleAvatar(backgroundColor: Colors.white, radius: 20),
-              const SizedBox(width: 15),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(width: 180, height: 12, color: Colors.white, decoration: BoxDecoration(borderRadius: BorderRadius.circular(4))),
-                const SizedBox(height: 8),
-                Container(width: 100, height: 8, color: Colors.white, decoration: BoxDecoration(borderRadius: BorderRadius.circular(4))),
-              ])
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildBottomNav() {
+    final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
+    return GlassContainer(
+      height: 90,
+      borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          const Text("📂", style: TextStyle(fontSize: 50)),
-          const SizedBox(height: 15),
-          const Text("Folder is empty", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Go Back", style: TextStyle(color: Color(0xFF6C63FF)))
-          ),
+          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context), isDark),
+          _navItem(Icons.folder_copy_rounded, "Files", true, null, isDark),
+          _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushReplacementNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushReplacementNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
+  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
+    final accent = const Color(0xFF6C63FF);
+    return GestureDetector(
+      onTap: tap,
+      child: Opacity(
+        opacity: active ? 1.0 : 0.4,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 50),
-            const SizedBox(height: 15),
-            const Text("Connection Failed", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            const Text("Ensure the PC server is running", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 25),
-            SizedBox(
-              width: 140,
-              child: ElevatedButton(
-                onPressed: _refresh,
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6C63FF),
-                    shape: const StadiumBorder()
-                ),
-                child: const Text("Retry", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
+            Icon(icon, color: active ? accent : (isDark ? Colors.white : Colors.black), size: 24),
+            const SizedBox(height: 4),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : (isDark ? Colors.white : Colors.black))),
           ],
         ),
       ),

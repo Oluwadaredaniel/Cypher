@@ -12,7 +12,7 @@ class AppTheme {
     scaffoldBackgroundColor: background,
     primaryColor: accent,
     // Using Outfit from Google Fonts
-    textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).copyWith(
+    textTheme: GoogleFonts.robotoTextTheme(ThemeData.dark().textTheme).copyWith(
       bodyLarge: const TextStyle(color: textPrimary),
       bodyMedium: const TextStyle(color: textPrimary),
     ),
@@ -33,7 +33,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
         ),
-        textStyle: GoogleFonts.outfit(
+        textStyle: GoogleFonts.roboto(
           fontSize: 18,
           fontWeight: FontWeight.bold,
         ),

@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/central_service.dart';
-import 'screens/send_to_pc_screen.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -38,6 +37,12 @@ import 'screens/app_launcher_screen.dart';
 import 'screens/active_tasks_screen.dart';
 import 'screens/screen_recorder_screen.dart';
 import 'screens/image_editor_screen.dart';
+import 'screens/remote_view_screen.dart';
+import 'screens/remote_keyboard_screen.dart';
+import 'screens/phone_browser_screen.dart';
+import 'services/socket_service.dart';
+import 'services/theme_service.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -53,10 +58,35 @@ class SharingWrapper extends StatefulWidget {
 class _SharingWrapperState extends State<SharingWrapper> {
   static const platform = MethodChannel('app/share');
 
+  final SocketService _socketService = SocketService();
+
   @override
   void initState() {
     super.initState();
     _initNativeShareListener();
+    _initConnectionMonitor();
+  }
+
+  void _initConnectionMonitor() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ip = prefs.getString('pc_ip_address') ?? '';
+    final token = prefs.getString('auth_token') ?? '';
+
+    if (ip.isNotEmpty && token.isNotEmpty) {
+      _socketService.connect(ip, token);
+      _socketService.connectionStatus.listen((isConnected) {
+        if (!isConnected && mounted) {
+           // Basic logic to prevent pushing if already disconnected or on splash
+           final currentRoute = ModalRoute.of(context)?.settings.name;
+           if (currentRoute != '/' && currentRoute != '/disconnected') {
+             navigatorKey.currentState?.pushNamed('/disconnected', arguments: {
+               'pcIpAddress': ip,
+               'authToken': token,
+             });
+           }
+        }
+      });
+    }
   }
 
   void _initNativeShareListener() {
@@ -65,9 +95,9 @@ class _SharingWrapperState extends State<SharingWrapper> {
         final List<dynamic> files = call.arguments;
         _handleSharedMedia(files.cast<String>());
       }
+      return null;
     });
 
-    // Check for initial sharing data (if app was opened via intent)
     platform.invokeMethod('getSharedFiles').then((files) {
       if (files != null) {
         _handleSharedMedia(List<String>.from(files));
@@ -92,11 +122,6 @@ class _SharingWrapperState extends State<SharingWrapper> {
   }
 
   @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) => widget.child;
 }
 
@@ -118,7 +143,6 @@ void callbackDispatcher() {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['is_critical'] == true) {
-          // In a real app, use flutter_local_notifications here
           print("ALERT: PC Battery is low! (${data['percent']}%)");
         }
       }
@@ -132,7 +156,6 @@ void callbackDispatcher() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase
   try {
     await Firebase.initializeApp();
     FirebaseAnalytics.instance.logAppOpen();
@@ -140,7 +163,6 @@ void main() async {
     debugPrint("Firebase initialization failed: $e");
   }
   
-  // Analytics: Report Install to Emerald's Central Hub
   await CentralService.reportInstall();
 
   Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
@@ -151,7 +173,12 @@ void main() async {
     constraints: Constraints(networkType: NetworkType.connected),
   );
 
-  runApp(const CypherApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeService(),
+      child: const CypherApp(),
+    ),
+  );
 }
 
 class CypherApp extends StatelessWidget {
@@ -159,249 +186,80 @@ class CypherApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CYPHER',
-      navigatorKey: navigatorKey,
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFF6C63FF),
-        scaffoldBackgroundColor: const Color(0xFF0D0D0D),
-        textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme),
-      ),
-      builder: (context, child) => SharingWrapper(child: child!),
-      initialRoute: '/',
-      onGenerateRoute: (settings) {
-        switch (settings.name) {
-          case '/':
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => const SplashScreen(),
-            );
-
-          case '/onboarding':
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => const OnboardingScreen(),
-            );
-
-          case '/setup':
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => const SetupScreen(),
-            );
-
-          case '/connection':
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => const ConnectionScreen(),
-            );
-
-          case '/pairing':
+    return Consumer<ThemeService>(
+      builder: (context, themeService, child) {
+        return MaterialApp(
+          title: 'CYPHER',
+          navigatorKey: navigatorKey,
+          debugShowCheckedModeBanner: false,
+          themeMode: themeService.themeMode,
+          theme: ThemeService.lightTheme,
+          darkTheme: ThemeService.darkTheme,
+          builder: (context, child) => SharingWrapper(child: child!),
+          initialRoute: '/',
+          onGenerateRoute: (settings) {
             final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => PairingScreen(pcIpAddress: args?['pcIpAddress'] ?? ''),
-            );
 
-          case '/home':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => HomeScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/browser':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => FileBrowserScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-                initialPath: args?['initialPath'],
-              ),
-            );
-
-          case '/send':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => SendToPCScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-                preSelectedFile: args?['preSelectedFile'],
-                sharedFiles: args?['sharedFiles'],
-              ),
-            );
-
-          case '/controls':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => ControlsScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/clipboard':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => ClipboardScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/guest':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => GuestScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/activity':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => ActivityScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/notifications':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => NotificationScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/settings':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => SettingsScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/disconnected':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => DisconnectedScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-                onReconnected: () => Navigator.pushReplacementNamed(context, '/home'),
-              ),
-            );
-
-          case '/preview':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => FilePreviewScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-                filePath: args?['filePath'] ?? '',
-                fileName: args?['fileName'] ?? '',
-                fileSize: args?['fileSize'] ?? 0,
-                fileExtension: args?['fileExtension'] ?? '',
-              ),
-            );
-
-          case '/transfers':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => TransferProgressScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-                transfers: args?['transfers'] ?? [],
-              ),
-            );
-
-          case '/guide':
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => const GuideScreen(),
-            );
-
-          case '/master_control':
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => const MasterControlScreen(),
-            );
-
-          case '/processes':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => ProcessManagerScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/apps_launcher':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => AppLauncherScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/active_tasks':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => ActiveTasksScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/recorder':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => ScreenRecorderScreen(
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          case '/image_editor':
-            final args = settings.arguments as Map<String, dynamic>?;
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => ImageEditorScreen(
-                imageFile: args?['imageFile'],
-                pcIpAddress: args?['pcIpAddress'] ?? '',
-                authToken: args?['authToken'] ?? '',
-              ),
-            );
-
-          default:
-            return CustomPageRoute(
-              settings: settings,
-              builder: (context) => const SplashScreen(),
-            );
-        }
+            switch (settings.name) {
+              case '/':
+                return CustomPageRoute(settings: settings, builder: (context) => const SplashScreen());
+              case '/onboarding':
+                return CustomPageRoute(settings: settings, builder: (context) => const OnboardingScreen());
+              case '/setup':
+                return CustomPageRoute(settings: settings, builder: (context) => const SetupScreen());
+              case '/connection':
+                return CustomPageRoute(settings: settings, builder: (context) => const ConnectionScreen());
+              case '/pairing':
+                return CustomPageRoute(settings: settings, builder: (context) => PairingScreen(pcIpAddress: args?['pcIpAddress'] ?? ''));
+              case '/home':
+                return CustomPageRoute(settings: settings, builder: (context) => HomeScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/browser':
+                return CustomPageRoute(settings: settings, builder: (context) => FileBrowserScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? '', initialPath: args?['initialPath']));
+              case '/send':
+                return CustomPageRoute(settings: settings, builder: (context) => SendToPCScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? '', preSelectedFile: args?['preSelectedFile'], sharedFiles: args?['sharedFiles']));
+              case '/controls':
+                return CustomPageRoute(settings: settings, builder: (context) => ControlsScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/clipboard':
+                return CustomPageRoute(settings: settings, builder: (context) => ClipboardScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/guest':
+                return CustomPageRoute(settings: settings, builder: (context) => GuestScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/activity':
+                return CustomPageRoute(settings: settings, builder: (context) => ActivityScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/notifications':
+                return CustomPageRoute(settings: settings, builder: (context) => NotificationScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/settings':
+                return CustomPageRoute(settings: settings, builder: (context) => SettingsScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/disconnected':
+                return CustomPageRoute(settings: settings, builder: (context) => DisconnectedScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? '', onReconnected: () => Navigator.pushReplacementNamed(context, '/home')));
+              case '/preview':
+                return CustomPageRoute(settings: settings, builder: (context) => FilePreviewScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? '', filePath: args?['filePath'] ?? '', fileName: args?['fileName'] ?? '', fileSize: args?['fileSize'] ?? 0, fileExtension: args?['fileExtension'] ?? ''));
+              case '/transfers':
+                return CustomPageRoute(settings: settings, builder: (context) => TransferProgressScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? '', transfers: args?['transfers'] ?? []));
+              case '/guide':
+                return CustomPageRoute(settings: settings, builder: (context) => const GuideScreen());
+              case '/master_control':
+                return CustomPageRoute(settings: settings, builder: (context) => const MasterControlScreen());
+              case '/processes':
+                return CustomPageRoute(settings: settings, builder: (context) => ProcessManagerScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/apps_launcher':
+                return CustomPageRoute(settings: settings, builder: (context) => AppLauncherScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/active_tasks':
+                return CustomPageRoute(settings: settings, builder: (context) => ActiveTasksScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/recorder':
+                return CustomPageRoute(settings: settings, builder: (context) => ScreenRecorderScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/image_editor':
+                return CustomPageRoute(settings: settings, builder: (context) => ImageEditorScreen(imageFile: args?['imageFile'], pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/remote_view':
+                return CustomPageRoute(settings: settings, builder: (context) => RemoteViewScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/keyboard':
+                return CustomPageRoute(settings: settings, builder: (context) => RemoteKeyboardScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              case '/phone_browser':
+                return CustomPageRoute(settings: settings, builder: (context) => PhoneBrowserScreen(pcIpAddress: args?['pcIpAddress'] ?? '', authToken: args?['authToken'] ?? ''));
+              default:
+                return CustomPageRoute(settings: settings, builder: (context) => const SplashScreen());
+            }
+          },
+        );
       },
     );
   }
@@ -419,19 +277,10 @@ class CustomPageRoute extends PageRouteBuilder {
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             const begin = Offset(1.0, 0.0);
             const end = Offset.zero;
-            const curve = Curves.easeOutQuart;
-
+            const curve = Curves.easeInOutCubic;
             var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-            var offsetAnimation = animation.drive(tween);
-
-            return SlideTransition(
-              position: offsetAnimation,
-              child: FadeTransition(
-                opacity: animation,
-                child: child,
-              ),
-            );
+            return SlideTransition(position: animation.drive(tween), child: FadeTransition(opacity: animation, child: child));
           },
-          transitionDuration: const Duration(milliseconds: 500),
+          transitionDuration: const Duration(milliseconds: 400),
         );
 }

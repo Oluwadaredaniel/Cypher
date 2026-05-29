@@ -1,652 +1,460 @@
-import 'dart:async';
 import 'dart:io';
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:path/path.dart' as p;
-import 'dart:convert';
-import 'phone_browser_screen.dart';
-
-enum UploadState { picking, uploading, success, error }
+import 'package:file_picker/file_picker.dart';
+import 'package:provider/provider.dart';
+import '../services/theme_service.dart';
+import '../widgets/glass_container.dart';
 
 class SendToPCScreen extends StatefulWidget {
   final String pcIpAddress;
   final String authToken;
-  final File? preSelectedFile;
+  final dynamic preSelectedFile;
   final List<String>? sharedFiles;
 
-  const SendToPCScreen({
-    super.key,
-    required this.pcIpAddress,
-    required this.authToken,
-    this.preSelectedFile,
-    this.sharedFiles,
-  });
+  const SendToPCScreen({super.key, required this.pcIpAddress, required this.authToken, this.preSelectedFile, this.sharedFiles});
 
   @override
   State<SendToPCScreen> createState() => _SendToPCScreenState();
 }
 
-class _SendToPCScreenState extends State<SendToPCScreen> with TickerProviderStateMixin {
-  // Logic State
-  UploadState _currentState = UploadState.picking;
+class _SendToPCScreenState extends State<SendToPCScreen> {
   List<PlatformFile> _selectedFiles = [];
-  List<File> _directFiles = [];
-  File? _directFile;
-  String? _selectedDestination;
-  String _currentPath = ""; // Empty string represents Root
-  List<dynamic> _folders = [];
-  bool _isLoadingFolders = false;
-  String? _folderError;
-
-  // Upload Tracking
-  double _uploadProgress = 0.0;
-  int _currentFileIndex = 0;
-  bool _isUploadingCancelled = false;
-  http.Client? _uploadClient;
-
-  // Animations
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
+  String _targetDirectory = "Downloads";
+  bool _isUploading = false;
+  String _pcName = "My Computer";
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(_pulseController);
-
-    if (widget.preSelectedFile != null) {
-      _directFile = widget.preSelectedFile;
-    }
+    _fetchPCInfo();
     if (widget.sharedFiles != null && widget.sharedFiles!.isNotEmpty) {
-      _directFiles = widget.sharedFiles!.map((path) => File(path)).toList();
+      // Handle files shared via intent
     }
-    _loadFolders();
   }
 
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  String get _baseUrl => "http://${widget.pcIpAddress}:5000";
-  Map<String, String> get _headers => {"X-Auth-Token": widget.authToken};
-
-  Future<void> _loadFolders([Function? setModalState]) async {
-    if (!mounted) return;
-    if (setModalState != null) {
-      setModalState(() {
-        _isLoadingFolders = true;
-        _folderError = null;
-      });
-    } else {
-      setState(() {
-        _isLoadingFolders = true;
-        _folderError = null;
-      });
-    }
-
+  Future<void> _fetchPCInfo() async {
     try {
-      final encodedPath = Uri.encodeComponent(_currentPath);
-      final response = await http.get(
-        Uri.parse("$_baseUrl/files/list?path=$encodedPath"),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (mounted) {
-          if (setModalState != null) {
-            setModalState(() {
-              _folders = data['contents'].where((item) => item['is_dir'] == true).toList();
-              _isLoadingFolders = false;
-            });
-          } else {
-            setState(() {
-              _folders = data['contents'].where((item) => item['is_dir'] == true).toList();
-              _isLoadingFolders = false;
-            });
-          }
-        }
-      } else {
-        if (mounted) {
-          if (setModalState != null) {
-            setModalState(() {
-              _isLoadingFolders = false;
-              _folderError = "Server returned error: ${response.statusCode}";
-            });
-          } else {
-            setState(() {
-              _isLoadingFolders = false;
-              _folderError = "Server returned error: ${response.statusCode}";
-            });
-          }
-        }
+      final res = await http.get(Uri.parse('http://${widget.pcIpAddress}:5000/status'), headers: {'X-Auth-Token': widget.authToken});
+      if (res.statusCode == 200) {
+        setState(() => _pcName = jsonDecode(res.body)['pc_name'] ?? "My Computer");
       }
-    } catch (e) {
-      if (mounted) {
-        if (setModalState != null) {
-          setModalState(() {
-            _isLoadingFolders = false;
-            _folderError = "Connection failed. Is the PC online?";
-          });
-        } else {
-          setState(() {
-            _isLoadingFolders = false;
-            _folderError = "Connection failed. Is the PC online?";
-          });
-        }
-      }
-    }
+    } catch (_) {}
   }
 
-  Future<void> _pickFile() async {
+  Future<void> _pickFiles() async {
     final result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result != null) {
-      setState(() {
-        _selectedFiles = result.files;
-        _directFile = null;
-      });
+      setState(() => _selectedFiles = result.files);
     }
   }
 
-  Future<void> _uploadFile() async {
-    if ((_selectedFiles.isEmpty && _directFile == null && _directFiles.isEmpty) || _selectedDestination == null) return;
-
-    setState(() {
-      _currentState = UploadState.uploading;
-      _uploadProgress = 0.0;
-      _currentFileIndex = 0;
-      _isUploadingCancelled = false;
-    });
-
-    _uploadClient = http.Client();
-
-    try {
-      if (_directFile != null) {
-        await _uploadSingleFile(_directFile!.path);
-      } else if (_directFiles.isNotEmpty) {
-        for (int i = 0; i < _directFiles.length; i++) {
-          if (_isUploadingCancelled) break;
-          setState(() => _currentFileIndex = i);
-          await _uploadSingleFile(_directFiles[i].path);
-        }
-      } else {
-        for (int i = 0; i < _selectedFiles.length; i++) {
-          if (_isUploadingCancelled) break;
-          setState(() => _currentFileIndex = i);
-          await _uploadSingleFile(_selectedFiles[i].path!);
-        }
-      }
-      
-      if (!_isUploadingCancelled) {
-        _triggerSuccess();
-      }
-    } catch (e) {
-      if (!_isUploadingCancelled) {
-        setState(() => _currentState = UploadState.error);
-      }
-    } finally {
-      _uploadClient?.close();
-    }
-  }
-
-  Future<void> _uploadSingleFile(String path) async {
-    if (_isUploadingCancelled) return;
-    
-    final file = File(path);
-    final totalBytes = await file.length();
-    int sentBytes = 0;
-
-    final request = http.MultipartRequest('POST', Uri.parse("$_baseUrl/files/upload"));
-    request.headers.addAll(_headers);
-    request.fields['destination'] = _selectedDestination!;
-
-    final stream = file.openRead();
-    final multipartFile = http.MultipartFile(
-      'file',
-      stream.map((chunk) {
-        sentBytes += chunk.length;
-        if (mounted) {
-          setState(() {
-            _uploadProgress = sentBytes / totalBytes;
-          });
-        }
-        return chunk;
-      }),
-      totalBytes,
-      filename: p.basename(path),
-    );
-
-    request.files.add(multipartFile);
-
-    final streamedResponse = await _uploadClient!.send(request);
-    
-    if (streamedResponse.statusCode != 200) throw Exception("Failed");
-  }
-
-  void _cancelUpload() {
-    setState(() {
-      _isUploadingCancelled = true;
-      _currentState = UploadState.picking;
-    });
-    _uploadClient?.close();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Upload cancelled")),
-    );
-  }
-
-  void _triggerSuccess() {
-    setState(() => _currentState = UploadState.success);
-  }
-
-  void _showDestinationSheet() {
+  void _showDestinationPicker() {
+    String currentPath = ""; // Root
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0C0C10),
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            // Fetch initial folders for the modal
-            if (_isLoadingFolders && _folders.isEmpty && _folderError == null) {
-               _loadFolders(setModalState);
-            } else if (!_isLoadingFolders && _folders.isEmpty && _folderError == null) {
-               _loadFolders(setModalState);
-            }
-
-            return DraggableScrollableSheet(
-              initialChildSize: 0.7,
-              minChildSize: 0.5,
-              maxChildSize: 0.9,
-              expand: false,
-              builder: (context, scrollController) {
-                return Column(
-                  children: [
-                    const SizedBox(height: 12),
-                    Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(2))),
-                    const SizedBox(height: 24),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Row(
-                        children: [
-                          Text("Choose Destination", style: GoogleFonts.outfit(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                          const Spacer(),
-                          if (_currentPath != "")
-                            IconButton(
-                              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                              onPressed: () {
-                                final parts = _currentPath.split(Platform.pathSeparator);
-                                parts.removeLast();
-                                _currentPath = parts.join(Platform.pathSeparator);
-                                _loadFolders(setModalState);
-                              },
-                            )
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: _isLoadingFolders 
-                          ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
-                          : _folderError != null
-                            ? Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.cloud_off_rounded, color: Colors.white24, size: 48),
-                                    const SizedBox(height: 16),
-                                    Text(_folderError!, style: const TextStyle(color: Colors.white60)),
-                                    const SizedBox(height: 16),
-                                    TextButton(
-                                      onPressed: () => _loadFolders(setModalState),
-                                      child: const Text("Retry", style: TextStyle(color: Color(0xFF6C63FF))),
-                                    )
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                controller: scrollController,
-                                itemCount: _folders.length + 1,
-                                itemBuilder: (context, index) {
-                                if (index == 0) {
-                                  return ListTile(
-                                    leading: const Icon(Icons.check_circle_outline, color: Color(0xFF6C63FF)),
-                                    title: Text("Select current: ${_currentPath == "" ? "Root" : p.basename(_currentPath)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                    onTap: () {
-                                      setState(() => _selectedDestination = _currentPath);
-                                      Navigator.pop(context);
-                                    },
-                                  );
-                                }
-                                final item = _folders[index - 1];
-                                final isDir = item['is_dir'] ?? true;
-                                final isSelectable = item['selectable'] ?? isDir;
-
-                                return ListTile(
-                                  leading: Icon(
-                                    isDir ? Icons.folder_rounded : Icons.insert_drive_file_outlined, 
-                                    color: isDir ? const Color(0xFF86868B) : const Color(0xFF444444)
-                                  ),
-                                  title: Text(
-                                    item['name'], 
-                                    style: TextStyle(color: isSelectable ? Colors.white : Colors.white24)
-                                  ),
-                                  trailing: isDir ? const Icon(Icons.chevron_right_rounded, color: Colors.white24) : null,
-                                  onTap: isDir ? () {
-                                    _currentPath = item['path'];
-                                    _loadFolders(setModalState);
-                                  } : null,
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        );
-      },
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PCDirectoryPicker(
+        pcIpAddress: widget.pcIpAddress,
+        authToken: widget.authToken,
+        onSelected: (path) {
+          setState(() => _targetDirectory = path);
+        },
+      ),
     );
+  }
+
+  Future<void> _startUpload() async {
+    if (_selectedFiles.isEmpty) return;
+    setState(() => _isUploading = true);
+
+    try {
+      final baseUrl = 'http://${widget.pcIpAddress}:5000';
+
+      // Upload files one by one or in a batch?
+      // The current backend /files/upload supports multiple files in one request.
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/files/upload'));
+      request.headers['X-Auth-Token'] = widget.authToken;
+      request.fields['destination'] = _targetDirectory;
+
+      for (var file in _selectedFiles) {
+        if (file.path != null) {
+          request.files.add(await http.MultipartFile.fromPath('file', file.path!));
+        } else if (file.bytes != null) {
+          // Handle web/bytes if necessary
+          request.files.add(http.MultipartFile.fromBytes('file', file.bytes!, filename: file.name));
+        }
+      }
+
+      final response = await request.send().timeout(const Duration(minutes: 10));
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Successfully sent ${_selectedFiles.length} files to PC"),
+              backgroundColor: const Color(0xFF10B981),
+            ),
+          );
+          Navigator.pushReplacementNamed(context, '/transfers', arguments: {
+            'pcIpAddress': widget.pcIpAddress,
+            'authToken': widget.authToken,
+          });
+        }
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Upload failed. Check PC storage."), backgroundColor: Colors.orange));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection error during upload"), backgroundColor: Colors.redAccent));
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeService>(context);
+    final accent = const Color(0xFF6C63FF);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF050507),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text("Send to PC", style: GoogleFonts.syne(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: _buildMainContent(),
-      ),
-    );
-  }
-
-  Widget _buildMainContent() {
-    switch (_currentState) {
-      case UploadState.picking:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("1. Select Content", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 16),
-            _buildUploadArea(),
-            const SizedBox(height: 32),
-            Text("2. Choose Folder", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 16),
-            _buildDestinationSelector(),
-            const Spacer(),
-            _buildSendButton(),
-          ],
-        );
-      case UploadState.uploading:
-        return _buildUploadingState();
-      case UploadState.success:
-        return _buildSuccessState();
-      case UploadState.error:
-        return _buildErrorState();
-    }
-  }
-
-  Widget _buildUploadArea() {
-    if (_selectedFiles.isNotEmpty || _directFile != null) {
-      final String label = _directFile != null 
-          ? p.basename(_directFile!.path) 
-          : (_selectedFiles.length == 1 ? _selectedFiles.first.name : "${_selectedFiles.length} files selected");
-      
-      return FadeIn(
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFF2C2C2C))
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 50, height: 50,
-                decoration: BoxDecoration(color: const Color(0xFF6C63FF).withOpacity(0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.copy_all_rounded, color: Color(0xFF6C63FF), size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis),
-                    Text(_directFile != null ? "Ready to send" : "Tap to change selection", style: const TextStyle(color: Color(0xFF86868B), fontSize: 12)),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit_outlined, color: Color(0xFF6C63FF), size: 20),
-                onPressed: () {
-                  setState(() { _selectedFiles = []; _directFile = null; });
-                  _pickFile();
-                },
-              )
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: _pickFile,
-          child: FadeTransition(
-            opacity: _pulseAnimation,
-            child: Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3), width: 2),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("📤", style: TextStyle(fontSize: 40)),
-                  const SizedBox(height: 16),
-                  Text("Choose a file to send", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text("Photos, videos, or documents", style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 13)),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextButton.icon(
-          onPressed: () => Navigator.push(context, MaterialPageRoute(
-            builder: (context) => PhoneBrowserScreen(pcIpAddress: widget.pcIpAddress, authToken: widget.authToken),
-          )),
-          icon: const Icon(Icons.folder_shared_rounded, color: Color(0xFF6C63FF)),
-          label: Text("Browse Phone Storage (Hidden Files)", style: GoogleFonts.outfit(color: const Color(0xFF6C63FF))),
-        )
-      ],
-    );
-  }
-
-  Widget _buildDestinationSelector() {
-    String folderName = _selectedDestination == null || _selectedDestination == ""
-        ? "Choose destination"
-        : p.basename(_selectedDestination!);
-
-    return InkWell(
-      onTap: _showDestinationSheet,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _selectedDestination != null ? const Color(0xFF6C63FF) : Colors.transparent),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.folder_open, color: _selectedDestination != null ? const Color(0xFF6C63FF) : const Color(0xFF86868B)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                folderName,
-                style: TextStyle(color: _selectedDestination != null ? Colors.white : const Color(0xFF86868B)),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const Icon(Icons.keyboard_arrow_down, color: Color(0xFF86868B)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSendButton() {
-    bool isActive = (_selectedFiles.isNotEmpty || _directFile != null) && _selectedDestination != null;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: isActive ? _uploadFile : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isActive ? const Color(0xFF6C63FF) : const Color(0xFF1A1A1A),
-          shape: const StadiumBorder(),
-          elevation: isActive ? 8 : 0,
-          shadowColor: const Color(0xFF6C63FF).withOpacity(0.5),
-        ),
-        child: Text(
-            isActive ? "Send to PC" : "Select File & Folder",
-            style: GoogleFonts.outfit(
-                color: isActive ? Colors.white : Colors.white24,
-                fontWeight: FontWeight.bold,
-                fontSize: 16
-            )
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUploadingState() {
-    final String currentFileName = _directFile != null 
-        ? p.basename(_directFile!.path) 
-        : _selectedFiles[_currentFileIndex].name;
-    
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            SizedBox(
-              width: 140, height: 140,
-              child: CircularProgressIndicator(
-                  value: _uploadProgress == 0 ? null : _uploadProgress,
-                  strokeWidth: 6,
-                  color: const Color(0xFF6C63FF),
-                  backgroundColor: Colors.white10
-              ),
-            ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
+      backgroundColor: theme.isDarkMode ? const Color(0xFF080F17) : const Color(0xFFF2F2F7),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
               children: [
-                Text("${_currentFileIndex + 1}/${_selectedFiles.length + (_directFile != null ? 1 : 0) + _directFiles.length}",
-                  style: GoogleFonts.outfit(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
-                const Text("Sending", style: TextStyle(color: Color(0xFF86868B), fontSize: 12)),
+                _buildTopBar(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        _buildConnectionBanner(),
+                        const SizedBox(height: 24),
+                        _buildUploadArea(),
+                        const SizedBox(height: 24),
+                        _buildTargetSelector(),
+                        const SizedBox(height: 24),
+                        _buildRecentLocations(),
+                        const SizedBox(height: 120),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
-          ],
-        ),
-        const SizedBox(height: 40),
-        Text(currentFileName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-        const SizedBox(height: 12),
-        Text("Warp Speed Protocol Active", style: const TextStyle(color: Color(0xFF86868B), fontSize: 12)),
-        const SizedBox(height: 40),
-        TextButton(
-            onPressed: _cancelUpload,
-            child: const Text("Cancel Batch", style: TextStyle(color: Colors.redAccent, fontSize: 14))
-        ),
-      ],
-    );
-  }
+          ),
 
-  Widget _buildSuccessState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ZoomIn(
-            child: Container(
-              width: 100, height: 100,
-              decoration: BoxDecoration(
-                  color: const Color(0xFF6C63FF).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF6C63FF), width: 2)
+          if (_selectedFiles.isNotEmpty)
+            Positioned(
+              bottom: 110, right: 24,
+              child: FadeInRight(
+                child: FloatingActionButton.extended(
+                  onPressed: _startUpload,
+                  backgroundColor: accent,
+                  icon: const Icon(Icons.send_rounded, color: Colors.white),
+                  label: Text("Send ${_selectedFiles.length} Files", style: GoogleFonts.roboto(fontWeight: FontWeight.bold)),
+                ),
               ),
-              child: const Icon(Icons.check, color: Color(0xFF6C63FF), size: 50),
             ),
-          ),
-          const SizedBox(height: 32),
-          Text("Batch sent successfully", style: GoogleFonts.outfit(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text("Files are safe on your PC", style: const TextStyle(color: Color(0xFF86868B))),
-          const SizedBox(height: 48),
-          SizedBox(
-            width: double.infinity, height: 56,
-            child: ElevatedButton(
-              onPressed: () => setState(() { _selectedFiles = []; _directFile = null; _currentState = UploadState.picking; }),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: const StadiumBorder()),
-              child: const Text("Send more", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Done", style: TextStyle(color: Color(0xFF86868B)))),
+
+          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav(theme.isDarkMode)),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          ShakeX(
-            child: Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 80),
+          Row(
+            children: [
+              IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF6C63FF), size: 20), onPressed: () => Navigator.pop(context)),
+              Text("SEND TO PC", style: GoogleFonts.roboto(fontSize: 24, fontWeight: FontWeight.w800, color: const Color(0xFF6C63FF), letterSpacing: -1)),
+            ],
           ),
-          const SizedBox(height: 24),
-          Text("Upload failed", style: GoogleFonts.outfit(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
-            child: Text("We couldn't reach your PC. Please check if the server is still running.", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF86868B))),
-          ),
-          const SizedBox(height: 40),
-          SizedBox(
-            width: double.infinity, height: 56,
-            child: ElevatedButton(
-              onPressed: _uploadFile,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: const StadiumBorder()),
-              child: const Text("Try again", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+          const Icon(Icons.sensors_rounded, color: Color(0xFF6C63FF)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConnectionBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+          const SizedBox(width: 12),
+          Text("CONNECTED TO: $_pcName", style: GoogleFonts.roboto(fontSize: 10, color: Colors.white38, letterSpacing: 1)),
+          const Spacer(),
+          Text("FAST SYNC", style: GoogleFonts.roboto(fontSize: 10, color: const Color(0xFF6C63FF), fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadArea() {
+    final accent = const Color(0xFF6C63FF);
+    return GestureDetector(
+      onTap: _pickFiles,
+      child: GlassContainer(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: accent.withOpacity(0.1), shape: BoxShape.circle),
+              child: Icon(Icons.upload_file_rounded, color: accent, size: 40),
+            ),
+            const SizedBox(height: 24),
+            Text("Select files to send", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text("Tap to browse your device storage", style: GoogleFonts.roboto(fontSize: 13, color: Colors.white24)),
+
+            if (_selectedFiles.isNotEmpty) ...[
+              const SizedBox(height: 32),
+              const Divider(color: Colors.white10),
+              const SizedBox(height: 16),
+              ..._selectedFiles.take(3).map((f) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.description_rounded, size: 16, color: Colors.white24),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(f.name, style: GoogleFonts.roboto(fontSize: 12, color: Colors.white70), overflow: TextOverflow.ellipsis)),
+                    Text("${(f.size / 1024 / 1024).toStringAsFixed(1)} MB", style: GoogleFonts.roboto(fontSize: 9, color: Colors.white10)),
+                  ],
+                ),
+              )),
+              if (_selectedFiles.length > 3)
+                Text("+ ${_selectedFiles.length - 3} more files", style: GoogleFonts.roboto(fontSize: 11, color: accent.withOpacity(0.5))),
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTargetSelector() {
+    return GestureDetector(
+      onTap: _showDestinationPicker,
+      child: GlassContainer(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: const Color(0xFFFFB786).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.folder_open_rounded, color: Color(0xFFFFB786), size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("SEND TO", style: GoogleFonts.roboto(fontSize: 8, color: Colors.white24, letterSpacing: 1)),
+                  Text(_targetDirectory, style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            const Icon(Icons.edit_rounded, color: Colors.white24, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentLocations() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 8, bottom: 16),
+          child: Text("RECENT LOCATIONS", style: GoogleFonts.roboto(fontSize: 10, color: Colors.white24, letterSpacing: 1)),
+        ),
+        _recentItem("Desktop/Downloads", "2m ago"),
+        const SizedBox(height: 12),
+        _recentItem("Projects/Alpha/Renders", "System default"),
+      ],
+    );
+  }
+
+  Widget _recentItem(String path, String label) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.02), borderRadius: BorderRadius.circular(16)),
+      child: Row(
+        children: [
+          const Icon(Icons.history_rounded, color: Colors.white10, size: 18),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(path, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600)),
+                Text(label, style: GoogleFonts.roboto(fontSize: 11, color: Colors.white10)),
+              ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNav(bool isDark) {
+    return GlassContainer(
+      height: 90,
+      borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _navItem(Icons.home_rounded, "Home", true, null, isDark),
+          _navItem(Icons.folder_copy_rounded, "Files", false, () => Navigator.pushReplacementNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+          _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushReplacementNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushReplacementNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
+    final accent = const Color(0xFF6C63FF);
+    return GestureDetector(
+      onTap: tap,
+      child: Opacity(
+        opacity: active ? 1.0 : 0.4,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: active ? accent : (isDark ? Colors.white : Colors.black), size: 24),
+            const SizedBox(height: 4),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : (isDark ? Colors.white : Colors.black))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PCDirectoryPicker extends StatefulWidget {
+  final String pcIpAddress;
+  final String authToken;
+  final Function(String) onSelected;
+
+  const _PCDirectoryPicker({required this.pcIpAddress, required this.authToken, required this.onSelected});
+
+  @override
+  State<_PCDirectoryPicker> createState() => _PCDirectoryPickerState();
+}
+
+class _PCDirectoryPickerState extends State<_PCDirectoryPicker> {
+  List<dynamic> _contents = [];
+  String _currentPath = "";
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDir(_currentPath);
+  }
+
+  Future<void> _fetchDir(String path) async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await http.get(
+        Uri.parse('http://${widget.pcIpAddress}:5000/files/list?path=${Uri.encodeComponent(path)}'),
+        headers: {'X-Auth-Token': widget.authToken},
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _contents = jsonDecode(res.body)['contents'];
+          _currentPath = path;
+        });
+      }
+    } catch (_) {}
+    setState(() => _isLoading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassContainer(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("PICK DESTINATION", style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF6C63FF))),
+              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white24)),
+            ],
+          ),
           const SizedBox(height: 16),
-          TextButton(onPressed: () => setState(() => _currentState = UploadState.picking), child: const Text("Pick another file", style: TextStyle(color: Color(0xFF86868B)))),
+          if (_currentPath.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981)),
+              title: Text("Select this folder", style: GoogleFonts.roboto(fontWeight: FontWeight.bold, color: Colors.white)),
+              subtitle: Text(_currentPath, style: const TextStyle(fontSize: 10, color: Colors.white24)),
+              onTap: () {
+                widget.onSelected(_currentPath);
+                Navigator.pop(context);
+              },
+            ),
+          if (_currentPath.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.arrow_upward_rounded, color: Color(0xFF6C63FF)),
+              title: const Text("..", style: TextStyle(color: Colors.white)),
+              onTap: () {
+                final parts = _currentPath.split(Platform.isWindows ? '\\' : '/');
+                parts.removeLast();
+                _fetchDir(parts.join(Platform.isWindows ? '\\' : '/'));
+              },
+            ),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+            child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _contents.length,
+                  itemBuilder: (ctx, i) {
+                    final item = _contents[i];
+                    return ListTile(
+                      leading: Icon(item['is_dir'] ? Icons.folder_rounded : Icons.description_rounded, color: item['is_dir'] ? const Color(0xFFFFB786) : Colors.white24),
+                      title: Text(item['name'], style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                      onTap: () {
+                        if (item['is_dir']) {
+                          _fetchDir(item['path']);
+                        }
+                      },
+                      trailing: item['is_dir'] ? TextButton(
+                        onPressed: () {
+                          widget.onSelected(item['path']);
+                          Navigator.pop(context);
+                        },
+                        child: const Text("SELECT", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ) : null,
+                    );
+                  },
+                ),
+          ),
         ],
       ),
     );

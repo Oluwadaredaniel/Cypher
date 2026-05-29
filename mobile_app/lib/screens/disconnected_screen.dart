@@ -1,395 +1,426 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:nsd/nsd.dart';
+import '../services/theme_service.dart';
+import '../widgets/glass_container.dart';
 
 class DisconnectedScreen extends StatefulWidget {
   final String pcIpAddress;
   final String authToken;
   final VoidCallback onReconnected;
 
-  const DisconnectedScreen({
-    super.key,
-    required this.pcIpAddress,
-    required this.authToken,
-    required this.onReconnected,
-  });
+  const DisconnectedScreen({super.key, required this.pcIpAddress, required this.authToken, required this.onReconnected});
 
   @override
   State<DisconnectedScreen> createState() => _DisconnectedScreenState();
 }
 
-class _DisconnectedScreenState extends State<DisconnectedScreen> with TickerProviderStateMixin {
-  // Connection State
+class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTickerProviderStateMixin {
   bool _isRetrying = false;
-  bool _isSuccess = false;
-  int _retryCountdown = 10;
-  Timer? _autoRetryTimer;
-  Timer? _countdownTimer;
-
-  // Discovery State
-  Discovery? _discovery;
-  bool _isSearching = false;
-
-  // Animation Controllers
-  late AnimationController _dashController;
+  late AnimationController _scanController;
 
   @override
   void initState() {
     super.initState();
-    
-    _dashController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
-
-    _startAutoRetryLogic();
+    _scanController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
   }
 
   @override
   void dispose() {
-    _autoRetryTimer?.cancel();
-    _countdownTimer?.cancel();
-    _stopDiscovery();
-    _dashController.dispose();
+    _scanController.dispose();
     super.dispose();
   }
 
-  Future<void> _stopDiscovery() async {
-    if (_discovery != null) {
-      await stopDiscovery(_discovery!);
-    }
-  }
-
-  void _startAutoRetryLogic() {
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_retryCountdown > 1) {
-        setState(() => _retryCountdown--);
-      } else {
-        _attemptReconnect(silent: true);
-      }
-    });
-  }
-
-  Future<void> _attemptReconnect({bool silent = false}) async {
-    if (_isRetrying || _isSuccess) return;
-
-    if (!silent) setState(() => _isRetrying = true);
-
+  Future<void> _handleRetry() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _isRetrying = true);
     try {
-      final response = await http
-          .get(
-            Uri.parse('http://${widget.pcIpAddress}:5000/ping'),
-            headers: {'X-Auth-Token': widget.authToken},
-          )
-          .timeout(const Duration(seconds: 4));
+      final res = await http.get(
+        Uri.parse('http://${widget.pcIpAddress}:5000/ping'),
+        headers: {'X-Auth-Token': widget.authToken},
+      ).timeout(const Duration(seconds: 5));
 
-      if (response.statusCode == 200) {
-        _handleSuccess();
-      } else {
-        _tryAutoDiscovery();
-      }
-    } catch (e) {
-      _tryAutoDiscovery();
-    }
-  }
-
-  Future<void> _tryAutoDiscovery() async {
-    if (_isSearching) return;
-    setState(() => _isSearching = true);
-
-    try {
-      _discovery = await startDiscovery('_cypher._tcp');
-      _discovery!.addListener(() async {
-        for (var service in _discovery!.services) {
-          final String? newIp = service.host;
-          if (newIp != null && (newIp != widget.pcIpAddress || !newIp.contains("."))) {
-            // Persistent retry on found services
-            for (int attempt = 0; attempt < 3; attempt++) {
-              try {
-                final resp = await http.get(Uri.parse('http://$newIp:5000/ping'))
-                    .timeout(const Duration(seconds: 3));
-                if (resp.statusCode == 200) {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setString('pc_ip_address', newIp);
-                  
-                  if (mounted) {
-                     _handleSuccess();
-                     await _stopDiscovery();
-                     return;
-                  }
-                }
-              } catch (_) {
-                await Future.delayed(const Duration(seconds: 1));
-              }
-            }
-          }
+      if (res.statusCode == 200) {
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false, arguments: {
+            'pcIpAddress': widget.pcIpAddress,
+            'authToken': widget.authToken,
+          });
         }
-      });
-
-      // Search for 15 seconds instead of 5
-      await Future.delayed(const Duration(seconds: 15));
-      await _stopDiscovery();
-    } catch (e) {
-      debugPrint("Discovery error: $e");
-    } finally {
-      if (mounted) setState(() { _isSearching = false; _isRetrying = false; _retryCountdown = 10; });
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Computer found but refused connection."), backgroundColor: Colors.orange));
+      }
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Still unable to reach computer."), backgroundColor: Colors.redAccent));
     }
+    if (mounted) setState(() => _isRetrying = false);
   }
 
-  void _handleSuccess() {
-    _autoRetryTimer?.cancel();
-    _countdownTimer?.cancel();
-    setState(() {
-      _isRetrying = false;
-      _isSuccess = true;
-    });
-
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) widget.onReconnected();
-    });
+  void _showManualIpEntry() {
+    final controller = TextEditingController(text: widget.pcIpAddress);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("Update IP Address", style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: "e.g. 192.168.1.10",
+            hintStyle: TextStyle(color: Colors.white24),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text("CANCEL", style: GoogleFonts.roboto(color: Colors.white24))),
+          ElevatedButton(
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('pc_ip_address', controller.text);
+              if (mounted) {
+                Navigator.pop(ctx);
+                Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false, arguments: {
+                  'pcIpAddress': controller.text,
+                  'authToken': widget.authToken,
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
+            child: const Text("UPDATE & RETRY"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
-      body: SafeArea(
-        child: FadeIn(
-          duration: const Duration(milliseconds: 300),
-          child: _isSuccess ? _buildSuccessState() : _buildDisconnectedState(),
-        ),
-      ),
-    );
-  }
+    final accent = const Color(0xFF6C63FF);
 
-  Widget _buildDisconnectedState() {
-    return Column(
-      children: [
-        Align(
-          alignment: Alignment.topLeft,
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+    return Scaffold(
+      backgroundColor: const Color(0xFF080F17),
+      body: Stack(
+        children: [
+          SafeArea(
             child: Column(
               children: [
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 120,
-                  width: 240,
-                  child: AnimatedBuilder(
-                    animation: _dashController,
-                    builder: (context, child) {
-                      return CustomPaint(
-                        painter: BrokenConnectionPainter(animationValue: _dashController.value),
-                      );
-                    },
+                _buildTopBar(accent),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16),
+                        _buildHeroCard(accent),
+                        const SizedBox(height: 24),
+                        _buildDiagnosticLog(),
+                        const SizedBox(height: 24),
+                        _buildQuickFixCard(),
+                        const SizedBox(height: 24),
+                        _buildTopologyCard(accent),
+                        const SizedBox(height: 120),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 40),
-                Text("Lost connection to your PC",
-                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                Text("Make sure your PC is on and connected to your phone's hotspot",
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 14)),
-                const SizedBox(height: 40),
-                
-                // Reasons Card
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(20)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("What might have happened",
-                          style: GoogleFonts.outfit(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
-                      _reasonRow("📱", "Your phone's hotspot turned off"),
-                      _reasonRow("💤", "Your PC went to sleep"),
-                      _reasonRow("📶", "You moved out of WiFi range"),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 48),
-                
-                // Action Buttons
-                _buildPrimaryButton(),
-                const SizedBox(height: 12),
-                _buildGhostButton("Change PC address", _showIpEditSheet),
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Text("Go to home", 
-                      style: GoogleFonts.outfit(color: const Color(0xFF86868B), decoration: TextDecoration.underline)),
-                ),
-                const SizedBox(height: 16),
-                Text("Retrying in ${_retryCountdown}s...", 
-                    style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 12)),
               ],
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSuccessState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ZoomIn(
-            duration: const Duration(milliseconds: 400),
-            child: Container(
-              width: 80, height: 80,
-              decoration: const BoxDecoration(color: Color(0xFF6C63FF), shape: BoxShape.circle),
-              child: const Icon(Icons.check, color: Colors.white, size: 40),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text("Reconnected!", style: GoogleFonts.outfit(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text("Taking you back...", style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 14)),
+          _buildFloatingHeader(accent),
+          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
         ],
       ),
     );
   }
 
-  Widget _reasonRow(String emoji, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 16)),
-          const SizedBox(width: 12),
-          Text(text, style: GoogleFonts.outfit(color: const Color(0xFF86868B), fontSize: 14)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrimaryButton() {
-    return GestureDetector(
-      onTap: () => _attemptReconnect(),
+  Widget _buildFloatingHeader(Color accent) {
+    return Positioned(
+      top: 0, left: 0, right: 0,
       child: Container(
-        width: double.infinity,
-        height: 52,
-        decoration: BoxDecoration(color: const Color(0xFF6C63FF), borderRadius: BorderRadius.circular(100)),
-        child: Center(
-          child: _isRetrying 
-            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : Text("Try reconnecting", style: GoogleFonts.outfit(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGhostButton(String text, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         decoration: BoxDecoration(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: const Color(0xFF2C2C2C))
+          color: const Color(0xFF080F17).withOpacity(0.8),
+          border: const Border(bottom: BorderSide(color: Colors.white10)),
         ),
-        child: Center(
-          child: Text(text, style: GoogleFonts.outfit(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        ),
-      ),
-    );
-  }
-
-  void _showIpEditSheet() {
-    final controller = TextEditingController(text: widget.pcIpAddress);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Edit PC Address", style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            TextField(
-              controller: controller,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: const Color(0xFF0D0D0D),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
+            Row(
+              children: [
+                const Icon(Icons.shield_moon_outlined, color: Color(0xFF6C63FF), size: 24),
+                const SizedBox(width: 12),
+                Text("CYPHER", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
+              ],
             ),
-            const SizedBox(height: 20),
-            _buildGhostButton("Confirm", () async {
-              (await SharedPreferences.getInstance()).setString('pc_ip_address', controller.text.trim());
-              if (mounted) Navigator.pop(context);
-              _attemptReconnect();
-            }),
-            const SizedBox(height: 24),
+            const Icon(Icons.sensors_off_rounded, color: Colors.redAccent, size: 18),
           ],
         ),
       ),
     );
   }
-}
 
-class BrokenConnectionPainter extends CustomPainter {
-  final double animationValue;
-  BrokenConnectionPainter({required this.animationValue});
+  Widget _buildTopBar(Color accent) => const SizedBox(height: 64);
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final devicePaint = Paint()
-      ..color = const Color(0xFF1A1A1A)
-      ..style = PaintingStyle.fill;
-
-    final dashPaint = Paint()
-      ..color = const Color(0xFFFF453A)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    // Draw Device Rects
-    RRect leftDevice = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, size.height/4, 60, 60), const Radius.circular(12));
-    RRect rightDevice = RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width - 60, size.height/4, 60, 60), const Radius.circular(12));
-    
-    canvas.drawRRect(leftDevice, devicePaint);
-    canvas.drawRRect(rightDevice, devicePaint);
-
-    // Draw Dashed Line with offset
-    double dashWidth = 8, dashSpace = 6;
-    double startX = 70;
-    double endX = size.width - 70;
-    double y = size.height / 2;
-    
-    double currentX = startX + (animationValue * (dashWidth + dashSpace));
-    while (currentX < endX) {
-      canvas.drawLine(Offset(currentX, y), Offset(currentX + dashWidth, y), dashPaint);
-      currentX += dashWidth + dashSpace;
-    }
-    
-    // Draw "Broken" center gap overlay
-    final bgPaint = Paint()..color = const Color(0xFF0D0D0D);
-    canvas.drawRect(Rect.fromCenter(center: Offset(size.width/2, y), width: 20, height: 10), bgPaint);
+  Widget _buildHeroCard(Color accent) {
+    return GlassContainer(
+      padding: EdgeInsets.zero,
+      child: Stack(
+        children: [
+          AnimatedBuilder(
+            animation: _scanController,
+            builder: (context, child) {
+              return Positioned(
+                top: _scanController.value * 400,
+                left: 0, right: 0,
+                child: Container(
+                  height: 2,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.transparent, accent.withOpacity(0.5), Colors.transparent],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Pulse(
+                      infinite: true,
+                      child: Container(
+                        width: 96, height: 96,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.redAccent.withOpacity(0.2), width: 4),
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.wifi_off_rounded, color: Colors.redAccent, size: 48),
+                    Positioned(
+                      top: 0, right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(10)),
+                        child: Text("OFFLINE", style: GoogleFonts.roboto(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                Text("Connection Lost", style: GoogleFonts.roboto(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 12),
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    style: GoogleFonts.roboto(fontSize: 14, color: Colors.white38),
+                    children: [
+                      const TextSpan(text: "We can't reach your computer "),
+                      TextSpan(text: "right now", style: GoogleFonts.roboto(color: accent, fontWeight: FontWeight.bold)),
+                      const TextSpan(text: ". Please check your connection."),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isRetrying ? null : _handleRetry,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 10,
+                      shadowColor: accent.withOpacity(0.3),
+                    ),
+                    child: _isRetrying
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.sync_rounded, color: Colors.white),
+                            const SizedBox(width: 12),
+                            Text("Try Again", style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _showManualIpEntry,
+                  child: Text("Update IP Address", style: GoogleFonts.roboto(fontSize: 14, color: accent.withOpacity(0.6), fontWeight: FontWeight.bold)),
+                ),
+                TextButton(
+                  onPressed: () {},
+                  child: Text("Network Diagnostics", style: GoogleFonts.roboto(fontSize: 14, color: Colors.white24, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  @override
-  bool shouldRepaint(BrokenConnectionPainter oldDelegate) => true;
+  Widget _buildDiagnosticLog() {
+    return GlassContainer(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.terminal_rounded, color: Color(0xFF6C63FF), size: 20),
+              const SizedBox(width: 12),
+              Text("What happened?", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _logEntry("14:22:09", "Connection timed out", "The computer didn't respond in time.", Colors.redAccent),
+          const SizedBox(height: 16),
+          _logEntry("14:21:55", "Address changed", "The computer address has changed.", const Color(0xFFFFB786)),
+        ],
+      ),
+    );
+  }
+
+  Widget _logEntry(String time, String error, String detail, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.black26,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("TIME: $time", style: GoogleFonts.roboto(fontSize: 9, color: Colors.white12)),
+          const SizedBox(height: 4),
+          Text(error, style: GoogleFonts.roboto(fontSize: 11, color: color, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(detail, style: GoogleFonts.roboto(fontSize: 12, color: Colors.white38)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickFixCard() {
+    return GlassContainer(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: Color(0xFFFFB786), size: 20),
+              const SizedBox(width: 12),
+              Text("Quick Fix", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _fixItem("Ensure Cypher PC App is running."),
+          _fixItem("Check if PC and Phone are on same WiFi."),
+          _fixItem("Verify IP address hasn't changed."),
+        ],
+      ),
+    );
+  }
+
+  Widget _fixItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle_rounded, color: Colors.white10, size: 14),
+          const SizedBox(width: 12),
+          Expanded(child: Text(text, style: GoogleFonts.roboto(fontSize: 13, color: Colors.white38))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopologyCard(Color accent) {
+    return Container(
+      width: double.infinity,
+      height: 160,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        image: const DecorationImage(
+          image: NetworkImage("https://lh3.googleusercontent.com/aida-public/AB6AXuB5ZYn4z2wn8iXgWvaa-ZysOP8XmOkvNB3DQLquGIN5VsLOOCEGR90ZMiY_yTtnddWF3Kpw5XPGCZyrdfwC3x1WTpX5kBMi027PuSlCnXewrT2ObbD49W7tnzusJrGf6bZ3IDii9wMz2KIXanzEtW4fqVvSIWYRkWBXwjNiMwA_q0EEogVbY3pypm1ffQ2zF9PxYBG2zkQZE5GCnvw0LLeNb_KOwBY56nb7Fi8mgGLuGHCX2x4rQRSMCegQVh88FN4BYCWHVEQ8_eU"),
+          fit: BoxFit.cover,
+          opacity: 0.2,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [const Color(0xFF080F17), Colors.transparent]),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("COMPUTER OFFLINE", style: GoogleFonts.roboto(fontSize: 8, color: accent, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                const SizedBox(height: 4),
+                Text("Computer is disconnected", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return GlassContainer(
+      height: 90,
+      borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context)),
+          _navItem(Icons.folder_copy_rounded, "Files", false, () {}),
+          _navItem(Icons.settings_input_component_rounded, "Controls", false, () {}),
+          _navItem(Icons.tune_rounded, "Settings", false, () {}),
+        ],
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap]) {
+    final accent = const Color(0xFF6C63FF);
+    return GestureDetector(
+      onTap: tap,
+      child: Opacity(
+        opacity: active ? 1.0 : 0.4,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: active ? accent : Colors.white, size: 24),
+            const SizedBox(height: 4),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : Colors.white)),
+          ],
+        ),
+      ),
+    );
+  }
 }
