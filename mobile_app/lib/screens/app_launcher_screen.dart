@@ -76,13 +76,13 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
     final accent = const Color(0xFF6C63FF);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7),
       body: Stack(
         children: [
           SafeArea(
             child: Column(
               children: [
-                _buildTopBar(accent),
+                _buildTopBar(accent, isDark),
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
@@ -93,11 +93,7 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
                         const SizedBox(height: 8),
                         _buildSearchBox(isDark),
                         const SizedBox(height: 32),
-                        _buildSectionHeader("QUICK ACCESS", null, isDark),
-                        const SizedBox(height: 16),
-                        _buildQuickAccessGrid(accent, isDark),
-                        const SizedBox(height: 40),
-                        _buildSectionHeader("APPLICATIONS", _buildViewToggle(isDark), isDark),
+                        _buildSectionHeader("INSTALLED APPLICATIONS", _buildViewToggle(isDark), isDark),
                         const SizedBox(height: 16),
                         _isLoading
                           ? Center(child: Padding(padding: const EdgeInsets.all(40), child: CircularProgressIndicator(color: accent)))
@@ -116,7 +112,7 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
     );
   }
 
-  Widget _buildTopBar(Color accent) {
+  Widget _buildTopBar(Color accent, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
@@ -189,53 +185,13 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
   }
 
   Widget _toggleBtn(IconData icon, bool active, VoidCallback tap) {
+    final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
     return GestureDetector(
       onTap: tap,
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(color: active ? const Color(0xFF6C63FF).withOpacity(0.1) : Colors.transparent, borderRadius: BorderRadius.circular(8)),
-        child: Icon(icon, color: active ? const Color(0xFF6C63FF) : (Provider.of<ThemeService>(context, listen: false).isDarkMode ? Colors.white24 : Colors.black26), size: 16),
-      ),
-    );
-  }
-
-  Widget _buildQuickAccessGrid(Color accent, bool isDark) {
-    return Column(
-      children: [
-        _quickAccessItem("Direct Command", "Direct CLI Access", Icons.terminal_rounded, accent, isDark, () => Navigator.pushNamed(context, '/remote_view', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
-        const SizedBox(height: 12),
-        _quickAccessItem("File Storage", "Encrypted Sync", Icons.folder_zip_rounded, const Color(0xFFFFB786), isDark, () => Navigator.pushReplacementNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
-        const SizedBox(height: 12),
-        _quickAccessItem("Computer Stats", "System Health", Icons.analytics_rounded, const Color(0xFFC0C6DB), isDark, () => Navigator.pushNamed(context, '/processes', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
-      ],
-    );
-  }
-
-  Widget _quickAccessItem(String title, String sub, IconData icon, Color color, bool isDark, VoidCallback tap) {
-    return GestureDetector(
-      onTap: tap,
-      child: GlassContainer(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                  Text(sub, style: GoogleFonts.roboto(fontSize: 11, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
-                ],
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.1), size: 12),
-          ],
-        ),
+        child: Icon(icon, color: active ? const Color(0xFF6C63FF) : (isDark ? Colors.white24 : Colors.black26), size: 16),
       ),
     );
   }
@@ -255,6 +211,8 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
       itemCount: _filteredApps.length,
       itemBuilder: (context, index) {
         final app = _filteredApps[index];
+        final iconUrl = 'http://${widget.pcIpAddress}:5000/system/window-icon?path=${Uri.encodeComponent(app['path'])}&token=${widget.authToken}';
+
         return FadeInUp(
           delay: Duration(milliseconds: index * 20),
           child: GestureDetector(
@@ -266,7 +224,11 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
                   child: GlassContainer(
                     width: double.infinity,
                     child: Center(
-                      child: Icon(_getAppIcon(app['name']), color: accent.withOpacity(0.5), size: 32),
+                      child: Image.network(
+                        iconUrl,
+                        width: 32, height: 32,
+                        errorBuilder: (context, error, stackTrace) => Icon(Icons.rocket_launch_rounded, color: accent.withOpacity(0.5), size: 32),
+                      ),
                     ),
                   ),
                 ),
@@ -295,6 +257,8 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
       itemCount: _filteredApps.length,
       itemBuilder: (context, index) {
         final app = _filteredApps[index];
+        final iconUrl = 'http://${widget.pcIpAddress}:5000/system/window-icon?path=${Uri.encodeComponent(app['path'])}&token=${widget.authToken}';
+
         return FadeInUp(
           delay: Duration(milliseconds: index * 10),
           child: Padding(
@@ -305,7 +269,11 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    Icon(_getAppIcon(app['name']), color: accent.withOpacity(0.5), size: 24),
+                    Image.network(
+                      iconUrl,
+                      width: 24, height: 24,
+                      errorBuilder: (context, error, stackTrace) => Icon(Icons.rocket_launch_rounded, color: accent.withOpacity(0.5), size: 24),
+                    ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Text(app['name'], style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7))),
@@ -330,20 +298,9 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
     );
   }
 
-  IconData _getAppIcon(String name) {
-    final lowerName = name.toLowerCase();
-    if (lowerName.contains('code') || lowerName.contains('studio') || lowerName.contains('intellij')) return Icons.code_rounded;
-    if (lowerName.contains('browser') || lowerName.contains('chrome') || lowerName.contains('firefox')) return Icons.chrome_reader_mode_rounded;
-    if (lowerName.contains('chat') || lowerName.contains('signal') || lowerName.contains('discord') || lowerName.contains('messenger')) return Icons.chat_bubble_rounded;
-    if (lowerName.contains('music') || lowerName.contains('spotify') || lowerName.contains('audio')) return Icons.music_note_rounded;
-    if (lowerName.contains('manage') || lowerName.contains('settings')) return Icons.settings_rounded;
-    if (lowerName.contains('debug')) return Icons.bug_report_rounded;
-    if (lowerName.contains('security') || lowerName.contains('shield')) return Icons.shield_rounded;
-    return Icons.rocket_launch_rounded;
-  }
-
   Widget _buildBottomNav() {
-    final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
+    final theme = Provider.of<ThemeService>(context, listen: false);
+    final isDark = theme.isDarkMode;
     return GlassContainer(
       height: 90,
       borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
@@ -361,16 +318,17 @@ class _AppLauncherScreenState extends State<AppLauncherScreen> {
 
   Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
     final accent = const Color(0xFF6C63FF);
+    final inactiveColor = isDark ? Colors.white38 : Colors.black38;
     return GestureDetector(
       onTap: tap,
       child: Opacity(
-        opacity: active ? 1.0 : 0.4,
+        opacity: 1.0,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: active ? accent : (isDark ? Colors.white : Colors.black), size: 24),
+            Icon(icon, color: active ? accent : inactiveColor, size: 24),
             const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : (isDark ? Colors.white : Colors.black))),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : inactiveColor)),
           ],
         ),
       ),

@@ -91,7 +91,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
           ),
           _buildFloatingHeader(accent, isDark),
-          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav(isDark)),
+          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
         ],
       ),
     );
@@ -376,7 +376,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Widget _buildBottomNav(bool isDark) {
+  Widget _buildBottomNav() {
+    final theme = Provider.of<ThemeService>(context, listen: false);
+    final isDark = theme.isDarkMode;
     return GlassContainer(
       height: 90,
       borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),

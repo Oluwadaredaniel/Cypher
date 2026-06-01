@@ -23,7 +23,7 @@ class _ActivityTabState extends State<ActivityTab> {
 
   List<dynamic> get _filteredLogs {
     if (_activityFilter == "All Events") return widget.logs;
-    return widget.logs.where((log) => log['category'] == _activityFilter).toList();
+    return widget.logs.where((log) => (log['category'] ?? "").toString() == _activityFilter).toList();
   }
 
   @override
@@ -42,14 +42,18 @@ class _ActivityTabState extends State<ActivityTab> {
           ),
           const SizedBox(height: 48),
           if (_filteredLogs.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(100),
+            GlassContainer(
+              height: 400,
+              child: Center(
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.history_rounded, size: 64, color: widget.isDark ? Colors.white10 : Colors.black12),
                     const SizedBox(height: 16),
-                    Text("No activity matching your filter.", style: GoogleFonts.roboto(color: widget.isDark ? Colors.white24 : Colors.black26)),
+                    Text("No activity recorded yet.",
+                        style: GoogleFonts.roboto(color: widget.isDark ? Colors.white24 : Colors.black26, fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text("Interactions from your mobile app will appear here.",
+                        style: GoogleFonts.roboto(color: widget.isDark ? Colors.white10 : Colors.black12, fontSize: 12)),
                   ],
                 ),
               ),

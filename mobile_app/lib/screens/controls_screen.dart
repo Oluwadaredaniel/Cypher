@@ -35,6 +35,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
     super.initState();
     _fetchActiveWindow();
     _fetchStats();
+    _fetchVolume();
     _statsTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       _fetchActiveWindow();
       _fetchStats();
@@ -56,7 +57,18 @@ class _ControlsScreenState extends State<ControlsScreen> {
     } catch (_) {}
   }
 
+  Future<void> _fetchVolume() async {
+    try {
+      final res = await http.get(Uri.parse('http://${widget.pcIpAddress}:5000/media/volume/get'), headers: {'X-Auth-Token': widget.authToken});
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (mounted) setState(() => _volume = (data['level'] ?? 50).toDouble());
+      }
+    } catch (_) {}
+  }
+
   Future<void> _fetchStats() async {
+    if (mounted) setState(() => _isLoading = true);
     try {
       final res = await http.get(Uri.parse('http://${widget.pcIpAddress}:5000/system-stats'), headers: {'X-Auth-Token': widget.authToken});
       if (res.statusCode == 200) {
@@ -71,6 +83,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
         }
       }
     } catch (_) {}
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _sendCommand(String endpoint, [Map<String, dynamic>? body]) async {
@@ -87,6 +100,9 @@ class _ControlsScreenState extends State<ControlsScreen> {
             const SnackBar(content: Text("Command executed"), duration: Duration(seconds: 1)),
           );
         }
+        if (endpoint.contains("volume")) {
+          _fetchVolume();
+        }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -101,6 +117,30 @@ class _ControlsScreenState extends State<ControlsScreen> {
         );
       }
     }
+  }
+
+  void _showPowerConfirm(String title, String endpoint) {
+    final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(title, style: GoogleFonts.roboto(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+        content: Text("Are you sure you want to execute this power command?", style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("CANCEL")),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _sendCommand(endpoint);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text("EXECUTE"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -158,7 +198,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         decoration: BoxDecoration(
-          color: (isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7)).withOpacity(0.8),
+          color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.8),
           border: Border(bottom: BorderSide(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05))),
         ),
         child: Row(
@@ -183,7 +223,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
       children: [
         Text("System Tools", style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
         const SizedBox(height: 6),
-        Text("Manage apps, screenshots, and power.", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4))),
+        Text("Manage apps, and power.", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4))),
       ],
     );
   }
@@ -279,7 +319,13 @@ class _ControlsScreenState extends State<ControlsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text("SOUND CONTROL", style: GoogleFonts.roboto(fontSize: 10, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), letterSpacing: 2)),
-              Icon(Icons.volume_up_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), size: 20),
+              Row(
+                children: [
+                  _miniVolumeBtn(Icons.remove_rounded, () => _sendCommand('/media/volumedown'), isDark),
+                  const SizedBox(width: 12),
+                  _miniVolumeBtn(Icons.add_rounded, () => _sendCommand('/media/volumeup'), isDark),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -291,6 +337,23 @@ class _ControlsScreenState extends State<ControlsScreen> {
             setState(() => _micLevel = v);
           }, (v) {}, const Color(0xFFFFB786), isDark),
         ],
+      ),
+    );
+  }
+
+  Widget _miniVolumeBtn(IconData icon, VoidCallback tap, bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        tap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4), size: 18),
       ),
     );
   }
@@ -336,10 +399,10 @@ class _ControlsScreenState extends State<ControlsScreen> {
       childAspectRatio: 1.5,
       children: [
         _buildActionBtn("Mute Audio", Icons.volume_off_rounded, Colors.teal, () => _sendCommand('/media/mute'), isDark),
-        _buildActionBtn("Lock screen", Icons.lock_rounded, const Color(0xFFC0C6DB), () => _sendCommand('/power/lock'), isDark),
-        _buildActionBtn("Hibernate", Icons.snooze_rounded, const Color(0xFFADC6FF), () => _sendCommand('/power/hibernate'), isDark),
-        _buildActionBtn("Restart", Icons.restart_alt_rounded, const Color(0xFFFFB786), () => _sendCommand('/power/restart'), isDark),
-        _buildActionBtn("Shutdown", Icons.power_settings_new_rounded, Colors.redAccent, () => _sendCommand('/power/shutdown'), isDark),
+        _buildActionBtn("Lock screen", Icons.lock_rounded, const Color(0xFFC0C6DB), () => _showPowerConfirm("Lock PC?", '/power/lock'), isDark),
+        _buildActionBtn("Hibernate", Icons.snooze_rounded, const Color(0xFFADC6FF), () => _showPowerConfirm("Hibernate PC?", '/power/hibernate'), isDark),
+        _buildActionBtn("Restart", Icons.restart_alt_rounded, const Color(0xFFFFB786), () => _showPowerConfirm("Restart PC?", '/power/restart'), isDark),
+        _buildActionBtn("Shutdown", Icons.power_settings_new_rounded, Colors.redAccent, () => _showPowerConfirm("Shutdown PC?", '/power/shutdown'), isDark),
       ],
     );
   }
@@ -405,48 +468,11 @@ class _ControlsScreenState extends State<ControlsScreen> {
     );
   }
 
-  Future<void> _takeScreenshot() async {
-    HapticFeedback.mediumImpact();
-    setState(() => _isLoading = true);
-    try {
-      final res = await http.get(
-        Uri.parse('http://${widget.pcIpAddress}:5000/screenshot'),
-        headers: {'X-Auth-Token': widget.authToken},
-      ).timeout(const Duration(seconds: 10));
-
-      if (res.statusCode == 200) {
-        if (mounted) {
-          Navigator.pushNamed(context, '/image_editor', arguments: {
-            'imageFile': res.bodyBytes,
-            'pcIpAddress': widget.pcIpAddress,
-            'authToken': widget.authToken,
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to capture screen")),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
   Widget _buildSpecializedTools(Color accent, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text("SPECIALIZED TOOLS", style: GoogleFonts.roboto(fontSize: 10, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), letterSpacing: 2)),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: _buildToolTile("Screenshot", Icons.screenshot_monitor_rounded, _takeScreenshot, isDark)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildToolTile("Recording", Icons.videocam_rounded, () => Navigator.pushNamed(context, '/recorder', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
-          ],
-        ),
         const SizedBox(height: 16),
         Row(
           children: [
@@ -458,33 +484,9 @@ class _ControlsScreenState extends State<ControlsScreen> {
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildToolTile("Processes", Icons.list_rounded, () => Navigator.pushNamed(context, '/processes', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+            Expanded(child: _buildToolTile("Task Manager", Icons.list_rounded, () => Navigator.pushNamed(context, '/processes', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
             const SizedBox(width: 16),
-            Expanded(child: _buildToolTile("Tasks", Icons.task_alt_rounded, () => Navigator.pushNamed(context, '/active_tasks', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: _buildToolTile("Clipboard", Icons.assignment_return_rounded, () => Navigator.pushNamed(context, '/clipboard', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildToolTile("Phone Files", Icons.phone_android_rounded, () => Navigator.pushNamed(context, '/phone_browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: _buildToolTile("Alerts", Icons.notifications_active_rounded, () => Navigator.pushNamed(context, '/notifications', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildToolTile("Guest Mode", Icons.person_add_rounded, () => Navigator.pushNamed(context, '/guest', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: _buildToolTile("Editor", Icons.edit_note_rounded, () => Navigator.pushNamed(context, '/image_editor', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildToolTile("Remote View", Icons.visibility_rounded, () => Navigator.pushNamed(context, '/remote_view', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
+            Expanded(child: _buildToolTile("Close Apps", Icons.task_alt_rounded, () => Navigator.pushNamed(context, '/active_tasks', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark)),
           ],
         ),
       ],
@@ -509,7 +511,8 @@ class _ControlsScreenState extends State<ControlsScreen> {
   }
 
   Widget _buildBottomNav() {
-    final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
+    final theme = Provider.of<ThemeService>(context);
+    final isDark = theme.isDarkMode;
     return GlassContainer(
       height: 90,
       borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
@@ -527,16 +530,17 @@ class _ControlsScreenState extends State<ControlsScreen> {
 
   Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
     final accent = const Color(0xFF6C63FF);
+    final inactiveColor = isDark ? Colors.white38 : Colors.black38;
     return GestureDetector(
       onTap: tap,
       child: Opacity(
-        opacity: active ? 1.0 : 0.4,
+        opacity: 1.0,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: active ? accent : (isDark ? Colors.white : Colors.black), size: 24),
+            Icon(icon, color: active ? accent : inactiveColor, size: 24),
             const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : (isDark ? Colors.white : Colors.black))),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : inactiveColor)),
           ],
         ),
       ),

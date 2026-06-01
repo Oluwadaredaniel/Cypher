@@ -9,6 +9,7 @@ class SecurityTab extends StatefulWidget {
   final Color accent;
   final List<dynamic> sessions;
   final String pcIp;
+  final Function(String) onRevokeSession;
 
   const SecurityTab({
     super.key,
@@ -16,6 +17,7 @@ class SecurityTab extends StatefulWidget {
     required this.accent,
     required this.sessions,
     required this.pcIp,
+    required this.onRevokeSession,
   });
 
   @override
@@ -67,17 +69,20 @@ class _SecurityTabState extends State<SecurityTab> {
           _isGenerating = false;
         });
       } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to generate link. Check backend logs."))
+          );
+        }
         setState(() => _isGenerating = false);
       }
     } catch (e) {
-      if (mounted) setState(() => _isGenerating = false);
-    }
-  }
-
-  void _removeSession(String token) async {
-    final success = await _bridge.endGuestSession(token);
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Access Revoked")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Bridge Error: $e"))
+        );
+        setState(() => _isGenerating = false);
+      }
     }
   }
 
@@ -222,7 +227,6 @@ class _SecurityTabState extends State<SecurityTab> {
   }
 
   Widget _buildQuickConnectCard() {
-    // [LEGIT LOGIC] Default to a local IP landing page, not a placeholder website.
     String qrData = _generatedUrl ?? "http://${widget.pcIp}:5000/guest/access";
 
     return GlassContainer(
@@ -284,20 +288,31 @@ class _SecurityTabState extends State<SecurityTab> {
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(40),
-                child: Text("No active guest sessions.", style: GoogleFonts.roboto(color: widget.isDark ? Colors.white12 : Colors.black12)),
+                child: Column(
+                  children: [
+                    Icon(Icons.person_off_outlined, size: 48, color: widget.isDark ? Colors.white10 : Colors.black.withOpacity(0.1)),
+                    const SizedBox(height: 16),
+                    Text("No active guest sessions.", style: GoogleFonts.roboto(color: widget.isDark ? Colors.white12 : Colors.black12)),
+                  ],
+                ),
               ),
             )
           else
-            ...widget.sessions.map((s) => Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: _sessionItem(
-                "Guest - ${s['token'].substring(0, 8)}",
-                "Expires in ${s['time_remaining_seconds'] ~/ 60}m",
-                Icons.person_pin_circle_rounded,
-                s['is_active'] ?? true,
-                s['token'],
-              ),
-            )).toList(),
+            ...widget.sessions.map((s) {
+              final token = s['token']?.toString() ?? "";
+              final shortToken = token.length > 8 ? token.substring(0, 8) : token;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _sessionItem(
+                  "Guest - $shortToken",
+                  "Expires in ${(s['time_remaining_seconds'] ?? 0) ~/ 60}m",
+                  Icons.person_pin_circle_rounded,
+                  s['is_active'] ?? true,
+                  token,
+                ),
+              );
+            }).toList(),
         ],
       ),
     );
@@ -337,7 +352,7 @@ class _SecurityTabState extends State<SecurityTab> {
           ),
           const SizedBox(width: 12),
           TextButton(
-            onPressed: () => _removeSession(token),
+            onPressed: token.isEmpty ? null : () => widget.onRevokeSession(token),
             child: Text("Revoke", style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.redAccent.withOpacity(0.7))),
           ),
         ],

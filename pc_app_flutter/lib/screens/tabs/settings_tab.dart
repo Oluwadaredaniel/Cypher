@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../widgets/glass_container.dart';
 import '../../services/theme_service.dart';
+import '../../widgets/glass_container.dart';
 
-class SettingsTab extends StatelessWidget {
+class SettingsTab extends StatefulWidget {
   final Map<String, dynamic> settings;
   final bool isDark;
   final Color accent;
@@ -20,10 +20,55 @@ class SettingsTab extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final pcNameController = TextEditingController(text: settings['device_name'] ?? "WORKSYSTEM-01");
-    final portController = TextEditingController(text: (settings['server_port'] ?? 5000).toString());
+  State<SettingsTab> createState() => _SettingsTabState();
+}
 
+class _SettingsTabState extends State<SettingsTab> {
+  late TextEditingController _pcNameController;
+  late int _batteryThreshold;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pcNameController = TextEditingController(
+      text: widget.settings['device_name'] ?? "WORKSYSTEM-01",
+    );
+    _batteryThreshold = widget.settings['battery_alert_threshold'] ?? 20;
+  }
+
+  @override
+  void didUpdateWidget(SettingsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only update controller if the setting changed externally and we aren't typing
+    if (widget.settings['device_name'] != oldWidget.settings['device_name'] &&
+        widget.settings['device_name'] != _pcNameController.text) {
+      _pcNameController.text = widget.settings['device_name'] ?? "";
+    }
+    if (widget.settings['battery_alert_threshold'] != oldWidget.settings['battery_alert_threshold']) {
+      _batteryThreshold = widget.settings['battery_alert_threshold'] ?? 20;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pcNameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveName() async {
+    setState(() => _isLoading = true);
+    await widget.onUpdateSetting('device_name', _pcNameController.text);
+    if (mounted) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("PC name updated successfully")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(40),
       child: Column(
@@ -31,6 +76,7 @@ class SettingsTab extends StatelessWidget {
         children: [
           _buildHeader("System Preferences", "Configure your security and behavior."),
           const SizedBox(height: 32),
+
           _buildBentoSection(
             icon: Icons.computer_rounded,
             title: "General Identity",
@@ -38,66 +84,99 @@ class SettingsTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("PC NAME", style: GoogleFonts.roboto(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
+                Text("PC NAME", style: GoogleFonts.roboto(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: pcNameController,
-                  onSubmitted: (v) => onUpdateSetting('device_name', v),
-                  style: GoogleFonts.roboto(color: isDark ? Colors.white : Colors.black),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.02),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _pcNameController,
+                        style: GoogleFonts.roboto(color: widget.isDark ? Colors.white : Colors.black),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: widget.isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.02),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          hintText: "Enter PC Name",
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _saveName,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: widget.accent,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: _isLoading
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text("Save", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+
           const SizedBox(height: 24),
+
+          _buildBentoSection(
+            icon: Icons.battery_alert_rounded,
+            title: "Battery Alerts",
+            sub: "Threshold for mobile notifications.",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("ALERT AT $_batteryThreshold%", style: GoogleFonts.roboto(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
+                    Text("Range: 10% - 50%", style: GoogleFonts.roboto(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26)),
+                  ],
+                ),
+                Slider(
+                  value: _batteryThreshold.toDouble(),
+                  min: 10, max: 50,
+                  divisions: 8,
+                  activeColor: widget.accent,
+                  onChanged: (v) => setState(() => _batteryThreshold = v.toInt()),
+                  onChangeEnd: (v) => widget.onUpdateSetting('battery_alert_threshold', v.toInt()),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
           Row(
             children: [
               Expanded(
                 child: _buildBentoSection(
                   icon: Icons.power_settings_new_rounded,
-                  title: "Startup Behavior",
-                  sub: "Background services.",
+                  title: "Startup",
+                  sub: "Auto-launch.",
                   child: _settingsToggle(
-                      "Launch on Start",
-                      settings['launch_on_startup'] ?? true,
-                      (v) => onUpdateSetting('launch_on_startup', v)),
+                    "Launch on Start",
+                    widget.settings['launch_on_startup'] ?? true,
+                    (v) => widget.onUpdateSetting('launch_on_startup', v)
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: _buildBentoSection(
                   icon: Icons.dark_mode_rounded,
-                  title: "Appearance",
-                  sub: "UI theme elements.",
+                  title: "Theme",
+                  sub: "UI Appearance.",
                   child: _settingsToggle(
-                      "Night Protocol",
-                      themeService.isDarkMode,
-                      (v) => themeService.toggleTheme()),
+                    "Night Protocol",
+                    widget.themeService.isDarkMode,
+                    (v) => widget.themeService.toggleTheme()
+                  ),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 24),
-          _buildBentoSection(
-            icon: Icons.router_rounded,
-            title: "Network Connectivity",
-            sub: "Manage visibility on your local network.",
-            child: Row(
-              children: [
-                Expanded(
-                  child: _settingsToggle(
-                      "Discovery Mode",
-                      settings['ip_discovery'] ?? true,
-                      (v) => onUpdateSetting('ip_discovery', v),
-                      desc: "Allow other devices to find this SYSTEM"),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -112,12 +191,12 @@ class SettingsTab extends StatelessWidget {
           children: [
             Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
             const SizedBox(width: 12),
-            Text("LIVE CONNECTION", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white24 : Colors.black26, letterSpacing: 2)),
+            Text("LIVE CONNECTION", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white24 : Colors.black26, letterSpacing: 2)),
           ],
         ),
         const SizedBox(height: 8),
-        Text(title, style: GoogleFonts.roboto(fontSize: 32, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
-        Text(sub, style: GoogleFonts.roboto(fontSize: 14, color: isDark ? Colors.white24 : Colors.black38)),
+        Text(title, style: GoogleFonts.roboto(fontSize: 32, fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white : Colors.black)),
+        Text(sub, style: GoogleFonts.roboto(fontSize: 14, color: widget.isDark ? Colors.white24 : Colors.black38)),
       ],
     );
   }
@@ -130,13 +209,13 @@ class SettingsTab extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: accent, size: 20),
+              Icon(icon, color: widget.accent, size: 20),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                  Text(sub, style: GoogleFonts.roboto(fontSize: 12, color: isDark ? Colors.white24 : Colors.black38)),
+                  Text(title, style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black)),
+                  Text(sub, style: GoogleFonts.roboto(fontSize: 12, color: widget.isDark ? Colors.white24 : Colors.black38)),
                 ],
               ),
             ],
@@ -148,28 +227,12 @@ class SettingsTab extends StatelessWidget {
     );
   }
 
-  Widget _settingsToggle(String title, bool val, Function(bool) tap, {String? desc}) {
+  Widget _settingsToggle(String title, bool val, Function(bool) tap) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black)),
-              if (desc != null)
-                Text(desc,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.roboto(fontSize: 11, color: isDark ? Colors.white24 : Colors.black38)),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Switch.adaptive(value: val, onChanged: tap, activeColor: accent),
+        Text(title, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.white : Colors.black)),
+        Switch.adaptive(value: val, onChanged: tap, activeColor: widget.accent),
       ],
     );
   }

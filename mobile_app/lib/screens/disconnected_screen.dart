@@ -62,23 +62,27 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
   }
 
   void _showManualIpEntry() {
+    final theme = Provider.of<ThemeService>(context, listen: false);
+    final isDark = theme.isDarkMode;
     final controller = TextEditingController(text: widget.pcIpAddress);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Update IP Address", style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text("Update IP Address", style: GoogleFonts.roboto(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: controller,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
+          style: TextStyle(color: isDark ? Colors.white : Colors.black),
+          decoration: InputDecoration(
             hintText: "e.g. 192.168.1.10",
-            hintStyle: TextStyle(color: Colors.white24),
+            hintStyle: TextStyle(color: (isDark ? Colors.white : Colors.black).withOpacity(0.24)),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1))),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text("CANCEL", style: GoogleFonts.roboto(color: Colors.white24))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text("CANCEL", style: GoogleFonts.roboto(color: (isDark ? Colors.white : Colors.black).withOpacity(0.24)))),
           ElevatedButton(
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
@@ -92,7 +96,7 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
-            child: const Text("UPDATE & RETRY"),
+            child: const Text("UPDATE & RETRY", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -101,61 +105,66 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
+    final theme = Provider.of<ThemeService>(context);
+    final isDark = theme.isDarkMode;
     final accent = const Color(0xFF6C63FF);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF080F17),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                _buildTopBar(accent),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 16),
-                        _buildHeroCard(accent),
-                        const SizedBox(height: 24),
-                        _buildDiagnosticLog(),
-                        const SizedBox(height: 24),
-                        _buildQuickFixCard(),
-                        const SizedBox(height: 24),
-                        _buildTopologyCard(accent),
-                        const SizedBox(height: 120),
-                      ],
+    return PopScope(
+      canPop: false, // Prevent back button to broken state
+      child: Scaffold(
+        backgroundColor: isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7),
+        body: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  _buildTopBar(accent),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 16),
+                          _buildHeroCard(accent, isDark),
+                          const SizedBox(height: 24),
+                          _buildDiagnosticLog(isDark),
+                          const SizedBox(height: 24),
+                          _buildQuickFixCard(isDark),
+                          const SizedBox(height: 24),
+                          _buildTopologyCard(accent, isDark),
+                          const SizedBox(height: 120),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          _buildFloatingHeader(accent),
-          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
-        ],
+            _buildFloatingHeader(accent, isDark),
+            Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav(isDark)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildFloatingHeader(Color accent) {
+  Widget _buildFloatingHeader(Color accent, bool isDark) {
     return Positioned(
       top: 0, left: 0, right: 0,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         decoration: BoxDecoration(
-          color: const Color(0xFF080F17).withOpacity(0.8),
-          border: const Border(bottom: BorderSide(color: Colors.white10)),
+          color: (isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7)).withOpacity(0.8),
+          border: Border(bottom: BorderSide(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05))),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               children: [
-                const Icon(Icons.shield_moon_outlined, color: Color(0xFF6C63FF), size: 24),
+                Icon(Icons.shield_moon_outlined, color: accent, size: 24),
                 const SizedBox(width: 12),
                 Text("CYPHER", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
               ],
@@ -169,7 +178,7 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
 
   Widget _buildTopBar(Color accent) => const SizedBox(height: 64);
 
-  Widget _buildHeroCard(Color accent) {
+  Widget _buildHeroCard(Color accent, bool isDark) {
     return GlassContainer(
       padding: EdgeInsets.zero,
       child: Stack(
@@ -220,12 +229,12 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
                   ],
                 ),
                 const SizedBox(height: 32),
-                Text("Connection Lost", style: GoogleFonts.roboto(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                Text("Connection Lost", style: GoogleFonts.roboto(fontSize: 24, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                 const SizedBox(height: 12),
                 RichText(
                   textAlign: TextAlign.center,
                   text: TextSpan(
-                    style: GoogleFonts.roboto(fontSize: 14, color: Colors.white38),
+                    style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.38)),
                     children: [
                       const TextSpan(text: "We can't reach your computer "),
                       TextSpan(text: "right now", style: GoogleFonts.roboto(color: accent, fontWeight: FontWeight.bold)),
@@ -252,7 +261,7 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
                           children: [
                             const Icon(Icons.sync_rounded, color: Colors.white),
                             const SizedBox(width: 12),
-                            Text("Try Again", style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.bold)),
+                            Text("Try Again", style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
                           ],
                         ),
                   ),
@@ -264,7 +273,7 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
                 ),
                 TextButton(
                   onPressed: () {},
-                  child: Text("Network Diagnostics", style: GoogleFonts.roboto(fontSize: 14, color: Colors.white24, fontWeight: FontWeight.bold)),
+                  child: Text("Network Diagnostics", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -274,7 +283,7 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
     );
   }
 
-  Widget _buildDiagnosticLog() {
+  Widget _buildDiagnosticLog(bool isDark) {
     return GlassContainer(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -284,40 +293,40 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
             children: [
               const Icon(Icons.terminal_rounded, color: Color(0xFF6C63FF), size: 20),
               const SizedBox(width: 12),
-              Text("What happened?", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text("What happened?", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
             ],
           ),
           const SizedBox(height: 20),
-          _logEntry("14:22:09", "Connection timed out", "The computer didn't respond in time.", Colors.redAccent),
+          _logEntry("14:22:09", "Connection timed out", "The computer didn't respond in time.", Colors.redAccent, isDark),
           const SizedBox(height: 16),
-          _logEntry("14:21:55", "Address changed", "The computer address has changed.", const Color(0xFFFFB786)),
+          _logEntry("14:21:55", "Address changed", "The computer address has changed.", const Color(0xFFFFB786), isDark),
         ],
       ),
     );
   }
 
-  Widget _logEntry(String time, String error, String detail, Color color) {
+  Widget _logEntry(String time, String error, String detail, Color color, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.black26,
+        color: (isDark ? Colors.white : Colors.black).withOpacity(0.02),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("TIME: $time", style: GoogleFonts.roboto(fontSize: 9, color: Colors.white12)),
+          Text("TIME: $time", style: GoogleFonts.roboto(fontSize: 9, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
           const SizedBox(height: 4),
           Text(error, style: GoogleFonts.roboto(fontSize: 11, color: color, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text(detail, style: GoogleFonts.roboto(fontSize: 12, color: Colors.white38)),
+          Text(detail, style: GoogleFonts.roboto(fontSize: 12, color: (isDark ? Colors.white : Colors.black).withOpacity(0.38))),
         ],
       ),
     );
   }
 
-  Widget _buildQuickFixCard() {
+  Widget _buildQuickFixCard(bool isDark) {
     return GlassContainer(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -327,33 +336,33 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
             children: [
               const Icon(Icons.info_outline_rounded, color: Color(0xFFFFB786), size: 20),
               const SizedBox(width: 12),
-              Text("Quick Fix", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text("Quick Fix", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
             ],
           ),
           const SizedBox(height: 16),
-          _fixItem("Ensure Cypher PC App is running."),
-          _fixItem("Check if PC and Phone are on same WiFi."),
-          _fixItem("Verify IP address hasn't changed."),
+          _fixItem("Ensure Cypher PC App is running.", isDark),
+          _fixItem("Check if PC and Phone are on same WiFi.", isDark),
+          _fixItem("Verify IP address hasn't changed.", isDark),
         ],
       ),
     );
   }
 
-  Widget _fixItem(String text) {
+  Widget _fixItem(String text, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.check_circle_rounded, color: Colors.white10, size: 14),
+          Icon(Icons.check_circle_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.05), size: 14),
           const SizedBox(width: 12),
-          Expanded(child: Text(text, style: GoogleFonts.roboto(fontSize: 13, color: Colors.white38))),
+          Expanded(child: Text(text, style: GoogleFonts.roboto(fontSize: 13, color: (isDark ? Colors.white : Colors.black).withOpacity(0.38)))),
         ],
       ),
     );
   }
 
-  Widget _buildTopologyCard(Color accent) {
+  Widget _buildTopologyCard(Color accent, bool isDark) {
     return Container(
       width: double.infinity,
       height: 160,
@@ -370,7 +379,7 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [const Color(0xFF080F17), Colors.transparent]),
+              gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7), Colors.transparent]),
             ),
           ),
           Padding(
@@ -381,7 +390,7 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
               children: [
                 Text("COMPUTER OFFLINE", style: GoogleFonts.roboto(fontSize: 8, color: accent, fontWeight: FontWeight.bold, letterSpacing: 2)),
                 const SizedBox(height: 4),
-                Text("Computer is disconnected", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                Text("Computer is disconnected", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
               ],
             ),
           ),
@@ -390,34 +399,35 @@ class _DisconnectedScreenState extends State<DisconnectedScreen> with SingleTick
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav(bool isDark) {
     return GlassContainer(
       height: 90,
       borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context)),
-          _navItem(Icons.folder_copy_rounded, "Files", false, () {}),
-          _navItem(Icons.settings_input_component_rounded, "Controls", false, () {}),
-          _navItem(Icons.tune_rounded, "Settings", false, () {}),
+          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context), isDark),
+          _navItem(Icons.folder_copy_rounded, "Files", false, () {}, isDark),
+          _navItem(Icons.settings_input_component_rounded, "Controls", false, () {}, isDark),
+          _navItem(Icons.tune_rounded, "Settings", false, () {}, isDark),
         ],
       ),
     );
   }
 
-  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap]) {
+  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
     final accent = const Color(0xFF6C63FF);
+    final inactiveColor = isDark ? Colors.white38 : Colors.black38;
     return GestureDetector(
       onTap: tap,
       child: Opacity(
-        opacity: active ? 1.0 : 0.4,
+        opacity: active ? 1.0 : 1.0,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: active ? accent : Colors.white, size: 24),
+            Icon(icon, color: active ? accent : inactiveColor, size: 24),
             const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : Colors.white)),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : inactiveColor)),
           ],
         ),
       ),

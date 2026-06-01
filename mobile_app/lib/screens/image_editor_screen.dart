@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,18 +22,20 @@ class ImageEditorScreen extends StatefulWidget {
 }
 
 class _ImageEditorScreenState extends State<ImageEditorScreen> {
-  // State variables
   String _activeTool = "Select";
   Color _activeColor = const Color(0xFF6C63FF);
-  double _zoomScale = 0.85;
+  double _zoomScale = 1.0;
   double _brightness = 0.0;
   double _contrast = 1.0;
 
-  // Drawing state
   List<DrawnPath> _paths = [];
   DrawnPath? _currentPath;
 
-  // Tools mapping
+  // Crop state
+  Rect _cropRect = const Rect.fromLTWH(50, 50, 200, 200);
+  bool _isResizingCrop = false;
+  String? _currentHandle;
+
   final List<Map<String, dynamic>> _tools = [
     {"id": "Select", "icon": Icons.near_me_rounded},
     {"id": "Crop", "icon": Icons.crop_rounded},
@@ -52,9 +55,32 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
     }
   }
 
+  void _updateCropRect(Offset delta, String? handle) {
+    setState(() {
+      if (handle == null) {
+        _cropRect = _cropRect.shift(delta);
+      } else {
+        double left = _cropRect.left;
+        double top = _cropRect.top;
+        double right = _cropRect.right;
+        double bottom = _cropRect.bottom;
+
+        if (handle.contains('top')) top += delta.dy;
+        if (handle.contains('bottom')) bottom += delta.dy;
+        if (handle.contains('left')) left += delta.dx;
+        if (handle.contains('right')) right += delta.dx;
+
+        // Ensure minimum size
+        if (right - left < 50) return;
+        if (bottom - top < 50) return;
+
+        _cropRect = Rect.fromLTRB(left, top, right, bottom);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Provider.of<ThemeService>(context);
     final accent = const Color(0xFF6C63FF);
 
     return Scaffold(
@@ -67,7 +93,6 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
               children: [
                 _buildSidebar(accent),
                 Expanded(child: _buildCanvasArea(accent)),
-                if (MediaQuery.of(context).size.width > 900) _buildPropertiesPanel(accent),
               ],
             ),
           ),
@@ -99,7 +124,7 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
               const SizedBox(width: 16),
               Container(width: 1, height: 16, color: Colors.white10),
               const SizedBox(width: 16),
-              Text("EDITOR_v1.PNG", style: GoogleFonts.roboto(fontSize: 10, color: Colors.white24)),
+              Text("IMAGE_EDITOR.PNG", style: GoogleFonts.roboto(fontSize: 10, color: Colors.white24)),
             ],
           ),
           Row(
@@ -109,7 +134,8 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.mediumImpact();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Image exported successfully")));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Changes applied and saved")));
+                  Navigator.pop(context);
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -163,9 +189,9 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
           const SizedBox(height: 20),
           ..._tools.map((t) => _toolBtn(t['id'], t['icon'], accent)).toList(),
           const Spacer(),
-          _colorCircle(accent, true),
-          _colorCircle(const Color(0xFFFFB786), false),
-          _colorCircle(Colors.redAccent, false),
+          _colorCircle(accent, _activeColor == accent),
+          _colorCircle(const Color(0xFFFFB786), _activeColor == const Color(0xFFFFB786)),
+          _colorCircle(Colors.redAccent, _activeColor == Colors.redAccent),
           const SizedBox(height: 32),
         ],
       ),
@@ -206,81 +232,96 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
 
   Widget _buildCanvasArea(Color accent) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D141D),
-        image: DecorationImage(
-          image: AssetImage('assets/images/canvas_dot.png'), // Fallback to pattern
-          repeat: ImageRepeat.repeat,
-          opacity: 0.1,
-        ),
-      ),
+      decoration: const BoxDecoration(color: Color(0xFF0D141D)),
       child: Center(
-        child: InteractiveViewer(
-          minScale: 0.1, maxScale: 4.0,
-          child: GestureDetector(
-            onPanStart: (details) {
-              if (_activeTool == "Draw") {
-                _currentPath = DrawnPath(color: _activeColor, points: [details.localPosition]);
-              }
-            },
-            onPanUpdate: (details) {
-              if (_activeTool == "Draw" && _currentPath != null) {
-                setState(() {
-                  _currentPath!.points.add(details.localPosition);
-                });
-              }
-            },
-            onPanEnd: (details) {
-              if (_activeTool == "Draw" && _currentPath != null) {
-                setState(() {
-                  _paths.add(_currentPath!);
-                  _currentPath = null;
-                });
-              }
-            },
-            child: Stack(
-              children: [
-                // The Image with Adjustments
-                ColorFiltered(
-                  colorFilter: ColorFilter.matrix([
-                    _contrast, 0, 0, 0, _brightness * 255,
-                    0, _contrast, 0, 0, _brightness * 255,
-                    0, 0, _contrast, 0, _brightness * 255,
-                    0, 0, 0, 1, 0,
-                  ]),
-                  child: Hero(
-                    tag: 'editor-image',
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF192029),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: widget.imageFile is File
-                          ? Image.file(widget.imageFile, fit: BoxFit.contain)
-                          : widget.imageFile is Uint8List
-                              ? Image.memory(widget.imageFile, fit: BoxFit.contain)
-                              : Image.network("https://lh3.googleusercontent.com/aida-public/AB6AXuAVlrajdi-GO-ocIj5JIDZdJNedpuOgWk1g6-f76fuX-ikzXIzvqWWsJVOZ4ONrUjx_0eY3pOEFriGSVuEiuz_5IeKOOXF7Yiu6LFBCNhzgCmDIvPcr40oEZJ9UdUW6SY7H8JoGL_sOONmKxWf1j96Mrtp8m0t-taWSbacMHsK449QMUDM2bVPiFc3RujUDiLmuw564lD0CRYjGL5poFxWM3hGrSF0DrHxTwSr4qGZgEhV2UDTdgZ6ZyAqZezBcQvcN-du5puwPjCs"),
-                      ),
-                    ),
+        child: GestureDetector(
+          onPanStart: (details) {
+            if (_activeTool == "Draw") {
+              _currentPath = DrawnPath(color: _activeColor, points: [details.localPosition]);
+            } else if (_activeTool == "Crop") {
+              _checkCropHandle(details.localPosition);
+            }
+          },
+          onPanUpdate: (details) {
+            if (_activeTool == "Draw" && _currentPath != null) {
+              setState(() => _currentPath!.points.add(details.localPosition));
+            } else if (_activeTool == "Crop") {
+              _updateCropRect(details.delta, _currentHandle);
+            }
+          },
+          onPanEnd: (details) {
+            if (_activeTool == "Draw" && _currentPath != null) {
+              setState(() {
+                _paths.add(_currentPath!);
+                _currentPath = null;
+              });
+            } else if (_activeTool == "Crop") {
+              _currentHandle = null;
+            }
+          },
+          child: Stack(
+            children: [
+              // Background Image
+              ColorFiltered(
+                colorFilter: ColorFilter.matrix([
+                  _contrast, 0, 0, 0, _brightness * 255,
+                  0, _contrast, 0, 0, _brightness * 255,
+                  0, 0, _contrast, 0, _brightness * 255,
+                  0, 0, 0, 1, 0,
+                ]),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(color: const Color(0xFF192029), borderRadius: BorderRadius.circular(12)),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _buildImageSource(),
                   ),
                 ),
+              ),
 
-                // Drawing Layer
+              // Annotation Layer
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: CanvasPainter(paths: _paths, currentPath: _currentPath),
+                ),
+              ),
+
+              // Crop Overlay
+              if (_activeTool == "Crop")
                 Positioned.fill(
                   child: CustomPaint(
-                    painter: CanvasPainter(paths: _paths, currentPath: _currentPath),
+                    painter: CropPainter(cropRect: _cropRect),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildImageSource() {
+    if (widget.imageFile is File) return Image.file(widget.imageFile, fit: BoxFit.contain);
+    if (widget.imageFile is Uint8List) return Image.memory(widget.imageFile, fit: BoxFit.contain);
+    if (widget.imageFile is String) {
+       return Image.network(
+        widget.imageFile,
+        headers: {'X-Auth-Token': widget.authToken},
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 50, color: Colors.white24),
+      );
+    }
+    return const Icon(Icons.image_not_supported, size: 50, color: Colors.white24);
+  }
+
+  void _checkCropHandle(Offset localPosition) {
+    const handleSize = 20.0;
+    if ((localPosition - _cropRect.topLeft).distance < handleSize) _currentHandle = "topleft";
+    else if ((localPosition - _cropRect.topRight).distance < handleSize) _currentHandle = "topright";
+    else if ((localPosition - _cropRect.bottomLeft).distance < handleSize) _currentHandle = "bottomleft";
+    else if ((localPosition - _cropRect.bottomRight).distance < handleSize) _currentHandle = "bottomright";
+    else if (_cropRect.contains(localPosition)) _currentHandle = null; // Move
+    else _currentHandle = "none"; // Outside
   }
 
   Widget _buildBottomActions(Color accent) {
@@ -294,124 +335,15 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _bottomIcon(Icons.zoom_out_rounded),
-          const SizedBox(width: 12),
+          IconButton(icon: const Icon(Icons.zoom_out_rounded, color: Colors.white24), onPressed: () => setState(() => _zoomScale -= 0.1)),
           Text("${(_zoomScale * 100).toInt()}%", style: GoogleFonts.roboto(fontSize: 12, color: Colors.white38)),
-          const SizedBox(width: 12),
-          _bottomIcon(Icons.zoom_in_rounded),
+          IconButton(icon: const Icon(Icons.zoom_in_rounded, color: Colors.white24), onPressed: () => setState(() => _zoomScale += 0.1)),
           const SizedBox(width: 32),
           Container(width: 1, height: 24, color: Colors.white10),
           const SizedBox(width: 32),
-          _bottomIcon(Icons.layers_rounded, label: "Layers"),
-          const SizedBox(width: 32),
-          _bottomIcon(Icons.dark_mode_rounded),
-        ],
-      ),
-    );
-  }
-
-  Widget _bottomIcon(IconData icon, {String? label}) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white24, size: 20),
-        if (label != null) ...[
+          Icon(Icons.layers_rounded, color: accent, size: 20),
           const SizedBox(width: 8),
-          Text(label, style: GoogleFonts.roboto(fontSize: 12, color: Colors.white24)),
-        ]
-      ],
-    );
-  }
-
-  Widget _buildPropertiesPanel(Color accent) {
-    return Container(
-      width: 280,
-      decoration: const BoxDecoration(
-        color: Color(0xFF080F17),
-        border: Border(left: BorderSide(color: Colors.white10)),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("ADJUSTMENT", style: GoogleFonts.roboto(fontSize: 10, color: Colors.white24, letterSpacing: 2)),
-          const SizedBox(height: 24),
-          _propertySlider("Brightness", _brightness, -1.0, 1.0, (v) => setState(() => _brightness = v)),
-          const SizedBox(height: 24),
-          _propertySlider("Contrast", _contrast, 0.5, 2.0, (v) => setState(() => _contrast = v)),
-          const SizedBox(height: 40),
-          Text("ANNOTATION STYLE", style: GoogleFonts.roboto(fontSize: 10, color: Colors.white24, letterSpacing: 2)),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(child: _styleBtn("Pencil", Icons.edit_rounded, true, accent)),
-              const SizedBox(width: 12),
-              Expanded(child: _styleBtn("Brush", Icons.brush_rounded, false, accent)),
-            ],
-          ),
-          const Spacer(),
-          GlassContainer(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline_rounded, color: Color(0xFFFFB786), size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Smart Guide", style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.bold)),
-                      Text("Snapping is active", style: GoogleFonts.roboto(fontSize: 11, color: Colors.white24)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _propertySlider(String label, double val, double min, double max, Function(double) onChanged) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: GoogleFonts.roboto(fontSize: 13, color: Colors.white70)),
-            Text(val.toStringAsFixed(1), style: GoogleFonts.roboto(fontSize: 12, color: const Color(0xFF6C63FF))),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SliderTheme(
-          data: SliderThemeData(
-            trackHeight: 2,
-            activeTrackColor: const Color(0xFF6C63FF),
-            inactiveTrackColor: Colors.white10,
-            thumbColor: Colors.white,
-            overlayColor: const Color(0xFF6C63FF).withOpacity(0.1),
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-          ),
-          child: Slider(value: val, min: min, max: max, onChanged: onChanged),
-        ),
-      ],
-    );
-  }
-
-  Widget _styleBtn(String label, IconData icon, bool active, Color accent) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: active ? accent.withOpacity(0.1) : Colors.white.withOpacity(0.02),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: active ? accent.withOpacity(0.3) : Colors.white.withOpacity(0.05)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: active ? accent : Colors.white24, size: 20),
-          const SizedBox(height: 4),
-          Text(label, style: GoogleFonts.roboto(fontSize: 8, color: active ? Colors.white : Colors.white24)),
+          Text("LAYER 0", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white38)),
         ],
       ),
     );
@@ -427,36 +359,53 @@ class DrawnPath {
 class CanvasPainter extends CustomPainter {
   final List<DrawnPath> paths;
   final DrawnPath? currentPath;
-
   CanvasPainter({required this.paths, this.currentPath});
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paint = Paint()..strokeWidth = 3.0..strokeCap = StrokeCap.round..style = PaintingStyle.stroke;
     for (var path in paths) {
-      _drawPath(canvas, path);
+      paint.color = path.color;
+      if (path.points.length < 2) continue;
+      for (int i = 0; i < path.points.length - 1; i++) {
+        canvas.drawLine(path.points[i], path.points[i + 1], paint);
+      }
     }
-    if (currentPath != null) {
-      _drawPath(canvas, currentPath!);
+    if (currentPath != null && currentPath!.points.length >= 2) {
+      paint.color = currentPath!.color;
+      for (int i = 0; i < currentPath!.points.length - 1; i++) {
+        canvas.drawLine(currentPath!.points[i], currentPath!.points[i + 1], paint);
+      }
     }
-  }
-
-  void _drawPath(Canvas canvas, DrawnPath drawnPath) {
-    if (drawnPath.points.length < 2) return;
-
-    final paint = Paint()
-      ..color = drawnPath.color
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    path.moveTo(drawnPath.points.first.dx, drawnPath.points.first.dy);
-    for (var i = 1; i < drawnPath.points.length; i++) {
-      path.lineTo(drawnPath.points[i].dx, drawnPath.points[i].dy);
-    }
-    canvas.drawPath(path, paint);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class CropPainter extends CustomPainter {
+  final Rect cropRect;
+  CropPainter({required this.cropRect});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black.withOpacity(0.5)..style = PaintingStyle.fill;
+
+    // Dim background outside crop
+    canvas.drawPath(Path.combine(PathOperation.difference, Path()..addRect(Offset.zero & size), Path()..addRect(cropRect)), paint);
+
+    // Draw crop border
+    final borderPaint = Paint()..color = const Color(0xFF6C63FF)..strokeWidth = 2.0..style = PaintingStyle.stroke;
+    canvas.drawRect(cropRect, borderPaint);
+
+    // Draw handles
+    final handlePaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
+    canvas.drawCircle(cropRect.topLeft, 6, handlePaint);
+    canvas.drawCircle(cropRect.topRight, 6, handlePaint);
+    canvas.drawCircle(cropRect.bottomLeft, 6, handlePaint);
+    canvas.drawCircle(cropRect.bottomRight, 6, handlePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CropPainter oldDelegate) => true;
 }

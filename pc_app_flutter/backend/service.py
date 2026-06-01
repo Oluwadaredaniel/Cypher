@@ -1,6 +1,8 @@
 import os
 import sys
 
+# Eventlet monkey patching is unnecessary for 'threading' mode on Windows
+# and often causes issues in packaged executables on Python 3.12
 import threading
 import time
 import json
@@ -105,7 +107,7 @@ def get_pc_name():
 def start_server(flask_app, socketio):
     def run():
         log.info("Starting High-Performance Node on port 5000...")
-        socketio.run(flask_app, host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+        socketio.run(flask_app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
     threading.Thread(target=run, daemon=True).start()
 
 def main():

@@ -36,6 +36,7 @@ class FilePreviewScreen extends StatefulWidget {
 
 class _FilePreviewScreenState extends State<FilePreviewScreen> {
   bool _isDownloading = false;
+  double _downloadProgress = 0.0;
   String? _textContent;
   bool _isLoadingContent = false;
 
@@ -69,33 +70,65 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
       }
     }
 
-    setState(() => _isDownloading = true);
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+    });
+
     try {
       final url = 'http://${widget.pcIpAddress}:5000/files/download?path=${Uri.encodeComponent(widget.filePath)}';
-      final res = await http.get(Uri.parse(url), headers: {'X-Auth-Token': widget.authToken}).timeout(const Duration(minutes: 5));
 
-      if (res.statusCode == 200) {
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers['X-Auth-Token'] = widget.authToken;
+
+      final client = http.Client();
+      final response = await client.send(request).timeout(const Duration(minutes: 15));
+
+      if (response.statusCode == 200) {
         Directory? dir;
         if (Platform.isAndroid) {
           dir = Directory('/storage/emulated/0/Download');
+          if (!await dir.exists()) dir = await getExternalStorageDirectory();
         } else {
           dir = await getDownloadsDirectory();
         }
 
-        if (dir == null || !await dir.exists()) {
-          dir = await getApplicationDocumentsDirectory();
-        }
+        if (dir == null) dir = await getApplicationDocumentsDirectory();
 
         final file = File('${dir.path}/${widget.fileName}');
-        await file.writeAsBytes(res.bodyBytes);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved to Downloads"), backgroundColor: Color(0xFF10B981)));
+        final IOSink sink = file.openWrite();
+
+        int downloaded = 0;
+        final int total = response.contentLength ?? widget.fileSize;
+
+        await response.stream.forEach((chunk) {
+          sink.add(chunk);
+          downloaded += chunk.length;
+          if (mounted && total > 0) {
+            setState(() => _downloadProgress = downloaded / total);
+          }
+        });
+
+        await sink.close();
+        client.close();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Saved to Downloads: ${widget.fileName}"),
+              backgroundColor: const Color(0xFF10B981)
+            )
+          );
+        }
       } else {
+        client.close();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Download failed. PC rejected request."), backgroundColor: Colors.orange));
       }
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection lost during download"), backgroundColor: Colors.redAccent));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.redAccent));
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
     }
-    if (mounted) setState(() => _isDownloading = false);
   }
 
   Future<void> _shareFile() async {
@@ -108,11 +141,40 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
       if (res.statusCode == 200) {
         await file.writeAsBytes(res.bodyBytes);
         await Share.shareXFiles([XFile(file.path)]);
-      } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Unable to fetch file for sharing"), backgroundColor: Colors.orange));
       }
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection error"), backgroundColor: Colors.redAccent));
+    } catch (_) {}
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("Delete File?", style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text("Are you sure you want to permanently delete this file from your PC?", style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCEL", style: TextStyle(color: Colors.white24))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text("DELETE"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final res = await http.delete(
+          Uri.parse('http://${widget.pcIpAddress}:5000/files/delete?path=${Uri.encodeComponent(widget.filePath)}'),
+          headers: {'X-Auth-Token': widget.authToken},
+        );
+        if (res.statusCode == 200 && mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("File deleted successfully")));
+        }
+      } catch (_) {}
     }
   }
 
@@ -139,8 +201,6 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
                         _buildPreviewCanvas(),
                         const SizedBox(height: 24),
                         _buildMetadataPanel(),
-                        const SizedBox(height: 16),
-                        _buildCollaboratorsPanel(),
                         const SizedBox(height: 120),
                       ],
                     ),
@@ -149,7 +209,7 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
               ],
             ),
           ),
-          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav(isDark)),
+          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
         ],
       ),
     );
@@ -200,6 +260,21 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
                         )
                       : Icon(Icons.description_rounded, size: 80, color: accent.withOpacity(0.2)))),
           ),
+          if (_isDownloading)
+            Container(
+              color: Colors.black54,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(value: _downloadProgress, color: accent),
+                    const SizedBox(height: 16),
+                    Text("${(_downloadProgress * 100).toInt()}%", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    const Text("Downloading...", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ),
           Positioned(
             bottom: 20, left: 20,
             child: GlassContainer(
@@ -220,6 +295,8 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
   }
 
   Widget _buildMetadataPanel() {
+    final theme = Provider.of<ThemeService>(context);
+    final isDark = theme.isDarkMode;
     final accent = const Color(0xFF6C63FF);
     final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'].contains(widget.fileExtension.toLowerCase());
 
@@ -230,7 +307,7 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
         children: [
           Text("METADATA", style: GoogleFonts.roboto(fontSize: 10, color: accent, letterSpacing: 2)),
           const SizedBox(height: 8),
-          Text(widget.fileName, style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(widget.fileName, style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
           const SizedBox(height: 24),
           
           GridView.count(
@@ -241,10 +318,10 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
             crossAxisSpacing: 12,
             childAspectRatio: 2.2,
             children: [
-              _buildMetaItem("File Size", _formatSize(widget.fileSize)),
-              _buildMetaItem("Type", widget.fileExtension.toUpperCase().replaceAll('.', '')),
-              _buildMetaItem("Status", "Synced", isStatus: true),
-              _buildMetaItem("Encryption", "AES-256"),
+              _buildMetaItem("File Size", _formatSize(widget.fileSize), isDark),
+              _buildMetaItem("Type", widget.fileExtension.toUpperCase().replaceAll('.', ''), isDark),
+              _buildMetaItem("Status", "Synced", isDark, isStatus: true),
+              _buildMetaItem("Location", "PC Disk", isDark),
             ],
           ),
           
@@ -274,7 +351,7 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
             children: [
               Expanded(child: GestureDetector(onTap: _shareFile, child: _buildActionBtn("Share", Icons.share_rounded, const Color(0xFF404758), Colors.white, false))),
               const SizedBox(width: 12),
-              Expanded(child: _buildActionBtn("Delete", Icons.delete_outline_rounded, Colors.redAccent.withOpacity(0.1), Colors.redAccent, false)),
+              Expanded(child: GestureDetector(onTap: _confirmDelete, child: _buildActionBtn("Delete", Icons.delete_outline_rounded, Colors.redAccent.withOpacity(0.1), Colors.redAccent, false))),
             ],
           ),
         ],
@@ -282,20 +359,20 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
     );
   }
 
-  Widget _buildMetaItem(String label, String value, {bool isStatus = false}) {
+  Widget _buildMetaItem(String label, String value, bool isDark, {bool isStatus = false}) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withOpacity(0.05))),
+      decoration: BoxDecoration(color: (isDark ? Colors.white : Colors.black).withOpacity(0.03), borderRadius: BorderRadius.circular(12), border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label.toUpperCase(), style: GoogleFonts.roboto(fontSize: 8, color: Colors.white38)),
+          Text(label.toUpperCase(), style: GoogleFonts.roboto(fontSize: 8, color: (isDark ? Colors.white : Colors.black).withOpacity(0.38))),
           const SizedBox(height: 4),
           Row(
             children: [
               if (isStatus) Container(width: 6, height: 6, margin: const EdgeInsets.only(right: 6), decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-              Text(value, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600)),
+              Flexible(child: Text(value, overflow: TextOverflow.ellipsis, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black))),
             ],
           ),
         ],
@@ -322,48 +399,15 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
     );
   }
 
-  Widget _buildCollaboratorsPanel() {
-    return GlassContainer(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("SHARED WITH", style: GoogleFonts.roboto(fontSize: 10, color: Colors.white38, letterSpacing: 1)),
-          const SizedBox(height: 16),
-          _buildUserRow("JD", "John Dorsey", "Lead Architect", const Color(0xFFDF7412)),
-          _buildUserRow("AS", "Anna Sterling", "Security Ops", const Color(0xFF6C63FF)),
-          const SizedBox(height: 16),
-          TextButton.icon(onPressed: () {}, icon: const Icon(Icons.add_rounded, size: 18), label: Text("Invite collaborators", style: GoogleFonts.roboto(fontWeight: FontWeight.bold))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserRow(String init, String name, String role, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          CircleAvatar(radius: 16, backgroundColor: color.withOpacity(0.2), child: Text(init, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: color))),
-          const SizedBox(width: 12),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(name, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600)),
-            Text(role, style: GoogleFonts.roboto(fontSize: 11, color: Colors.white24)),
-          ]),
-          const Spacer(),
-          Icon(Icons.more_vert_rounded, color: Colors.white.withOpacity(0.2), size: 18),
-        ],
-      ),
-    );
-  }
-
   String _formatSize(int bytes) {
     if (bytes < 1024) return "$bytes B";
     if (bytes < 1024 * 1024) return "${(bytes / 1024).toStringAsFixed(1)} KB";
     return "${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB";
   }
 
-  Widget _buildBottomNav(bool isDark) {
+  Widget _buildBottomNav() {
+    final theme = Provider.of<ThemeService>(context, listen: false);
+    final isDark = theme.isDarkMode;
     return GlassContainer(
       height: 90,
       borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
@@ -381,16 +425,17 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
 
   Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
     final accent = const Color(0xFF6C63FF);
+    final inactiveColor = isDark ? Colors.white38 : Colors.black38;
     return GestureDetector(
       onTap: tap,
       child: Opacity(
-        opacity: active ? 1.0 : 0.4,
+        opacity: 1.0,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: active ? accent : (isDark ? Colors.white : Colors.black), size: 24),
+            Icon(icon, color: active ? accent : inactiveColor, size: 24),
             const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : (isDark ? Colors.white : Colors.black))),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : inactiveColor)),
           ],
         ),
       ),

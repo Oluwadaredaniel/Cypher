@@ -13,7 +13,10 @@ class BridgeService {
   Future<String> getConnectCode() async {
     // 1. Try Network first
     try {
-      final res = await http.get(Uri.parse("$baseUrl/connect-code")).timeout(const Duration(seconds: 1));
+      final res = await http.get(
+        Uri.parse("$baseUrl/connect-code"),
+        headers: {"X-Auth-Token": internalToken},
+      ).timeout(const Duration(seconds: 1));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         return data['code'] ?? "------";
@@ -41,7 +44,10 @@ class BridgeService {
   // Rotate the pairing code
   Future<String> refreshConnectCode() async {
     try {
-      final res = await http.post(Uri.parse("$baseUrl/connect-code")).timeout(const Duration(seconds: 2));
+      final res = await http.post(
+        Uri.parse("$baseUrl/connect-code"),
+        headers: {"X-Auth-Token": internalToken},
+      ).timeout(const Duration(seconds: 2));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         return data['code'] ?? "------";

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +9,8 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher_string.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/socket_service.dart';
 import '../services/theme_service.dart';
 import '../services/central_service.dart';
@@ -106,15 +109,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       final results = await Future.wait([
         http.get(Uri.parse('$baseUrl/settings'), headers: headers),
+        http.get(Uri.parse('$baseUrl/system-stats'), headers: headers),
         http.get(Uri.parse('$baseUrl/system/activity'), headers: headers),
         http.get(Uri.parse('$baseUrl/ping'), headers: headers),
       ]).timeout(const Duration(seconds: 8));
 
-      if (results[0].statusCode == 200) {
-        _pcName = jsonDecode(results[0].body)['device_name']?.toString().toUpperCase() ?? "COMPUTER";
+      if (mounted) {
+        setState(() {
+          if (results[0].statusCode == 200) {
+            _pcName = jsonDecode(results[0].body)['device_name']?.toString().toUpperCase() ?? "COMPUTER";
+          }
+          if (results[1].statusCode == 200) {
+            _liveStats = Map<String, dynamic>.from(jsonDecode(results[1].body));
+          }
+          _isLoading = false;
+        });
       }
-
-      setState(() => _isLoading = false);
     } catch (e) {
       if (mounted) {
         setState(() { _isLoading = false; _isError = true; });
@@ -138,22 +148,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _showMasterLogin() {
+    final theme = Provider.of<ThemeService>(context, listen: false);
+    final isDark = theme.isDarkMode;
     HapticFeedback.heavyImpact();
     final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: Text("MASTER ACCESS", style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text("MASTER ACCESS", style: GoogleFonts.roboto(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
         content: TextField(
           controller: controller,
           obscureText: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(hintText: "Enter Management Key", hintStyle: TextStyle(color: Colors.white24)),
+          style: TextStyle(color: isDark ? Colors.white : Colors.black),
+          decoration: InputDecoration(
+            hintText: "Enter Management Key",
+            hintStyle: TextStyle(color: isDark ? Colors.white24 : Colors.black26),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black12)),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text("CANCEL", style: GoogleFonts.roboto(color: Colors.white38))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text("CANCEL", style: GoogleFonts.roboto(color: isDark ? Colors.white38 : Colors.black38))),
           ElevatedButton(
             onPressed: () {
               if (controller.text == "emerald-admin") {
@@ -162,11 +178,76 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
-            child: const Text("UNLOCK"),
+            child: const Text("UNLOCK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _takeScreenshot() async {
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Capturing system screen...")));
+    try {
+      final res = await http.get(
+        Uri.parse('http://${widget.pcIpAddress}:5000/screenshot'),
+        headers: {'X-Auth-Token': widget.authToken},
+      ).timeout(const Duration(seconds: 15));
+
+      if (res.statusCode == 200) {
+        if (Platform.isAndroid) {
+          if (!await Permission.manageExternalStorage.request().isGranted &&
+              !await Permission.storage.request().isGranted) {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Storage permission required")));
+            return;
+          }
+        }
+
+        Directory? dir = Platform.isAndroid ? Directory('/storage/emulated/0/Download') : await getDownloadsDirectory();
+        if (dir == null || !await dir.exists()) dir = await getApplicationDocumentsDirectory();
+
+        final fileName = "screenshot_${DateTime.now().millisecondsSinceEpoch}.png";
+        final file = File('${dir.path}/$fileName');
+        await file.writeAsBytes(res.bodyBytes);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Saved to Downloads: $fileName"),
+              backgroundColor: const Color(0xFF10B981),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to capture screen")),
+        );
+      }
+    }
+  }
+
+  Future<void> _pushClipboard() async {
+    HapticFeedback.mediumImpact();
+    final data = await Clipboard.getData('text/plain');
+    if (data?.text == null || data!.text!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Phone clipboard is empty")));
+      return;
+    }
+
+    try {
+      final res = await http.post(
+        Uri.parse('http://${widget.pcIpAddress}:5000/clipboard'),
+        headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
+        body: jsonEncode({'content': data.text}),
+      );
+      if (res.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sent to PC Clipboard")));
+      }
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to sync clipboard")));
+    }
   }
 
   @override
@@ -181,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           SafeArea(
             child: _isError
               ? _buildErrorState()
-              : (_isLoading ? _buildShimmerLoading() : _buildDashboard(isDark)),
+              : (_isLoading ? _buildShimmerLoading(isDark) : _buildDashboard(isDark)),
           ),
           Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
         ],
@@ -206,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("System Overview", style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800)),
+                    Text("System Overview", style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -219,9 +300,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 Row(
                   children: [
-                    _buildMiniHeaderStat(Icons.memory_rounded, "${(_liveStats['cpu_percent'] ?? 0).toInt()}%", "CPU"),
+                    _buildMiniHeaderStat(Icons.memory_rounded, "${(_liveStats['cpu_percent'] ?? 0).toInt()}%", "CPU", isDark),
                     const SizedBox(width: 8),
-                    _buildMiniHeaderStat(Icons.speed_rounded, "${(_liveStats['ram_percent'] ?? 0).toInt()}%", "RAM"),
+                    _buildMiniHeaderStat(Icons.speed_rounded, "${(_liveStats['ram_percent'] ?? 0).toInt()}%", "RAM", isDark),
                   ],
                 ),
               ],
@@ -251,6 +332,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 subtitle: "Download files",
                 color: const Color(0xFF10B981),
                 onTap: () => Navigator.pushNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}),
+              ),
+              _buildQuickAction(
+                icon: Icons.screenshot_monitor_rounded,
+                title: "Screenshot",
+                subtitle: "Save PC screen",
+                color: const Color(0xFFFFB786),
+                onTap: _takeScreenshot,
+              ),
+              _buildQuickAction(
+                icon: Icons.assignment_return_rounded,
+                title: "Push Clipboard",
+                subtitle: "Sync to computer",
+                color: const Color(0xFFC0C6DB),
+                onTap: _pushClipboard,
               ),
             ],
           ),
@@ -312,7 +407,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Container(
             margin: const EdgeInsets.symmetric(vertical: 12),
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(100), border: Border.all(color: Colors.white10)),
+            decoration: BoxDecoration(
+              color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1)),
+            ),
             child: Row(
               children: [
                 ScaleTransition(
@@ -320,7 +419,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Container(width: 6, height: 6, decoration: BoxDecoration(color: _isConnected ? const Color(0xFF10B981) : Colors.redAccent, shape: BoxShape.circle)),
                 ),
                 const SizedBox(width: 8),
-                Text(_pcName, style: GoogleFonts.roboto(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white70)),
+                Text(_pcName, style: GoogleFonts.roboto(fontSize: 9, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black87)),
               ],
             ),
           ),
@@ -330,7 +429,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildMiniHeaderStat(IconData icon, String value, String label) {
+  Widget _buildMiniHeaderStat(IconData icon, String value, String label, bool isDark) {
     return GlassContainer(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       borderRadius: BorderRadius.circular(12),
@@ -342,8 +441,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(label, style: GoogleFonts.roboto(fontSize: 7, color: Colors.white38)),
-              Text(value, style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(label, style: GoogleFonts.roboto(fontSize: 7, color: (isDark ? Colors.white : Colors.black).withOpacity(0.38))),
+              Text(value, style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
             ],
           ),
         ],
@@ -367,7 +466,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: LinearProgressIndicator(
             value: percent.clamp(0.0, 1.0),
             minHeight: 6,
-            backgroundColor: Colors.white.withOpacity(0.05),
+            backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
             valueColor: AlwaysStoppedAnimation(color),
           ),
         ),
@@ -400,43 +499,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildBottomNav() {
+    final theme = Provider.of<ThemeService>(context);
+    final isDark = theme.isDarkMode;
     return GlassContainer(
       height: 90,
       borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navItem(Icons.home_filled, "Home", true),
-          _navItem(Icons.folder_copy_rounded, "Files", false, () => Navigator.pushNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
-          _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
-          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken})),
+          _navItem(Icons.home_filled, "Home", true, null, isDark),
+          _navItem(Icons.folder_copy_rounded, "Files", false, () => Navigator.pushNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+          _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
         ],
       ),
     );
   }
 
-  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap]) {
+  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
     final accent = const Color(0xFF6C63FF);
+    final inactiveColor = isDark ? Colors.white38 : Colors.black38;
     return GestureDetector(
       onTap: tap,
       child: Opacity(
-        opacity: active ? 1.0 : 0.4,
+        opacity: 1.0,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: active ? accent : Colors.white, size: 24),
+            Icon(icon, color: active ? accent : inactiveColor, size: 24),
             const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : Colors.white)),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : inactiveColor)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildShimmerLoading() {
+  Widget _buildShimmerLoading(bool isDark) {
     return Shimmer.fromColors(
-      baseColor: Colors.white.withOpacity(0.05),
-      highlightColor: Colors.white.withOpacity(0.1),
+      baseColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+      highlightColor: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [

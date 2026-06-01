@@ -30,9 +30,11 @@ class _RemoteKeyboardScreenState extends State<RemoteKeyboardScreen> {
         body: jsonEncode({'text': text}),
       );
       _typeController.clear();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Text sent"), duration: Duration(seconds: 1)));
     } catch (_) {}
   }
 
+  /* Shortcuts commented out for now
   Future<void> _sendHotkey(List<String> keys) async {
     try {
       HapticFeedback.lightImpact();
@@ -43,6 +45,7 @@ class _RemoteKeyboardScreenState extends State<RemoteKeyboardScreen> {
       );
     } catch (_) {}
   }
+  */
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +74,6 @@ class _RemoteKeyboardScreenState extends State<RemoteKeyboardScreen> {
             Text("Send text directly to your computer's active window.", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4))),
             const SizedBox(height: 32),
 
-            // Typing Box
             GlassContainer(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -104,11 +106,11 @@ class _RemoteKeyboardScreenState extends State<RemoteKeyboardScreen> {
               ),
             ),
 
+            /* Essential Shortcuts commented out for now
             const SizedBox(height: 40),
-            Text("Common Shortcuts", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+            Text("Essential Shortcuts", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
             const SizedBox(height: 16),
 
-            // Hotkey Grid
             GridView.count(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -119,21 +121,23 @@ class _RemoteKeyboardScreenState extends State<RemoteKeyboardScreen> {
               children: [
                 _hotkeyBtn("Alt + Tab", ["alt", "tab"], isDark),
                 _hotkeyBtn("Win + D", ["win", "d"], isDark),
-                _hotkeyBtn("Ctrl + C", ["ctrl", "c"], isDark),
-                _hotkeyBtn("Ctrl + V", ["ctrl", "v"], isDark),
-                _hotkeyBtn("Ctrl + Z", ["ctrl", "z"], isDark),
+                _hotkeyBtn("Win + L", ["win", "l"], isDark),
                 _hotkeyBtn("Enter", ["enter"], isDark),
                 _hotkeyBtn("Backspace", ["backspace"], isDark),
                 _hotkeyBtn("Esc", ["esc"], isDark),
                 _hotkeyBtn("Space", ["space"], isDark),
+                _hotkeyBtn("Ctrl + C", ["ctrl", "c"], isDark),
+                _hotkeyBtn("Ctrl + V", ["ctrl", "v"], isDark),
               ],
             ),
+            */
           ],
         ),
       ),
     );
   }
 
+  /* Shortcut helper widget commented out
   Widget _hotkeyBtn(String label, List<String> keys, bool isDark) {
     return GestureDetector(
       onTap: () => _sendHotkey(keys),
@@ -145,4 +149,5 @@ class _RemoteKeyboardScreenState extends State<RemoteKeyboardScreen> {
       ),
     );
   }
+  */
 }

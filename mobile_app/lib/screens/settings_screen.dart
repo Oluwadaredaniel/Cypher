@@ -23,8 +23,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoClipboard = false;
   double _batteryAlert = 20;
-  bool _biometricActive = true;
-  bool _tunnelingActive = false;
   List<String> _availableFolders = [];
 
   @override
@@ -89,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SafeArea(
             child: Column(
               children: [
-                _buildTopBar(accent),
+                const SizedBox(height: 64),
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
@@ -104,10 +102,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _buildBatteryThreshold(accent, isDark),
                         const SizedBox(height: 24),
                         _buildSharedFolders(accent, isDark),
-                        const SizedBox(height: 24),
-                        _buildSecurityParameters(accent, isDark),
-                        const SizedBox(height: 24),
-                        _buildAboutSection(accent, isDark),
                         const SizedBox(height: 48),
                         _buildFooterActions(accent, isDark),
                         const SizedBox(height: 120),
@@ -119,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           _buildFloatingHeader(accent, isDark),
-          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav(accent, isDark)),
+          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
         ],
       ),
     );
@@ -150,15 +144,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildTopBar(Color accent) => const SizedBox(height: 64);
-
   Widget _buildHeader(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text("System Settings", style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
         const SizedBox(height: 8),
-        Text("Configure your security protocol and bridge behavior.", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
+        Text("Configure your system preferences.", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4))),
       ],
     );
   }
@@ -168,8 +160,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         Expanded(
           child: _bentoToggle(
-            "Night Protocol",
-            "Toggle visual layers",
+            "Night Mode",
+            "UI Appearance",
             Icons.dark_mode_rounded,
             theme.isDarkMode,
             (v) => theme.toggleTheme(),
@@ -181,7 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Expanded(
           child: _bentoToggle(
             "Auto-Sync",
-            "Real-time parity",
+            "Clipboard Sync",
             Icons.sync_rounded,
             _autoClipboard,
             (v) {
@@ -228,48 +220,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSecurityParameters(Color accent, bool isDark) {
-    return GlassContainer(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Icon(Icons.verified_user_rounded, color: accent, size: 20),
-                const SizedBox(width: 12),
-                Text("Access & Privacy", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          _securityItem("Technical Guide", "Learn how to use Cypher", Icons.menu_book_rounded, true, (v){}, isDark, onTap: () => Navigator.pushNamed(context, '/guide')),
-          _securityItem("Macro Builder", "Automate complex tasks", Icons.bolt_rounded, true, (v){}, isDark, onTap: () => Navigator.pushNamed(context, '/guide')),
-          _securityItem("Battery Alert", "Threshold for PC alerts", Icons.battery_charging_full_rounded, true, (v){}, isDark, onTap: () => _showBatteryThresholdDialog(context, isDark)),
-          Divider(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05), height: 1),
-          _securityItem("Biometric Unlock", "Use FaceID/Fingerprint for access", Icons.fingerprint_rounded, _biometricActive, (v) => setState(() => _biometricActive = v), isDark),
-          _securityItem("End-to-End Tunneling", "Enforce AES-256 bridge traffic", Icons.vpn_lock_rounded, _tunnelingActive, (v) => setState(() => _tunnelingActive = v), isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _securityItem(String title, String sub, IconData icon, bool val, Function(bool) tap, bool isDark, {VoidCallback? onTap}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: ListTile(
-        leading: Icon(icon, color: (isDark ? Colors.white : Colors.black).withOpacity(0.38), size: 20),
-        title: Text(title, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7))),
-        subtitle: Text(sub, style: GoogleFonts.roboto(fontSize: 11, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
-        trailing: Icon(Icons.chevron_right_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.1), size: 18),
-        onTap: onTap ?? () {
-          HapticFeedback.lightImpact();
-        },
-      ),
-    );
-  }
-
   Widget _buildSharedFolders(Color accent, bool isDark) {
     return GlassContainer(
       padding: EdgeInsets.zero,
@@ -294,7 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (_availableFolders.isEmpty)
             Padding(
               padding: const EdgeInsets.all(24),
-              child: Text("No folders configured in Core.", style: GoogleFonts.roboto(fontSize: 12, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
+              child: Text("No folders configured on PC.", style: GoogleFonts.roboto(fontSize: 12, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
             )
           else
             ..._availableFolders.map((f) => ListTile(
@@ -347,21 +297,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildAboutSection(Color accent, bool isDark) {
-    return GlassContainer(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          _securityItem("CYPHER Core", "Version 1.0.0-PRO (Stable)", Icons.info_outline_rounded, true, (v) {}, isDark),
-          _securityItem("Technical Guide", "Documentation & Hotkeys", Icons.help_outline_rounded, true, (v) {
-            Navigator.pushNamed(context, '/guide');
-          }, isDark),
-          _securityItem("Bridge Connection", widget.pcIpAddress, Icons.lan_rounded, true, (v) {}, isDark),
-        ],
-      ),
-    );
-  }
-
   Widget _footerBtn(String label, Color color, VoidCallback tap, {bool outline = false, required bool isDark}) {
     return GestureDetector(
       onTap: tap,
@@ -384,8 +319,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildFooterActions(Color accent, bool isDark) {
     return Column(
       children: [
-        _footerBtn("Export Activity Log", accent, () {}, isDark: isDark),
-        const SizedBox(height: 12),
         _footerBtn("Disconnect & Factory Reset", Colors.redAccent, () async {
           final prefs = await SharedPreferences.getInstance();
           await prefs.clear();
@@ -395,45 +328,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showBatteryThresholdDialog(BuildContext context, bool isDark) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Battery Threshold", style: GoogleFonts.roboto(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text("Alert me when PC battery is below:", style: GoogleFonts.roboto(fontSize: 14, color: isDark ? Colors.white70 : Colors.black54)),
-            const SizedBox(height: 20),
-            _batteryOption(10, isDark, ctx),
-            _batteryOption(20, isDark, ctx),
-            _batteryOption(30, isDark, ctx),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _batteryOption(int value, bool isDark, BuildContext ctx) {
-    return ListTile(
-      title: Text("$value%", style: GoogleFonts.roboto(color: isDark ? Colors.white : Colors.black)),
-      onTap: () async {
-        try {
-          await http.post(
-            Uri.parse('http://${widget.pcIpAddress}:5000/battery/threshold'),
-            headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
-            body: jsonEncode({'threshold': value}),
-          );
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Threshold set to $value%")));
-        } catch (_) {}
-        Navigator.pop(ctx);
-      },
-    );
-  }
-
-  Widget _buildBottomNav(Color accent, bool isDark) {
+  Widget _buildBottomNav() {
+    final theme = Provider.of<ThemeService>(context, listen: false);
+    final isDark = theme.isDarkMode;
     return GlassContainer(
       height: 90,
       borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
@@ -451,16 +348,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
     final accent = const Color(0xFF6C63FF);
+    final inactiveColor = isDark ? Colors.white38 : Colors.black38;
     return GestureDetector(
       onTap: tap,
       child: Opacity(
-        opacity: active ? 1.0 : 0.4,
+        opacity: 1.0,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: active ? accent : (isDark ? Colors.white : Colors.black), size: 24),
+            Icon(icon, color: active ? accent : inactiveColor, size: 24),
             const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : (isDark ? Colors.white : Colors.black))),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : inactiveColor)),
           ],
         ),
       ),

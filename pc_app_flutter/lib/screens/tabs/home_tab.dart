@@ -64,6 +64,8 @@ class HomeTab extends StatelessWidget {
 
   Widget _buildPairingCard() {
     String cleanCode = pairingCode.replaceAll("-", "").padRight(6, "-");
+    if (cleanCode.length > 6) cleanCode = cleanCode.substring(0, 6);
+
     String p1 = cleanCode.substring(0, 3);
     String p2 = cleanCode.substring(3, 6);
 
@@ -143,14 +145,26 @@ class HomeTab extends StatelessWidget {
           Text("Linked Devices", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
           const SizedBox(height: 24),
           if (devices.isEmpty)
-            Expanded(child: Center(child: Text("No devices linked", style: GoogleFonts.roboto(color: isDark ? Colors.white10 : Colors.black12))))
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.smartphone_outlined, size: 48, color: isDark ? Colors.white10 : Colors.black12),
+                    const SizedBox(height: 16),
+                    Text("No devices linked.", style: GoogleFonts.roboto(color: isDark ? Colors.white24 : Colors.black26)),
+                    Text("Pair your phone to get started.", style: GoogleFonts.roboto(fontSize: 11, color: isDark ? Colors.white10 : Colors.black12)),
+                  ],
+                ),
+              ),
+            )
           else
             Expanded(
               child: ListView.builder(
                 itemCount: devices.length,
                 itemBuilder: (context, i) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: _deviceItem(devices[i]['device_name'], "Connected", Icons.smartphone_rounded, true),
+                  child: _deviceItem(devices[i]['device_name'] ?? "Unknown Device", "Connected", Icons.smartphone_rounded, true),
                 ),
               ),
             ),
@@ -158,9 +172,9 @@ class HomeTab extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: onRefreshCode,
               style: ElevatedButton.styleFrom(backgroundColor: accent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 16)),
-              child: Text("Link New Device", style: GoogleFonts.roboto(fontWeight: FontWeight.bold, color: Colors.white)),
+              child: Text("Rotate Access Key", style: GoogleFonts.roboto(fontWeight: FontWeight.bold, color: Colors.white)),
             ),
           ),
         ],

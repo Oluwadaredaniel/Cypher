@@ -232,7 +232,7 @@ class _RemoteViewScreenState extends State<RemoteViewScreen> {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.03),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.05)),
+          border: Border.all(color: Colors.white10),
         ),
         child: Row(
           children: [

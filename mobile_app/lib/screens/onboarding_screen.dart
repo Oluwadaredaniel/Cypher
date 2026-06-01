@@ -219,6 +219,7 @@ class OnboardingSlide {
 class _BentoFilesIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isDark = Provider.of<ThemeService>(context).isDarkMode;
     final accent = const Color(0xFF6C63FF);
     return Container(
       width: 300, height: 300,
@@ -228,6 +229,7 @@ class _BentoFilesIllustration extends StatelessWidget {
             left: 20, top: 40,
             child: _BentoCard(
               width: 120, height: 200,
+              isDark: isDark,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -236,9 +238,9 @@ class _BentoFilesIllustration extends StatelessWidget {
                     children: [
                       _Line(width: 40, color: accent.withOpacity(0.2)),
                       const SizedBox(height: 8),
-                      _Line(width: 60),
+                      _Line(width: 60, isDark: isDark),
                       const SizedBox(height: 8),
-                      _Line(width: 30),
+                      _Line(width: 30, isDark: isDark),
                     ],
                   )
                 ],
@@ -250,6 +252,7 @@ class _BentoFilesIllustration extends StatelessWidget {
             child: _BentoCard(
               width: 130, height: 100,
               color: accent,
+              isDark: isDark,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -264,6 +267,7 @@ class _BentoFilesIllustration extends StatelessWidget {
             right: 40, bottom: 40,
             child: _BentoCard(
               width: 100, height: 100,
+              isDark: isDark,
               child: Icon(Icons.verified_user_rounded, color: const Color(0xFFFFB786), size: 40),
             ),
           ),
@@ -276,6 +280,7 @@ class _BentoFilesIllustration extends StatelessWidget {
 class _BentoRemoteIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isDark = Provider.of<ThemeService>(context).isDarkMode;
     final accent = const Color(0xFF6C63FF);
     return Container(
       width: 300, height: 300,
@@ -286,6 +291,7 @@ class _BentoRemoteIllustration extends StatelessWidget {
             top: 50,
             child: _BentoCard(
               width: 220, height: 140,
+              isDark: isDark,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -309,10 +315,10 @@ class _BentoRemoteIllustration extends StatelessWidget {
             child: Container(
               width: 90, height: 180,
               decoration: BoxDecoration(
-                color: const Color(0xFF192029),
+                color: isDark ? const Color(0xFF192029) : Colors.white,
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.white.withOpacity(0.1), width: 4),
-                boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 20)],
+                border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1), width: 4),
+                boxShadow: [BoxShadow(color: isDark ? Colors.black54 : Colors.black12, blurRadius: 20)],
               ),
               child: Center(
                 child: Icon(Icons.settings_input_component_rounded, color: accent, size: 32),
@@ -328,6 +334,7 @@ class _BentoRemoteIllustration extends StatelessWidget {
 class _BentoSecurityIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isDark = Provider.of<ThemeService>(context).isDarkMode;
     final accent = const Color(0xFF6C63FF);
     return Container(
       width: 300, height: 300,
@@ -353,11 +360,11 @@ class _BentoSecurityIllustration extends StatelessWidget {
           ),
           Positioned(
             top: 40, right: 20,
-            child: _SystemStatus(label: "PHONE", icon: Icons.smartphone_rounded, color: const Color(0xFFFFB786)),
+            child: _SystemStatus(label: "PHONE", icon: Icons.smartphone_rounded, color: const Color(0xFFFFB786), isDark: isDark),
           ),
           Positioned(
             bottom: 40, left: 20,
-            child: _SystemStatus(label: "COMPUTER", icon: Icons.computer_rounded, color: accent),
+            child: _SystemStatus(label: "COMPUTER", icon: Icons.computer_rounded, color: accent, isDark: isDark),
           ),
         ],
       ),
@@ -370,16 +377,17 @@ class _BentoCard extends StatelessWidget {
   final double height;
   final Widget child;
   final Color? color;
-  const _BentoCard({required this.width, required this.height, required this.child, this.color});
+  final bool isDark;
+  const _BentoCard({required this.width, required this.height, required this.child, this.color, required this.isDark});
   @override
   Widget build(BuildContext context) {
     return Container(
       width: width, height: height,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color ?? const Color(0xFF192029).withOpacity(0.7),
+        color: color ?? (isDark ? const Color(0xFF192029) : Colors.white).withOpacity(0.7),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05)),
       ),
       child: child,
     );
@@ -389,9 +397,10 @@ class _BentoCard extends StatelessWidget {
 class _Line extends StatelessWidget {
   final double width;
   final Color? color;
-  const _Line({required this.width, this.color});
+  final bool isDark;
+  const _Line({required this.width, this.color, this.isDark = true});
   @override
-  Widget build(BuildContext context) => Container(width: width, height: 4, decoration: BoxDecoration(color: color ?? Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(10)));
+  Widget build(BuildContext context) => Container(width: width, height: 4, decoration: BoxDecoration(color: color ?? (isDark ? Colors.white : Colors.black).withOpacity(0.1), borderRadius: BorderRadius.circular(10)));
 }
 
 class _Dot extends StatelessWidget {
@@ -405,7 +414,8 @@ class _SystemStatus extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
-  const _SystemStatus({required this.label, required this.icon, required this.color});
+  final bool isDark;
+  const _SystemStatus({required this.label, required this.icon, required this.color, required this.isDark});
   @override
   Widget build(BuildContext context) {
     return GlassContainer(
@@ -420,8 +430,8 @@ class _SystemStatus extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(label, style: GoogleFonts.roboto(fontSize: 7, color: Colors.white38)),
-              Text("Online", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text(label, style: GoogleFonts.roboto(fontSize: 7, color: (isDark ? Colors.white : Colors.black).withOpacity(0.38))),
+              Text("Online", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
             ],
           )
         ],

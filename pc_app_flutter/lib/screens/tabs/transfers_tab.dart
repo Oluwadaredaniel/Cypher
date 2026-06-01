@@ -47,11 +47,20 @@ class TransfersTab extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: activeTransfers.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(100),
-                          child: Text("No active transfers",
-                              style: TextStyle(color: isDark ? Colors.white10 : Colors.black12)),
+                    ? GlassContainer(
+                        height: 400,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.cloud_done_outlined, size: 64, color: isDark ? Colors.white10 : Colors.black12),
+                              const SizedBox(height: 16),
+                              Text("No active transfers",
+                                  style: GoogleFonts.roboto(color: isDark ? Colors.white24 : Colors.black26, fontSize: 16, fontWeight: FontWeight.bold)),
+                              Text("Sync files from your mobile app to see them here.",
+                                  style: GoogleFonts.roboto(color: isDark ? Colors.white10 : Colors.black12, fontSize: 12)),
+                            ],
+                          ),
                         ),
                       )
                     : Column(

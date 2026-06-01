@@ -9,6 +9,7 @@ class HealthTab extends StatelessWidget {
   final Animation<double> waveAnimation;
   final Color accent;
   final VoidCallback onOptimize;
+  final bool isOptimizing;
 
   const HealthTab({
     super.key,
@@ -17,6 +18,7 @@ class HealthTab extends StatelessWidget {
     required this.waveAnimation,
     required this.accent,
     required this.onOptimize,
+    required this.isOptimizing,
   });
 
   @override
@@ -31,9 +33,11 @@ class HealthTab extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildHeader("Performance", "Monitoring live computer resources."),
-              GestureDetector(
-                onTap: onOptimize,
-                child: _actionBtn("Optimize System", Icons.bolt_rounded)
+              _actionBtn(
+                isOptimizing ? "Optimizing..." : "Optimize System",
+                Icons.bolt_rounded,
+                onTap: isOptimizing ? null : onOptimize,
+                isLoading: isOptimizing,
               ),
             ],
           ),
@@ -245,16 +249,25 @@ class HealthTab extends StatelessWidget {
     );
   }
 
-  Widget _actionBtn(String label, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white, size: 16),
-          const SizedBox(width: 8),
-          Text(label, style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-        ],
+  Widget _actionBtn(String label, IconData icon, {VoidCallback? onTap, bool isLoading = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isLoading ? accent.withOpacity(0.5) : accent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            if (isLoading)
+              const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            else
+              Icon(icon, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Text(label, style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+          ],
+        ),
       ),
     );
   }

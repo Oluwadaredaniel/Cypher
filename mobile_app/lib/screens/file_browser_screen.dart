@@ -29,9 +29,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   List<dynamic> _drives = [];
   String? _currentPath;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   // Selection Mode Logic
   final Set<String> _selectedPaths = {};
+  bool _isBatchDownloading = false;
+  double _batchProgress = 0.0;
 
   @override
   void initState() {
@@ -40,8 +43,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     _fetchFiles();
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchFiles() async {
     setState(() { _isLoading = true; _selectedPaths.clear(); });
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
     final headers = {'X-Auth-Token': widget.authToken};
     final baseUrl = 'http://${widget.pcIpAddress}:5000';
 
@@ -53,23 +64,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
           _drives = data.where((i) => i['type'] == 'drive').toList();
           _items = data.where((i) => i['type'] != 'drive').toList();
           _filteredItems = _items;
-        } else {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Unauthorized or access denied"), backgroundColor: Colors.orange));
         }
       } else {
         final res = await http.get(Uri.parse('$baseUrl/files/browse?path=${Uri.encodeComponent(_currentPath!)}'), headers: headers).timeout(const Duration(seconds: 10));
         if (res.statusCode == 200) {
           _items = jsonDecode(res.body) as List;
           _filteredItems = _items;
-        } else {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Unable to list folder contents"), backgroundColor: Colors.orange));
         }
       }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Network error: Check your computer"), backgroundColor: Colors.redAccent));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    } catch (_) {}
+    if (mounted) setState(() => _isLoading = false);
   }
 
   void _onSearch(String query) {
@@ -95,7 +99,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     final accent = const Color(0xFF6C63FF);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7),
       body: Stack(
         children: [
           SafeArea(
@@ -112,17 +116,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
             ),
           ),
 
-          // Selection Action Bar
           if (_selectedPaths.isNotEmpty) _buildSelectionBar(isDark),
-
           Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
         ],
       ),
-      floatingActionButton: _currentPath != null ? FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: accent,
-        child: const Icon(Icons.cloud_upload_rounded, color: Colors.white),
-      ) : null,
     );
   }
 
@@ -145,7 +142,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                   }
                 },
               ),
-              Text("CYPHER", style: GoogleFonts.roboto(fontSize: 24, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
+              Text("FILE BROWSER", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
             ],
           ),
           Icon(Icons.sensors_rounded, color: accent),
@@ -172,7 +169,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                 style: GoogleFonts.roboto(color: isDark ? Colors.white : Colors.black),
                 decoration: InputDecoration(
                   border: InputBorder.none,
-                  hintText: _currentPath == null ? "Search drives and folders..." : "Search in this folder...",
+                  hintText: _currentPath == null ? "Search drives..." : "Search folder...",
                   hintStyle: GoogleFonts.roboto(color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), fontSize: 14),
                 ),
               ),
@@ -186,6 +183,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   Widget _buildContent(Color accent, bool isDark) {
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
+      controller: _scrollController,
       slivers: [
         if (_currentPath == null && _drives.isNotEmpty)
           _buildSectionTitle("Locations", isDark),
@@ -200,7 +198,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
             ),
           ),
 
-        _buildSectionTitle(_currentPath == null ? "System Folders" : "Files", isDark),
+        _buildSectionTitle(_currentPath == null ? "Folders" : "Files", isDark),
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           sliver: SliverList(
@@ -222,7 +220,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(28, 32, 24, 16),
-        child: Text(title, style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+        child: Text(title.toUpperCase(), style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), letterSpacing: 2)),
       ),
     );
   }
@@ -340,38 +338,50 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
       }
     }
 
+    setState(() {
+      _isBatchDownloading = true;
+      _batchProgress = 0.0;
+    });
+
     int successCount = 0;
     final List<String> paths = _selectedPaths.toList();
-    setState(() => _isLoading = true);
+    final client = http.Client();
 
-    for (var path in paths) {
+    for (int i = 0; i < paths.length; i++) {
+      final path = paths[i];
       try {
         final fileName = path.split(Platform.isWindows ? '\\' : '/').last;
-        final res = await http.get(
-          Uri.parse('http://${widget.pcIpAddress}:5000/files/download?path=${Uri.encodeComponent(path)}'),
-          headers: {'X-Auth-Token': widget.authToken},
-        ).timeout(const Duration(minutes: 5));
+        final url = 'http://${widget.pcIpAddress}:5000/files/download?path=${Uri.encodeComponent(path)}';
 
-        if (res.statusCode == 200) {
+        final request = http.Request('GET', Uri.parse(url));
+        request.headers['X-Auth-Token'] = widget.authToken;
+
+        final response = await client.send(request).timeout(const Duration(minutes: 5));
+
+        if (response.statusCode == 200) {
           Directory? dir = Platform.isAndroid ? Directory('/storage/emulated/0/Download') : await getDownloadsDirectory();
           if (dir == null || !await dir.exists()) dir = await getApplicationDocumentsDirectory();
 
           final file = File('${dir.path}/$fileName');
-          await file.writeAsBytes(res.bodyBytes);
+          final IOSink sink = file.openWrite();
+          await response.stream.forEach((chunk) => sink.add(chunk));
+          await sink.close();
           successCount++;
         }
       } catch (_) {}
+      if (mounted) setState(() => _batchProgress = (i + 1) / paths.length);
     }
+    client.close();
 
     setState(() {
-      _isLoading = false;
+      _isBatchDownloading = false;
       _selectedPaths.clear();
     });
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Downloaded $successCount files to Downloads folder"),
+          content: Text("Synced $successCount files to Downloads"),
           backgroundColor: const Color(0xFF10B981),
         ),
       );
@@ -385,9 +395,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
         backgroundColor: const Color(0xFF1A1A1A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text("Delete Items?", style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Text("Are you sure you want to permanently delete ${_selectedPaths.length} items from your PC?", style: GoogleFonts.roboto(color: Colors.white70)),
+        content: Text("Permanently delete ${_selectedPaths.length} items from PC?", style: GoogleFonts.roboto(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text("CANCEL", style: GoogleFonts.roboto(color: Colors.white24))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCEL", style: TextStyle(color: Colors.white24))),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
@@ -419,34 +429,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Deleted $successCount items"), backgroundColor: Colors.redAccent));
   }
 
-  Future<void> _zipAndDownload() async {
-    setState(() => _isLoading = true);
-    try {
-      final res = await http.post(
-        Uri.parse('http://${widget.pcIpAddress}:5000/files/download/zip'),
-        headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
-        body: jsonEncode({'paths': _selectedPaths.toList()}),
-      ).timeout(const Duration(minutes: 5));
-
-      if (res.statusCode == 200) {
-        Directory? dir = Platform.isAndroid ? Directory('/storage/emulated/0/Download') : await getDownloadsDirectory();
-        if (dir == null || !await dir.exists()) dir = await getApplicationDocumentsDirectory();
-
-        final fileName = "cypher_bundle_${DateTime.now().millisecondsSinceEpoch}.zip";
-        final file = File('${dir.path}/$fileName');
-        await file.writeAsBytes(res.bodyBytes);
-
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zip bundle saved to Downloads"), backgroundColor: Color(0xFF10B981)));
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zip operation failed"), backgroundColor: Colors.redAccent));
-    }
-    setState(() {
-      _isLoading = false;
-      _selectedPaths.clear();
-    });
-  }
-
   Widget _buildSelectionBar(bool isDark) {
     return Positioned(
       bottom: 110, left: 20, right: 20,
@@ -459,13 +441,23 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
           opacity: 0.9,
           child: Row(
             children: [
-              Text("${_selectedPaths.length} SELECTED", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF6C63FF))),
-              const Spacer(),
-              _selectionAction(Icons.download_rounded, "Sync", isDark, onTap: _downloadSelectedFiles),
-              const SizedBox(width: 16),
-              _selectionAction(Icons.folder_zip_rounded, "Zip", isDark, onTap: _zipAndDownload),
-              const SizedBox(width: 16),
-              _selectionAction(Icons.delete_outline_rounded, "Delete", isDark, color: Colors.redAccent, onTap: _deleteSelectedFiles),
+              if (_isBatchDownloading)
+                Expanded(
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6C63FF))),
+                      const SizedBox(width: 12),
+                      Text("SYNCING ${(_batchProgress * 100).toInt()}%", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF6C63FF))),
+                    ],
+                  ),
+                )
+              else ...[
+                Text("${_selectedPaths.length} SELECTED", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF6C63FF))),
+                const Spacer(),
+                _selectionAction(Icons.download_rounded, "Sync", isDark, onTap: _downloadSelectedFiles),
+                const SizedBox(width: 16),
+                _selectionAction(Icons.delete_outline_rounded, "Delete", isDark, color: Colors.redAccent, onTap: _deleteSelectedFiles),
+              ],
             ],
           ),
         ),
@@ -497,17 +489,17 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   }
 
   Widget _buildBottomNav() {
-    final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
+    final theme = Provider.of<ThemeService>(context, listen: false).isDarkMode;
     return GlassContainer(
       height: 90,
       borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context), isDark),
-          _navItem(Icons.folder_copy_rounded, "Files", true, null, isDark),
-          _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushReplacementNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushReplacementNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
+          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context), theme),
+          _navItem(Icons.folder_copy_rounded, "Files", true, null, theme),
+          _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushReplacementNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), theme),
+          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushReplacementNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), theme),
         ],
       ),
     );
@@ -515,16 +507,17 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
 
   Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
     final accent = const Color(0xFF6C63FF);
+    final inactiveColor = isDark ? Colors.white38 : Colors.black38;
     return GestureDetector(
       onTap: tap,
       child: Opacity(
-        opacity: active ? 1.0 : 0.4,
+        opacity: 1.0,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: active ? accent : (isDark ? Colors.white : Colors.black), size: 24),
+            Icon(icon, color: active ? accent : inactiveColor, size: 24),
             const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : (isDark ? Colors.white : Colors.black))),
+            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : inactiveColor)),
           ],
         ),
       ),

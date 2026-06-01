@@ -113,11 +113,18 @@ class FilesTab extends StatelessWidget {
                       ),
                       if (sharedFolders.isEmpty)
                         Padding(
-                          padding: const EdgeInsets.all(40),
-                          child: Text("No folders shared yet.", style: GoogleFonts.roboto(color: isDark ? Colors.white24 : Colors.black26)),
+                          padding: const EdgeInsets.all(80),
+                          child: Column(
+                            children: [
+                              Icon(Icons.folder_off_outlined, size: 48, color: isDark ? Colors.white10 : Colors.black.withOpacity(0.1)),
+                              const SizedBox(height: 16),
+                              Text("No folders shared yet.", style: GoogleFonts.roboto(color: isDark ? Colors.white24 : Colors.black26, fontSize: 14)),
+                              Text("Add a folder to make it accessible on your mobile device.", style: GoogleFonts.roboto(color: isDark ? Colors.white10 : Colors.black12, fontSize: 11)),
+                            ],
+                          ),
                         )
                       else
-                        ...sharedFolders.map((f) => _folderRow(f['name'], f['path'])).toList(),
+                        ...sharedFolders.map((f) => _folderRow(f['name'] ?? "Unknown", f['path'] ?? "")).toList(),
                     ],
                   ),
                 ),

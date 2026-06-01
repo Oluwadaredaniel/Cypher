@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
@@ -20,49 +21,33 @@ class ActivityScreen extends StatefulWidget {
 
 class _ActivityScreenState extends State<ActivityScreen> {
   bool _isLoading = true;
-  List<dynamic> _logs = [];
-  String _activeFilter = "All Events";
-  Map<String, dynamic> _stats = {"transfers": 0, "health": "Nominal"};
-  Timer? _refreshTimer;
+  List<dynamic> _activity = [];
+  String _activeFilter = "ALL";
+  final List<String> _filters = ["ALL", "FILES", "SYSTEM", "SECURITY"];
 
   @override
   void initState() {
     super.initState();
-    _fetchData();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) => _fetchData());
+    _fetchActivity();
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _fetchData() async {
+  Future<void> _fetchActivity() async {
+    setState(() => _isLoading = true);
     try {
-      final headers = {'X-Auth-Token': widget.authToken};
-      final baseUrl = 'http://${widget.pcIpAddress}:5000';
-
-      final results = await Future.wait([
-        http.get(Uri.parse('$baseUrl/system/activity'), headers: headers),
-        http.get(Uri.parse('$baseUrl/files/transfers'), headers: headers),
-      ]).timeout(const Duration(seconds: 5));
-
-      if (results[0].statusCode == 200) {
-        if (mounted) setState(() => _logs = jsonDecode(results[0].body));
-      }
-
-      if (results[1].statusCode == 200) {
-        final transfers = jsonDecode(results[1].body) as Map;
-        if (mounted) setState(() => _stats["transfers"] = transfers.length);
+      final res = await http.get(
+        Uri.parse('http://${widget.pcIpAddress}:5000/system/activity'),
+        headers: {'X-Auth-Token': widget.authToken},
+      );
+      if (res.statusCode == 200) {
+        setState(() => _activity = jsonDecode(res.body));
       }
     } catch (_) {}
     if (mounted) setState(() => _isLoading = false);
-  }
-
-  List<dynamic> get _filteredLogs {
-    if (_activeFilter == "All Events") return _logs;
-    return _logs.where((log) => log['category'] == _activeFilter).toList();
   }
 
   @override
@@ -78,7 +63,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           SafeArea(
             child: Column(
               children: [
-                _buildTopBar(accent),
+                _buildTopBar(accent, isDark),
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
@@ -86,13 +71,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSummaryGrid(accent, isDark),
-                        const SizedBox(height: 32),
-                        _buildFilterHeader(isDark),
+                        _buildHeader(isDark),
+                        const SizedBox(height: 24),
+                        _buildFilterRow(isDark, accent),
                         const SizedBox(height: 24),
                         _isLoading
-                          ? const Center(child: Padding(padding: EdgeInsets.all(60), child: CircularProgressIndicator()))
-                          : _buildActivityStream(accent, isDark),
+                          ? Center(child: Padding(padding: const EdgeInsets.all(60), child: CircularProgressIndicator(color: accent)))
+                          : _buildActivityList(isDark, accent),
                         const SizedBox(height: 120),
                       ],
                     ),
@@ -102,7 +87,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ),
           ),
           _buildFloatingHeader(accent, isDark),
-          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav(isDark)),
+          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
         ],
       ),
     );
@@ -123,93 +108,62 @@ class _ActivityScreenState extends State<ActivityScreen> {
             Row(
               children: [
                 IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 20), onPressed: () => Navigator.pop(context)),
-                Text("ACTIVITY", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
+                Text("LOGS", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
               ],
             ),
-            IconButton(icon: Icon(Icons.refresh_rounded, color: accent, size: 18), onPressed: _fetchData),
+            Icon(Icons.history_rounded, color: accent),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTopBar(Color accent) => const SizedBox(height: 64);
+  Widget _buildTopBar(Color accent, bool isDark) => const SizedBox(height: 64);
 
-  Widget _buildSummaryGrid(Color accent, bool isDark) {
+  Widget _buildHeader(bool isDark) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _summaryBento("Active Transfers", "${_stats['transfers']}", Icons.sync_rounded, accent, isDark, sub: "Tracking file updates in real-time."),
-        const SizedBox(height: 12),
-        _summaryBento("System Status", _stats['health'], Icons.check_circle_outline_rounded, const Color(0xFF10B981), isDark, sub: "Everything is running smoothly."),
+        Text("Activity History", style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
+        const SizedBox(height: 8),
+        Text("Track all interactions between your phone and PC.", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
       ],
     );
   }
 
-  Widget _summaryBento(String label, String value, IconData icon, Color color, bool isDark, {double? progress, String? sub}) {
-    return GlassContainer(
-      padding: const EdgeInsets.all(20),
+  Widget _buildFilterRow(bool isDark, Color accent) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(label.toUpperCase(), style: GoogleFonts.roboto(fontSize: 8, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), fontWeight: FontWeight.bold, letterSpacing: 1)),
-                const SizedBox(height: 4),
-                Text(value, style: GoogleFonts.roboto(fontSize: 22, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                if (sub != null) Text(sub, style: GoogleFonts.roboto(fontSize: 10, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
-              ],
+        children: _filters.map((f) {
+          bool isSelected = _activeFilter == f;
+          return GestureDetector(
+            onTap: () => setState(() => _activeFilter = f),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected ? accent : (isDark ? Colors.white : Colors.black).withOpacity(0.03),
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(color: isSelected ? accent : (isDark ? Colors.white : Colors.black).withOpacity(0.05)),
+              ),
+              child: Text(f, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black).withOpacity(0.4))),
             ),
-          ),
-          const SizedBox(width: 16),
-          Icon(icon, color: color, size: 24),
-        ],
+          );
+        }).toList(),
       ),
     );
   }
 
-  Widget _buildFilterHeader(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("ACTIVITY STREAM", style: GoogleFonts.roboto(fontSize: 10, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), letterSpacing: 2, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            children: ["All Events", "Transfers", "Commands", "Connections"].map((f) {
-              bool active = _activeFilter == f;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () => setState(() => _activeFilter = f),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: active ? const Color(0xFF6C63FF) : (isDark ? const Color(0xFF192029) : Colors.white).withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Text(f, style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold, color: active ? Colors.white : (isDark ? Colors.white24 : Colors.black26))),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildActivityList(bool isDark, Color accent) {
+    final filtered = _activeFilter == "ALL" ? _activity : _activity.where((a) => a['type'].toString().toUpperCase() == _activeFilter).toList();
 
-  Widget _buildActivityStream(Color accent, bool isDark) {
-    final logs = _filteredLogs;
-    if (logs.isEmpty) {
+    if (filtered.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 60),
-          child: Text("No events found in this category.", style: GoogleFonts.roboto(color: (isDark ? Colors.white : Colors.black).withOpacity(0.12), fontSize: 13)),
+          padding: const EdgeInsets.all(40),
+          child: Text("No entries found for this category.", style: TextStyle(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1))),
         ),
       );
     }
@@ -217,65 +171,56 @@ class _ActivityScreenState extends State<ActivityScreen> {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: logs.length,
+      itemCount: filtered.length,
       itemBuilder: (context, index) {
-        return FadeInUp(
-          delay: Duration(milliseconds: index * 20),
-          child: _buildLogItem(logs[index], accent, isDark),
-        );
+        final a = filtered[index];
+        return _activityItem(a, isDark, accent);
       },
     );
   }
 
-  Widget _buildLogItem(dynamic log, Color accent, bool isDark) {
-    final category = log['category']?.toString() ?? "General";
-    final time = log['time'] ?? "--:--";
-
-    IconData icon = Icons.info_outline_rounded;
-    Color color = accent;
-
-    if (category == "Commands") { icon = Icons.terminal_rounded; color = Colors.redAccent; }
-    else if (category == "Transfers") { icon = Icons.sync_alt_rounded; color = const Color(0xFFFFB786); }
-    else if (category == "Connections") { icon = Icons.smartphone_rounded; color = accent; }
-
+  Widget _activityItem(dynamic a, bool isDark, Color accent) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: (isDark ? const Color(0xFF192029) : Colors.white).withOpacity(0.4),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.03)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(log['title'] ?? "System Update", style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                    Text(time, style: GoogleFonts.roboto(fontSize: 9, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(log['desc'] ?? "Operation completed successfully.", style: GoogleFonts.roboto(fontSize: 12, color: (isDark ? Colors.white : Colors.black).withOpacity(0.38))),
-              ],
+      margin: const EdgeInsets.only(bottom: 16),
+      child: GlassContainer(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+              child: Center(child: Icon(_getIconForType(a['type']), color: accent, size: 18)),
             ),
-          ),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(a['title'] ?? "Event", style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                  const SizedBox(height: 4),
+                  Text(a['timestamp'] ?? "Just now", style: GoogleFonts.roboto(fontSize: 10, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.1), size: 16),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBottomNav(bool isDark) {
+  IconData _getIconForType(dynamic type) {
+    switch (type.toString().toUpperCase()) {
+      case "FILES": return Icons.folder_copy_rounded;
+      case "SYSTEM": return Icons.computer_rounded;
+      case "SECURITY": return Icons.shield_rounded;
+      default: return Icons.info_rounded;
+    }
+  }
+
+  Widget _buildBottomNav() {
+    final theme = Provider.of<ThemeService>(context, listen: false);
+    final isDark = theme.isDarkMode;
     return GlassContainer(
       height: 90,
       borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
@@ -285,7 +230,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context), isDark),
           _navItem(Icons.folder_copy_rounded, "Files", false, () => Navigator.pushReplacementNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
           _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushReplacementNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-          _navItem(Icons.tune_rounded, "Settings", false, null, isDark),
+          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushReplacementNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
         ],
       ),
     );

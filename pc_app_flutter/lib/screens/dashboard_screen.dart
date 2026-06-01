@@ -34,6 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   String _pairingCode = "------";
   String _pcIp = "127.0.0.1";
   bool _isSystemActive = true;
+  bool _isOptimizing = false;
   List<dynamic> _devices = [];
   List<dynamic> _sharedFolders = [];
   List<dynamic> _securitySessions = [];
@@ -65,33 +66,44 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   void _startSync() {
     _syncTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (!mounted) return;
+
       try {
-        final code = await _bridge.getConnectCode();
-        // If we get a response from any endpoint, the system is active
-        final devices = await _bridge.getPairedDevices();
-        final stats = await _bridge.getSystemStats();
-        final transfers = await _bridge.getTransfers();
-        final folders = await _bridge.getSharedFolders();
-        final sessions = await _bridge.getSecuritySessions();
-        final activity = await _bridge.getActivityLog();
-        final netInfo = await _bridge.getNetworkInfo();
+        // Parallel fetching to avoid sequential bottlenecks
+        final results = await Future.wait([
+          _bridge.getConnectCode(),
+          _bridge.getPairedDevices(),
+          _bridge.getSystemStats(),
+          _bridge.getTransfers(),
+          _bridge.getSharedFolders(),
+          _bridge.getSecuritySessions(),
+          _bridge.getActivityLog(),
+          _bridge.getNetworkInfo(),
+        ]).timeout(const Duration(seconds: 5));
 
         if (mounted) {
           setState(() {
-            _pairingCode = code;
-            _devices = devices;
+            _pairingCode = results[0] as String;
+            _devices = results[1] as List<dynamic>;
+            final stats = results[2] as Map<String, dynamic>;
             if (stats.isNotEmpty) _stats = stats;
-            _activeTransfers = transfers;
-            _sharedFolders = folders;
-            _securitySessions = sessions;
-            _activityLog = activity;
+            _activeTransfers = results[3] as Map<String, dynamic>;
+            _sharedFolders = results[4] as List<dynamic>;
+            _securitySessions = results[5] as List<dynamic>;
+            _activityLog = results[6] as List<dynamic>;
+            final netInfo = results[7] as Map<String, dynamic>;
             _pcIp = netInfo['pc_ip'] ?? "127.0.0.1";
             _isSystemActive = true;
           });
         }
+
+        // Special case: Polling for settings changes every 10 ticks (20s)
+        if (timer.tick % 10 == 0) {
+          _loadSettings();
+        }
+
       } catch (e) {
-        // If we get a timeout or connection refused, check if we've ever been active
-        // Don't immediately switch to "Lost" state if we are still warming up
+        // Only trigger disconnect state if multiple consecutive failures occur
         if (mounted && timer.tick > 5) {
            setState(() => _isSystemActive = false);
         }
@@ -107,42 +119,104 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   Future<void> _updateSetting(String key, dynamic value) async {
-    final success = await _bridge.saveSettings({key: value});
-    if (success) _loadSettings();
+    try {
+      final success = await _bridge.saveSettings({key: value});
+      if (success) {
+        _loadSettings();
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to update system setting.")));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Setting Update Error: $e")));
+    }
   }
 
   Future<void> _optimizeSystem() async {
-    await _bridge.optimizeSystem();
-    _startSync();
+    if (_isOptimizing) return;
+    setState(() => _isOptimizing = true);
+    try {
+      await _bridge.optimizeSystem();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("System Optimization Complete.")));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Optimization Failed: $e")));
+    } finally {
+      if (mounted) setState(() => _isOptimizing = false);
+    }
   }
 
   Future<void> _refreshCode() async {
-    final newCode = await _bridge.refreshConnectCode();
-    if (mounted) setState(() => _pairingCode = newCode);
+    try {
+      final newCode = await _bridge.refreshConnectCode();
+      if (mounted) {
+        setState(() => _pairingCode = newCode);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pairing code rotated successfully.")));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to refresh code.")));
+    }
   }
 
   Future<void> _addSharedFolder() async {
-    String? result = await FilePicker.platform.getDirectoryPath();
-    if (result != null) {
-      final currentPaths = _sharedFolders.map((f) => f['path'] as String).toList();
-      if (!currentPaths.contains(result)) {
-        currentPaths.add(result);
-        final success = await _bridge.saveSettings({"shared_folders": currentPaths});
-        if (success) {
-          final folders = await _bridge.getSharedFolders();
-          if (mounted) setState(() => _sharedFolders = folders);
+    try {
+      String? result = await FilePicker.platform.getDirectoryPath();
+      if (result != null) {
+        final currentPaths = _sharedFolders.map((f) => f['path'] as String).toList();
+        if (!currentPaths.contains(result)) {
+          currentPaths.add(result);
+          final success = await _bridge.saveSettings({"shared_folders": currentPaths});
+          if (success) {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("New folder shared.")));
+            // Sync will pick it up naturally
+          }
         }
       }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("File Picker Error: $e")));
     }
   }
 
   Future<void> _removeSharedFolder(String path) async {
-    final currentPaths = _sharedFolders.map((f) => f['path'] as String).toList();
-    currentPaths.remove(path);
-    final success = await _bridge.saveSettings({"shared_folders": currentPaths});
-    if (success) {
-      final folders = await _bridge.getSharedFolders();
-      if (mounted) setState(() => _sharedFolders = folders);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1E),
+        title: const Text("Remove Shared Folder?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text("Stop sharing access to: $path", style: const TextStyle(color: Colors.white60)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCEL", style: TextStyle(color: Colors.white24))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text("REMOVE ACCESS"),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!confirmed) return;
+
+    try {
+      final currentPaths = _sharedFolders.map((f) => f['path'] as String).toList();
+      currentPaths.remove(path);
+      final success = await _bridge.saveSettings({"shared_folders": currentPaths});
+      if (success) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Folder unshared.")));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error removing folder: $e")));
+    }
+  }
+
+  Future<void> _revokeGuestSession(String token) async {
+    try {
+      final success = await _bridge.endGuestSession(token);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Guest Access Revoked")));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Revoke Error: $e")));
     }
   }
 
@@ -171,7 +245,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                             children: [
                               HomeTab(pairingCode: _pairingCode, devices: _devices, stats: _stats, isDark: isDark, accent: accent, onRefreshCode: _refreshCode),
                               TransfersTab(activeTransfers: _activeTransfers, activityLog: _activityLog, isDark: isDark, accent: accent),
-                              HealthTab(stats: _stats, isDark: isDark, waveAnimation: _waveController, accent: accent, onOptimize: _optimizeSystem),
+                              HealthTab(stats: _stats, isDark: isDark, waveAnimation: _waveController, accent: accent, onOptimize: _optimizeSystem, isOptimizing: _isOptimizing),
                               FilesTab(
                                 isDark: isDark,
                                 accent: accent,
@@ -179,7 +253,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                                 onAddFolder: _addSharedFolder,
                                 onRemoveFolder: _removeSharedFolder,
                               ),
-                              SecurityTab(isDark: isDark, accent: accent, sessions: _securitySessions, pcIp: _pcIp),
+                              SecurityTab(isDark: isDark, accent: accent, sessions: _securitySessions, pcIp: _pcIp, onRevokeSession: _revokeGuestSession),
                               ActivityTab(isDark: isDark, accent: accent, logs: _activityLog),
                               SettingsTab(
                                   settings: _settings,
@@ -364,7 +438,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Luxury Logo Animation Placeholder
             TweenAnimationBuilder<double>(
               tween: Tween(begin: 0.0, end: 1.0),
               duration: const Duration(seconds: 2),
@@ -389,7 +462,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             ),
             const SizedBox(height: 48),
             Text(
-              "LOADING CYPHER",
+              "CONNECTION LOST",
               style: GoogleFonts.roboto(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
@@ -399,7 +472,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             ),
             const SizedBox(height: 16),
             Text(
-              "CONNECTING TO MOBILE APP",
+              "CHECK IF MOBILE APP IS RUNNING ON THE SAME NETWORK",
+              textAlign: TextAlign.center,
               style: GoogleFonts.roboto(
                 fontSize: 10,
                 color: Colors.white24,
@@ -419,13 +493,15 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                       minHeight: 2,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("SECURING CONNECTION", style: GoogleFonts.roboto(fontSize: 8, color: Colors.white10)),
-                      Text("V1.0.4", style: GoogleFonts.roboto(fontSize: 8, color: Colors.white10)),
-                    ],
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => setState(() => _isSystemActive = true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accent,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text("RETRY CONNECTION", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                 ],
               ),
