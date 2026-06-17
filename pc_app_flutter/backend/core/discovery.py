@@ -28,7 +28,7 @@ class CypherDiscovery:
         """
         Returns all valid local IPv4 addresses.
         EXCLUDES 169.254.x.x (APIPA) and 127.0.0.1.
-        PRIORITIZES Hotspot (192.168.137.x) and local LAN (192.168.x.x, 10.x.x.x).
+        PRIORITIZES USB tethering (192.168.42.x), hotspots (192.168.43.x, 192.168.137.x), and local LAN (10.x.x.x).
         """
         ips = []
         try:
@@ -40,8 +40,10 @@ class CypherDiscovery:
                         if ip.startswith("127.") or ip.startswith("169.254."):
                             continue
 
-                        # Prioritize common Windows/Mobile hotspot ranges
-                        if ip.startswith("192.168.137.") or ip.startswith("10."):
+                        # Prioritize connection modes: USB tethering → hotspots → LAN
+                        if ip.startswith("192.168.42."):  # USB tethering
+                            ips.insert(0, ip)
+                        elif ip.startswith("192.168.43.") or ip.startswith("192.168.137.") or ip.startswith("10."):
                             ips.insert(0, ip)
                         else:
                             ips.append(ip)

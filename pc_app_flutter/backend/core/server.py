@@ -405,23 +405,31 @@ def verify_token_and_log():
 # --- HELPERS ---
 
 def get_local_ip():
-    """Returns the primary IP, prioritizing Android/Windows hotspot ranges for phone connection."""
+    """Returns the primary IP, prioritizing USB tethering → Android hotspot → Windows hotspot → WiFi/LAN."""
     try:
         all_addrs = psutil.net_if_addrs()
 
-        # Priority 1: Phone hotspot (Android = 192.168.43.x)
+        # Priority 1: USB Tethering (192.168.42.x) — Most reliable for direct tether
+        for iface_name, addrs in all_addrs.items():
+            # USB tethering interfaces are named: usb0, usb1, rndis0, etc.
+            if any(x in iface_name.lower() for x in ['usb', 'rndis', 'ncm', 'teth']):
+                for addr in addrs:
+                    if addr.family == socket.AF_INET and addr.address.startswith("192.168.42."):
+                        return addr.address
+
+        # Priority 2: Phone hotspot (Android = 192.168.43.x)
         for _, addrs in all_addrs.items():
             for addr in addrs:
                 if addr.family == socket.AF_INET and addr.address.startswith("192.168.43."):
                     return addr.address
 
-        # Priority 2: Windows built-in hotspot (192.168.137.x)
+        # Priority 3: Windows built-in hotspot (192.168.137.x)
         for _, addrs in all_addrs.items():
             for addr in addrs:
                 if addr.family == socket.AF_INET and addr.address.startswith("192.168.137."):
                     return addr.address
 
-        # Priority 3: Active route detection (works for regular WiFi/LAN)
+        # Priority 4: Active route detection (works for regular WiFi/LAN)
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0)
         try:
@@ -435,7 +443,7 @@ def get_local_ip():
         if ip != '127.0.0.1' and not ip.startswith('169.254.'):
             return ip
 
-        # Priority 4: Any private range
+        # Priority 5: Any private range (fallback)
         for _, addrs in all_addrs.items():
             for addr in addrs:
                 if addr.family == socket.AF_INET:
