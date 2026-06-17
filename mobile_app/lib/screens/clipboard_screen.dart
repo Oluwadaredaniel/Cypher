@@ -1,270 +1,227 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:animate_do/animate_do.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import '../services/theme_service.dart';
-import '../widgets/glass_container.dart';
+import '../providers/connection_provider.dart';
+import '../providers/system_provider.dart';
+import '../services/api_service.dart';
+import '../services/clipboard_service.dart';
+import '../theme/colors.dart';
+import '../theme/app_theme.dart';
+import '../widgets/cypher_button.dart';
+import '../widgets/cypher_card.dart';
 
 class ClipboardScreen extends StatefulWidget {
-  final String pcIpAddress;
-  final String authToken;
-
-  const ClipboardScreen({super.key, required this.pcIpAddress, required this.authToken});
+  const ClipboardScreen({super.key});
 
   @override
   State<ClipboardScreen> createState() => _ClipboardScreenState();
 }
 
 class _ClipboardScreenState extends State<ClipboardScreen> {
-  String _currentClipboard = "";
-  List<String> _history = [];
-  bool _isLoading = true;
+  String _phoneContent = '';
+  bool _sending = false;
   Timer? _refreshTimer;
+  final _quickSendCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _fetchClipboard();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) => _fetchClipboard(isSilent: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ip = context.read<ConnectionProvider>().ip ?? '';
+      if (ip.isNotEmpty) {
+        context.read<SystemProvider>().fetchClipboard(ip);
+        _loadPhoneClipboard();
+        _refreshTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+          if (mounted) context.read<SystemProvider>().fetchClipboard(ip);
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _quickSendCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchClipboard({bool isSilent = false}) async {
-    if (!isSilent) setState(() => _isLoading = true);
-    try {
-      final res = await http.get(
-        Uri.parse('http://${widget.pcIpAddress}:5000/clipboard'),
-        headers: {'X-Auth-Token': widget.authToken},
-      );
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final newContent = data['content'] ?? "";
-        if (newContent != _currentClipboard && newContent.isNotEmpty) {
-          if (_currentClipboard.isNotEmpty) _history.insert(0, _currentClipboard);
-          setState(() => _currentClipboard = newContent);
-        }
-      }
-    } catch (_) {}
-    if (mounted) setState(() => _isLoading = false);
+  Future<void> _loadPhoneClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (mounted) setState(() => _phoneContent = data?.text ?? '');
+  }
+
+  Future<void> _copyToPhone(String text) async {
+    if (text.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: text));
+    await ClipboardService.addToHistory(text, source: 'pc');
+    HapticFeedback.mediumImpact();
+    _toast('Copied to phone');
+    setState(() => _phoneContent = text);
   }
 
   Future<void> _sendToPC(String text) async {
-    HapticFeedback.mediumImpact();
+    if (text.trim().isEmpty) return;
+    final ip = context.read<ConnectionProvider>().ip ?? '';
+    setState(() => _sending = true);
     try {
-      await http.post(
-        Uri.parse('http://${widget.pcIpAddress}:5000/clipboard'),
-        headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
-        body: jsonEncode({'content': text}),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sent to PC Clipboard")));
-    } catch (_) {}
+      await ApiService.setPcClipboard(ip, text.trim());
+      await ClipboardService.addToHistory(text.trim(), source: 'phone');
+      HapticFeedback.mediumImpact();
+      _toast('Sent to PC');
+      _quickSendCtrl.clear();
+      FocusScope.of(context).unfocus();
+      context.read<SystemProvider>().fetchClipboard(ip);
+    } catch (_) {
+      _toast("Couldn't send — check connection", err: true);
+    }
+    if (mounted) setState(() => _sending = false);
+  }
+
+  Future<void> _pasteOnPC() async {
+    final ip = context.read<ConnectionProvider>().ip ?? '';
+    try {
+      await ApiService.pasteFromPhone(ip);
+      _toast('Pasted on PC');
+    } catch (_) {
+      _toast('Paste failed', err: true);
+    }
+  }
+
+  void _toast(String msg, {bool err = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: err ? CypherColors.error : CypherColors.accent,
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Provider.of<ThemeService>(context);
-    final isDark = theme.isDarkMode;
-    final accent = const Color(0xFF6C63FF);
+    final sp = context.watch<SystemProvider>();
+    final pcText = sp.pcClipboard ?? '';
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 80),
-                  _buildHeader(isDark),
-                  const SizedBox(height: 32),
-                  _buildLiveCard(accent, isDark),
-                  const SizedBox(height: 24),
-                  _buildHistoryBento(isDark),
-                ],
-              ),
-            ),
+      appBar: AppBar(
+        title: const Text('Clipboard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history_rounded),
+            tooltip: 'History',
+            onPressed: () => Navigator.pushNamed(context, '/clipboard-history'),
           ),
-          _buildFloatingHeader(accent, isDark),
-          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
+            onPressed: () {
+              final ip = context.read<ConnectionProvider>().ip ?? '';
+              context.read<SystemProvider>().fetchClipboard(ip);
+              _loadPhoneClipboard();
+            },
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildFloatingHeader(Color accent, bool isDark) {
-    return Positioned(
-      top: 0, left: 0, right: 0,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        decoration: BoxDecoration(
-          color: (isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7)).withOpacity(0.8),
-          border: Border(bottom: BorderSide(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05))),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        children: [
+          // PC Clipboard
+          const CypherSectionHeader(title: 'PC Clipboard'),
+          const SizedBox(height: 8),
+          CypherCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 20), onPressed: () => Navigator.pop(context)),
-                Text("CLIPBOARD", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
+                if (pcText.isEmpty)
+                  const Text('Nothing in PC clipboard', style: TextStyle(color: CypherColors.textMuted, fontSize: 14))
+                else
+                  Text(pcText, maxLines: 6, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: CypherColors.textPrimary, height: 1.5)),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: CypherButton(
+                        label: 'Copy to Phone',
+                        onTap: () => _copyToPhone(pcText),
+                      ),
+                    ),
+                    if (pcText.startsWith('http')) ...[
+                      const SizedBox(width: 8),
+                      CypherButton(
+                        label: 'Open Link',
+                        variant: CypherButtonVariant.secondary,
+                        onTap: () => ApiService.openLink(context.read<ConnectionProvider>().ip ?? '', pcText),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
-            Icon(Icons.sync_rounded, color: accent),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Universal Bridge", style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
-        const SizedBox(height: 8),
-        Text("Real-time clipboard synchronization.", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
-      ],
-    );
-  }
-
-  Widget _buildLiveCard(Color accent, bool isDark) {
-    return GlassContainer(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("CURRENT ON PC", style: GoogleFonts.roboto(fontSize: 9, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), fontWeight: FontWeight.bold, letterSpacing: 2)),
-              const Icon(Icons.computer_rounded, size: 14, color: Color(0xFF10B981)),
-            ],
           ),
+
+          // Phone Clipboard
           const SizedBox(height: 20),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: (isDark ? Colors.white : Colors.black).withOpacity(0.03), borderRadius: BorderRadius.circular(16)),
-            child: Text(
-              _currentClipboard.isEmpty ? "Clipboard is empty" : _currentClipboard,
-              style: GoogleFonts.roboto(fontSize: 16, color: isDark ? Colors.white : Colors.black, height: 1.5),
+          const CypherSectionHeader(title: 'Phone Clipboard'),
+          const SizedBox(height: 8),
+          CypherCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_phoneContent.isEmpty)
+                  const Text('Nothing in phone clipboard', style: TextStyle(color: CypherColors.textMuted, fontSize: 14))
+                else
+                  Text(_phoneContent, maxLines: 6, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: CypherColors.textPrimary, height: 1.5)),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: CypherButton(
+                        label: 'Send to PC',
+                        onTap: () => _sendToPC(_phoneContent),
+                        loading: _sending,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    CypherButton(
+                      label: 'Paste on PC',
+                      variant: CypherButtonVariant.secondary,
+                      onTap: _pasteOnPC,
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: _actionBtn("Copy to Phone", Icons.copy_rounded, accent, () {
-                  Clipboard.setData(ClipboardData(text: _currentClipboard));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Copied to phone")));
-                }),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _actionBtn("Push from Phone", Icons.upload_rounded, const Color(0xFFFFB786), () async {
-                  final data = await Clipboard.getData('text/plain');
-                  if (data?.text != null) _sendToPC(data!.text!);
-                }),
-              ),
-            ],
-          )
+
+          // Quick Send
+          const SizedBox(height: 20),
+          const CypherSectionHeader(title: 'Quick Send'),
+          const SizedBox(height: 8),
+          CypherCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _quickSendCtrl,
+                  maxLines: 4,
+                  minLines: 2,
+                  decoration: const InputDecoration(
+                    hintText: 'Type text or paste a link to send to PC...',
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    fillColor: Colors.transparent,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                CypherButton(
+                  label: 'Send to PC',
+                  onTap: () => _sendToPC(_quickSendCtrl.text),
+                  loading: _sending,
+                ),
+              ],
+            ),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _actionBtn(String label, IconData icon, Color color, VoidCallback tap) {
-    return GestureDetector(
-      onTap: tap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withOpacity(0.2))),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 16),
-            const SizedBox(width: 8),
-            Text(label, style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHistoryBento(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("HISTORY", style: GoogleFonts.roboto(fontSize: 9, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), fontWeight: FontWeight.bold, letterSpacing: 2)),
-        const SizedBox(height: 16),
-        if (_history.isEmpty)
-          Center(child: Padding(padding: const EdgeInsets.all(40), child: Text("No previous entries", style: TextStyle(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1)))))
-        else
-          ..._history.take(5).map((item) => _historyItem(item, isDark)).toList(),
-      ],
-    );
-  }
-
-  Widget _historyItem(String text, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: (isDark ? Colors.white : Colors.black).withOpacity(0.02), borderRadius: BorderRadius.circular(16)),
-      child: Row(
-        children: [
-          const Icon(Icons.history_rounded, size: 16, color: Colors.white10),
-          const SizedBox(width: 16),
-          Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.roboto(fontSize: 13, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4)))),
-          IconButton(icon: const Icon(Icons.send_to_mobile_rounded, size: 18, color: Colors.white10), onPressed: () => _sendToPC(text)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    final theme = Provider.of<ThemeService>(context, listen: false);
-    final isDark = theme.isDarkMode;
-    return GlassContainer(
-      height: 90,
-      borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context), isDark),
-          _navItem(Icons.folder_copy_rounded, "Files", false, () => Navigator.pushReplacementNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-          _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushReplacementNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushReplacementNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
-    final accent = const Color(0xFF6C63FF);
-    return GestureDetector(
-      onTap: tap,
-      child: Opacity(
-        opacity: active ? 1.0 : 0.4,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: active ? accent : (isDark ? Colors.white : Colors.black), size: 24),
-            const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : (isDark ? Colors.white : Colors.black))),
-          ],
-        ),
       ),
     );
   }

@@ -1,366 +1,326 @@
-import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import '../services/theme_service.dart';
-import '../widgets/glass_container.dart';
+import '../providers/connection_provider.dart';
+import '../services/api_service.dart';
+import '../services/storage_service.dart';
+import '../theme/colors.dart';
+import '../theme/app_theme.dart';
+import '../services/update_service.dart';
+import '../widgets/cypher_button.dart';
+import '../widgets/cypher_card.dart';
 
 class SettingsScreen extends StatefulWidget {
-  final String pcIpAddress;
-  final String authToken;
-
-  const SettingsScreen({super.key, required this.pcIpAddress, required this.authToken});
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _autoClipboard = false;
-  double _batteryAlert = 20;
-  List<String> _availableFolders = [];
+  Map<String, dynamic> _settings = {};
+  bool _isLoading = true;
+  bool _isSaving = false;
+  bool _hapticEnabled = true;
+  bool _batteryAlertEnabled = false;
+  double _batteryThreshold = 20;
+  UpdateResult? _updateResult;
+  bool _isCheckingUpdate = false;
+  bool _updateCheckFailed = false;
 
   @override
   void initState() {
     super.initState();
-    _loadLocalSettings();
-    _fetchFolders();
-  }
-
-  Future<void> _fetchFolders() async {
-    try {
-      final res = await http.get(
-        Uri.parse('http://${widget.pcIpAddress}:5000/settings'),
-        headers: {'X-Auth-Token': widget.authToken},
-      );
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        setState(() {
-          _availableFolders = List<String>.from(data['shared_folders'] ?? []);
-        });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _loadLocalSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _autoClipboard = prefs.getBool('auto_clipboard') ?? false;
-      _batteryAlert = prefs.getDouble('battery_threshold') ?? 20;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSettings();
+      _checkForUpdate();
     });
   }
 
-  Future<void> _savePreference(String key, dynamic value) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (value is bool) await prefs.setBool(key, value);
-    if (value is double) await prefs.setDouble(key, value);
+  Future<void> _loadSettings() async {
+    setState(() => _isLoading = true);
+    final ip = context.read<ConnectionProvider>().ip ?? '';
+    try {
+      final data = await ApiService.getSettings(ip);
+      if (mounted) {
+        setState(() {
+          _settings          = data;
+          _batteryThreshold  = (data['battery_alert_threshold'] ?? 20).toDouble();
+          _batteryAlertEnabled = data['battery_alert_enabled'] ?? false;
+          _isLoading         = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  Future<void> _syncToPC() async {
+  Future<void> _saveSettings() async {
+    setState(() => _isSaving = true);
+    final ip = context.read<ConnectionProvider>().ip ?? '';
     try {
-      await http.post(
-        Uri.parse('http://${widget.pcIpAddress}:5000/settings'),
-        headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'auto_clipboard_sync': _autoClipboard,
-          'battery_alert_threshold': _batteryAlert.toInt(),
-        }),
-      );
-    } catch (_) {}
+      await ApiService.updateSettings(ip, {
+        ..._settings,
+        'battery_alert_threshold': _batteryThreshold.toInt(),
+        'battery_alert_enabled': _batteryAlertEnabled,
+      });
+      _toast('Settings saved');
+    } catch (_) {
+      _toast('Could not save — check connection', err: true);
+    }
+    if (mounted) setState(() => _isSaving = false);
+  }
+
+  Future<void> _forgetPC() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Forget this PC?'),
+        content: const Text('You will need to re-pair to connect again.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Forget', style: TextStyle(color: CypherColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && mounted) {
+      await StorageService.clearPairing();
+      context.read<ConnectionProvider>().disconnect();
+      Navigator.pushNamedAndRemoveUntil(context, '/connection', (_) => false);
+    }
+  }
+
+  Future<void> _checkForUpdate() async {
+    if (!mounted) return;
+    setState(() { _isCheckingUpdate = true; _updateCheckFailed = false; });
+    final result = await UpdateService.check();
+    if (!mounted) return;
+    setState(() {
+      _updateResult = result;
+      _isCheckingUpdate = false;
+      _updateCheckFailed = result == null && !_isCheckingUpdate;
+    });
+  }
+
+  void _toast(String msg, {bool err = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: err ? CypherColors.error : CypherColors.accent,
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Provider.of<ThemeService>(context);
-    final isDark = theme.isDarkMode;
-    final accent = const Color(0xFF6C63FF);
+    final cp = context.watch<ConnectionProvider>();
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 64),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeader(isDark),
-                        const SizedBox(height: 32),
-                        _buildCoreControls(theme, accent, isDark),
-                        const SizedBox(height: 24),
-                        _buildBatteryThreshold(accent, isDark),
-                        const SizedBox(height: 24),
-                        _buildSharedFolders(accent, isDark),
-                        const SizedBox(height: 48),
-                        _buildFooterActions(accent, isDark),
-                        const SizedBox(height: 120),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _buildFloatingHeader(accent, isDark),
-          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFloatingHeader(Color accent, bool isDark) {
-    return Positioned(
-      top: 0, left: 0, right: 0,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        decoration: BoxDecoration(
-          color: (isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7)).withOpacity(0.8),
-          border: Border(bottom: BorderSide(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05))),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 20), onPressed: () => Navigator.pop(context)),
-                Text("SETTINGS", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
-              ],
-            ),
-            Icon(Icons.sensors_rounded, color: accent),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("System Settings", style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
-        const SizedBox(height: 8),
-        Text("Configure your system preferences.", style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4))),
-      ],
-    );
-  }
-
-  Widget _buildCoreControls(ThemeService theme, Color accent, bool isDark) {
-    return Row(
-      children: [
-        Expanded(
-          child: _bentoToggle(
-            "Night Mode",
-            "UI Appearance",
-            Icons.dark_mode_rounded,
-            theme.isDarkMode,
-            (v) => theme.toggleTheme(),
-            accent,
-            isDark
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _bentoToggle(
-            "Auto-Sync",
-            "Clipboard Sync",
-            Icons.sync_rounded,
-            _autoClipboard,
-            (v) {
-              setState(() => _autoClipboard = v);
-              _savePreference('auto_clipboard', v);
-              _syncToPC();
-            },
-            const Color(0xFFFFB786),
-            isDark
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _bentoToggle(String title, String sub, IconData icon, bool val, Function(bool) tap, Color color, bool isDark) {
-    return GlassContainer(
-      padding: const EdgeInsets.all(20),
-      height: 160,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      appBar: AppBar(title: const Text('Settings')),
+      body: _isLoading
+        ? const Center(child: CircularProgressIndicator(color: CypherColors.accent))
+        : ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              Switch.adaptive(value: val, onChanged: tap, activeColor: color),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-              Text(sub, style: GoogleFonts.roboto(fontSize: 11, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
-            ],
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSharedFolders(Color accent, bool isDark) {
-    return GlassContainer(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
+              const CypherSectionHeader(title: 'Connection'),
+              const SizedBox(height: 8),
+              CypherCard(
+                padding: const EdgeInsets.all(16),
+                child: Column(
                   children: [
-                    Icon(Icons.folder_copy_rounded, color: accent, size: 20),
-                    const SizedBox(width: 12),
-                    Text("Shared Locations", style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                    _InfoRow('PC Address', cp.ip ?? '—'),
+                    const SizedBox(height: 8),
+                    _InfoRow('PC Name', cp.pcName ?? '—'),
+                    const SizedBox(height: 8),
+                    _InfoRow('Status', cp.isConnected ? 'Connected' : 'Disconnected'),
                   ],
                 ),
-              ],
-            ),
-          ),
-          Divider(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05), height: 1),
-          if (_availableFolders.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text("No folders configured on PC.", style: GoogleFonts.roboto(fontSize: 12, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
-            )
-          else
-            ..._availableFolders.map((f) => ListTile(
-              leading: Icon(Icons.folder_open_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), size: 18),
-              title: Text(f.split('/').last.split('\\').last, style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7))),
-              subtitle: Text(f, style: GoogleFonts.roboto(fontSize: 8, color: (isDark ? Colors.white : Colors.black).withOpacity(0.1))),
-            )),
-        ],
-      ),
-    );
-  }
+              ),
 
-  Widget _buildBatteryThreshold(Color accent, bool isDark) {
-    return GlassContainer(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("BATTERY ALERT", style: GoogleFonts.roboto(fontSize: 9, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), fontWeight: FontWeight.bold, letterSpacing: 2)),
-              Text("${_batteryAlert.toInt()}%", style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFFFFB786))),
+              const SizedBox(height: 20),
+              const CypherSectionHeader(title: 'Auto-Connect'),
+              const SizedBox(height: 8),
+              CypherCard(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: _ToggleRow(
+                  label: 'Smart Auto-Connect',
+                  desc: 'Automatically reconnect to your PC when on home WiFi',
+                  value: cp.autoConnectEnabled,
+                  onChanged: (v) => cp.setAutoConnect(v),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              const CypherSectionHeader(title: 'Alerts'),
+              const SizedBox(height: 8),
+              CypherCard(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  children: [
+                    _ToggleRow(
+                      label: 'Battery alert',
+                      desc: 'Notify when PC battery is low',
+                      value: _batteryAlertEnabled,
+                      onChanged: (v) { HapticFeedback.lightImpact(); setState(() => _batteryAlertEnabled = v); },
+                    ),
+                    if (_batteryAlertEnabled)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Slider(
+                                value: _batteryThreshold,
+                                min: 5, max: 50, divisions: 9,
+                                onChanged: (v) => setState(() => _batteryThreshold = v),
+                              ),
+                            ),
+                            Text('${_batteryThreshold.toInt()}%', style: AppTheme.caption(context)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              const CypherSectionHeader(title: 'Preferences'),
+              const SizedBox(height: 8),
+              CypherCard(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: _ToggleRow(
+                  label: 'Haptic feedback',
+                  desc: 'Vibrate on actions',
+                  value: _hapticEnabled,
+                  onChanged: (v) => setState(() => _hapticEnabled = v),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              const CypherSectionHeader(title: 'About'),
+              const SizedBox(height: 8),
+              CypherCard(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _InfoRow('Version', UpdateService.currentVersion),
+                    const SizedBox(height: 8),
+                    const _InfoRow('Mode', '100% Local Network'),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Updates', style: AppTheme.body(context)),
+                        if (_isCheckingUpdate)
+                          const SizedBox(
+                            width: 16, height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: CypherColors.accent),
+                          )
+                        else if (_updateResult != null)
+                          GestureDetector(
+                            onTap: () => UpdateService.openReleasePage(_updateResult!.downloadUrl),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: CypherColors.accent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'v${_updateResult!.latestVersion} available',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                              ),
+                            ),
+                          )
+                        else
+                          Row(
+                            children: [
+                              Text(
+                                _updateCheckFailed ? 'Check failed' : 'Up to date',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: _updateCheckFailed ? CypherColors.textMuted : CypherColors.success,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: _checkForUpdate,
+                                child: const Icon(Icons.refresh_rounded, size: 16, color: CypherColors.textMuted),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              const CypherSectionHeader(title: 'Danger Zone'),
+              const SizedBox(height: 8),
+              CypherCard(
+                onTap: _forgetPC,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: const Row(
+                  children: [
+                    Icon(Icons.link_off_rounded, color: CypherColors.error, size: 18),
+                    SizedBox(width: 12),
+                    Text('Forget this PC & re-pair', style: TextStyle(color: CypherColors.error, fontSize: 14, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+              CypherButton(label: 'Save Settings', onTap: _saveSettings, loading: _isSaving),
             ],
           ),
-          const SizedBox(height: 16),
-          SliderTheme(
-            data: SliderThemeData(
-              trackHeight: 2,
-              activeTrackColor: const Color(0xFFFFB786),
-              inactiveTrackColor: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
-              thumbColor: isDark ? Colors.white : const Color(0xFFFFB786),
-              overlayColor: const Color(0xFFFFB786).withOpacity(0.1),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-            ),
-            child: Slider(
-              value: _batteryAlert,
-              min: 5, max: 50,
-              onChanged: (v) {
-                setState(() => _batteryAlert = v);
-                _savePreference('battery_threshold', v);
-              },
-              onChangeEnd: (v) => _syncToPC(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text("Notify when PC battery drops below this level.", style: GoogleFonts.roboto(fontSize: 11, color: (isDark ? Colors.white : Colors.black).withOpacity(0.12))),
-        ],
-      ),
     );
   }
+}
 
-  Widget _footerBtn(String label, Color color, VoidCallback tap, {bool outline = false, required bool isDark}) {
-    return GestureDetector(
-      onTap: tap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: outline ? Colors.transparent : color,
-          borderRadius: BorderRadius.circular(16),
-          border: outline ? Border.all(color: color.withOpacity(0.2)) : null,
-          boxShadow: !outline ? [BoxShadow(color: color.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 8))] : null,
-        ),
-        child: Center(
-          child: Text(label, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: outline ? color : Colors.white)),
-        ),
-      ),
-    );
-  }
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _InfoRow(this.label, this.value);
 
-  Widget _buildFooterActions(Color accent, bool isDark) {
-    return Column(
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _footerBtn("Disconnect & Factory Reset", Colors.redAccent, () async {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.clear();
-          if (mounted) Navigator.pushReplacementNamed(context, '/setup');
-        }, outline: true, isDark: isDark),
+        Text(label, style: AppTheme.body(context)),
+        Text(value, style: const TextStyle(fontSize: 13, color: CypherColors.textSecondary)),
       ],
     );
   }
+}
 
-  Widget _buildBottomNav() {
-    final theme = Provider.of<ThemeService>(context, listen: false);
-    final isDark = theme.isDarkMode;
-    return GlassContainer(
-      height: 90,
-      borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+class _ToggleRow extends StatelessWidget {
+  final String label;
+  final String desc;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const _ToggleRow({required this.label, required this.desc, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context), isDark),
-          _navItem(Icons.folder_copy_rounded, "Files", false, () => Navigator.pushReplacementNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-          _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushReplacementNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-          _navItem(Icons.tune_rounded, "Settings", true, null, isDark),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: CypherColors.textPrimary)),
+                Text(desc, style: AppTheme.caption(context)),
+              ],
+            ),
+          ),
+          Switch(value: value, onChanged: onChanged),
         ],
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
-    final accent = const Color(0xFF6C63FF);
-    final inactiveColor = isDark ? Colors.white38 : Colors.black38;
-    return GestureDetector(
-      onTap: tap,
-      child: Opacity(
-        opacity: 1.0,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: active ? accent : inactiveColor, size: 24),
-            const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : inactiveColor)),
-          ],
-        ),
       ),
     );
   }

@@ -56,11 +56,11 @@ class FilesTab extends StatelessWidget {
                                 child: Icon(Icons.storage_rounded, color: accent, size: 20),
                               ),
                               const SizedBox(width: 12),
-                              Text("Sharing Hub", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                              Text("Sharing Hub", style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                             ],
                           ),
                           const SizedBox(height: 20),
-                          Text("${sharedFolders.length} active locations shared with your phone.", style: GoogleFonts.roboto(fontSize: 13, color: isDark ? Colors.white30 : Colors.black38)),
+                          Text("${sharedFolders.length} active locations shared with your phone.", style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white30 : Colors.black38)),
                         ],
                       ),
                       Container(
@@ -71,20 +71,24 @@ class FilesTab extends StatelessWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text("Sync Status", style: GoogleFonts.roboto(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26)),
+                                Text("Sync Status", style: GoogleFonts.inter(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26)),
                                 Row(
                                   children: [
                                     Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
                                     const SizedBox(width: 8),
-                                    Text("Online", style: GoogleFonts.roboto(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
+                                    Text("Online", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
                                   ],
                                 )
                               ],
                             ),
                             const SizedBox(height: 12),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: LinearProgressIndicator(value: 1.0, minHeight: 2, backgroundColor: isDark ? Colors.white10 : Colors.black12, valueColor: AlwaysStoppedAnimation(accent)),
+                            Container(
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: accent,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [BoxShadow(color: accent.withOpacity(0.5), blurRadius: 8)],
+                              ),
                             ),
                           ],
                         ),
@@ -105,9 +109,9 @@ class FilesTab extends StatelessWidget {
                         decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.02), border: Border(bottom: BorderSide(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black12))),
                         child: Row(
                           children: [
-                            Expanded(child: Text("FOLDER LOCATION", style: GoogleFonts.roboto(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold))),
+                            Expanded(child: Text("FOLDER LOCATION", style: GoogleFonts.inter(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold))),
                             const SizedBox(width: 48),
-                            Text("ACTION", style: GoogleFonts.roboto(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
+                            Text("ACTION", style: GoogleFonts.inter(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -118,8 +122,8 @@ class FilesTab extends StatelessWidget {
                             children: [
                               Icon(Icons.folder_off_outlined, size: 48, color: isDark ? Colors.white10 : Colors.black.withOpacity(0.1)),
                               const SizedBox(height: 16),
-                              Text("No folders shared yet.", style: GoogleFonts.roboto(color: isDark ? Colors.white24 : Colors.black26, fontSize: 14)),
-                              Text("Add a folder to make it accessible on your mobile device.", style: GoogleFonts.roboto(color: isDark ? Colors.white10 : Colors.black12, fontSize: 11)),
+                              Text("No folders shared yet.", style: GoogleFonts.inter(color: isDark ? Colors.white24 : Colors.black26, fontSize: 14)),
+                              Text("Add a folder to make it accessible on your mobile device.", style: GoogleFonts.inter(color: isDark ? Colors.white10 : Colors.black12, fontSize: 11)),
                             ],
                           ),
                         )
@@ -142,14 +146,14 @@ class FilesTab extends StatelessWidget {
       children: [
         Row(
           children: [
-            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-            const SizedBox(width: 12),
-            Text("LIVE CONNECTION", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white24 : Colors.black26, letterSpacing: 2)),
+            Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Text('LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: const Color(0xFF10B981), letterSpacing: 2)),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(title, style: GoogleFonts.roboto(fontSize: 32, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
-        Text(sub, style: GoogleFonts.roboto(fontSize: 14, color: isDark ? Colors.white24 : Colors.black38)),
+        const SizedBox(height: 6),
+        Text(title, style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black, height: 1.1)),
+        Text(sub, style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white30 : Colors.black38)),
       ],
     );
   }
@@ -164,7 +168,7 @@ class FilesTab extends StatelessWidget {
           children: [
             Icon(icon, color: Colors.white, size: 16),
             const SizedBox(width: 8),
-            Text(label, style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
           ],
         ),
       ),
@@ -186,11 +190,11 @@ class FilesTab extends StatelessWidget {
                 Text(name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                 Text(path,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.roboto(fontSize: 9, color: isDark ? Colors.white12 : Colors.black12)),
+                  style: GoogleFonts.inter(fontSize: 9, color: isDark ? Colors.white12 : Colors.black12)),
               ],
             ),
           ),

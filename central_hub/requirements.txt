@@ -1,6 +1,0 @@
-Flask==3.0.3
-gunicorn==21.2.0
-pymongo[srv]==4.6.1
-dnspython==2.5.0
-flask-cors
-requests

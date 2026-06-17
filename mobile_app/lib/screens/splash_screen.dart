@@ -1,10 +1,8 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:animate_do/animate_do.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
-import '../services/theme_service.dart';
+import '../providers/connection_provider.dart';
+import '../services/storage_service.dart';
+import '../theme/colors.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,103 +11,118 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _opacity;
+  late Animation<double> _scale;
+
   @override
   void initState() {
     super.initState();
-    _startTimer();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _opacity = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _ctrl, curve: const Interval(0, 0.6, curve: Curves.easeOut)),
+    );
+    _scale = Tween<double>(begin: 0.85, end: 1).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
+    );
+    _ctrl.forward();
+    _navigate();
   }
 
-  void _startTimer() {
-    Timer(const Duration(seconds: 3), () => _navigateToNext());
-  }
-
-  void _navigateToNext() async {
+  Future<void> _navigate() async {
+    await Future.delayed(const Duration(milliseconds: 1800));
     if (!mounted) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final isPaired = prefs.getBool('is_paired') ?? false;
-    final ip = prefs.getString('pc_ip_address') ?? '';
-    final token = prefs.getString('auth_token') ?? '';
+    final onboarded = await StorageService.getOnboarded();
+    if (!onboarded) {
+      Navigator.pushReplacementNamed(context, '/onboarding');
+      return;
+    }
 
-    if (isPaired && ip.isNotEmpty && token.isNotEmpty) {
-      if (mounted) Navigator.pushReplacementNamed(context, '/home', arguments: {'pcIpAddress': ip, 'authToken': token});
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+
+    final cp = context.read<ConnectionProvider>();
+
+    // Auto-connect if enabled & already paired
+    if (cp.autoConnectEnabled && cp.ip != null && cp.token != null) {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+    }
+
+    if (cp.isConnected) {
+      Navigator.pushReplacementNamed(context, '/home');
     } else {
-      if (mounted) Navigator.pushReplacementNamed(context, '/onboarding');
+      Navigator.pushReplacementNamed(context, '/connection');
     }
   }
 
   @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final theme = Provider.of<ThemeService>(context);
-    final isDark = theme.isDarkMode;
-    final accent = const Color(0xFF6C63FF);
-
     return Scaffold(
-      backgroundColor: const Color(0xFF080F17), // Always dark for that classic feel
+      backgroundColor: CypherColors.bgDeep,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Original Pulsing Shield
-            Pulse(
-              infinite: true,
-              duration: const Duration(seconds: 2),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.05),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: accent.withOpacity(0.1), width: 1),
-                ),
-                child: Icon(Icons.shield_moon_outlined, color: accent, size: 64),
-              ),
-            ),
-
-            const SizedBox(height: 48),
-
-            // Classic Clean Brand
-            FadeIn(
-              duration: const Duration(seconds: 1),
+        child: AnimatedBuilder(
+          animation: _ctrl,
+          builder: (_, __) => Opacity(
+            opacity: _opacity.value,
+            child: Transform.scale(
+              scale: _scale.value,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    "CYPHER",
-                    style: GoogleFonts.roboto(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: 8,
+                  Container(
+                    width: 88,
+                    height: 88,
+                    decoration: BoxDecoration(
+                      color: CypherColors.bgCard,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: CypherColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: CypherColors.accentGlow,
+                          blurRadius: 48,
+                          spreadRadius: -8,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.shield_rounded,
+                      color: CypherColors.accent,
+                      size: 44,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    "SECURING CONNECTION",
-                    style: GoogleFonts.roboto(
-                      fontSize: 10,
-                      color: Colors.white24,
-                      letterSpacing: 2,
+                  const SizedBox(height: 20),
+                  const Text(
+                    'CYPHER',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: CypherColors.textPrimary,
+                      letterSpacing: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Your PC. In your pocket.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: CypherColors.textMuted,
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 64),
-
-            // Minimalist Progress
-            SizedBox(
-              width: 200,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(100),
-                child: LinearProgressIndicator(
-                  backgroundColor: Colors.white.withOpacity(0.03),
-                  valueColor: AlwaysStoppedAnimation(accent),
-                  minHeight: 2,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

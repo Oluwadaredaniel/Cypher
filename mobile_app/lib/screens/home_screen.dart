@@ -1,308 +1,118 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:animate_do/animate_do.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
-import 'package:url_launcher/url_launcher_string.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:path_provider/path_provider.dart';
-import '../services/socket_service.dart';
-import '../services/theme_service.dart';
-import '../services/central_service.dart';
-import '../widgets/glass_container.dart';
+import '../providers/connection_provider.dart';
+import '../providers/system_provider.dart';
+import '../theme/colors.dart';
+import '../theme/app_theme.dart';
+import '../widgets/cypher_card.dart';
+import '../widgets/stat_ring.dart';
+import '../widgets/connection_badge.dart';
+import '../widgets/shimmer_box.dart';
 
 class HomeScreen extends StatefulWidget {
-  final String pcIpAddress;
-  final String authToken;
-
-  const HomeScreen({super.key, required this.pcIpAddress, required this.authToken});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  bool _isConnected = false;
-  bool _isLoading = true;
-  bool _isError = false;
-
-  Map<String, dynamic> _liveStats = {
-    "cpu_percent": 0.0,
-    "ram_percent": 0.0,
-    "disk_percent": 0.0,
-    "battery_percent": 0.0
-  };
-  String _pcName = "COMPUTER";
-  List<dynamic> _recentActivity = [];
-  Map<String, dynamic>? _broadcast;
-
-  final SocketService _socketService = SocketService();
-  late AnimationController _pulseController;
-  Timer? _activityTimer;
-  StreamSubscription? _connectionSub;
-  StreamSubscription? _statsSub;
+class _HomeScreenState extends State<HomeScreen> {
+  int _activeTab = 0;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
-    _initConnection();
-    _initFetch();
-    _checkUpdates();
-    _activityTimer = Timer.periodic(const Duration(seconds: 10), (timer) => _fetchActivity());
-  }
-
-  void _initConnection() {
-    _socketService.connect(widget.pcIpAddress, widget.authToken);
-    _connectionSub = _socketService.connectionStatus.listen((status) {
-      if (mounted) setState(() => _isConnected = status);
-      if (!status && mounted) {
-        final currentRoute = ModalRoute.of(context)?.settings.name;
-        if (currentRoute == '/home') {
-          Navigator.pushNamed(context, '/disconnected', arguments: {
-            'pcIpAddress': widget.pcIpAddress,
-            'authToken': widget.authToken,
-            'onReconnected': () => Navigator.pop(context),
-          });
-        }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final cp = context.read<ConnectionProvider>();
+      if (cp.ip != null) {
+        context.read<SystemProvider>()
+          ..startPolling(cp.ip!)
+          ..fetchActivity(cp.ip!)
+          ..fetchApps(cp.ip!);
       }
-    });
-    _statsSub = _socketService.systemStats.listen((stats) {
-      if (mounted) setState(() => _liveStats = stats);
     });
   }
 
   @override
   void dispose() {
-    _connectionSub?.cancel();
-    _statsSub?.cancel();
-    _pulseController.dispose();
-    _activityTimer?.cancel();
+    context.read<SystemProvider>().stopPolling();
     super.dispose();
-  }
-
-  Future<void> _checkUpdates() async {
-    final update = await CentralService.checkForUpdates();
-    if (mounted && update != null && update['update_available'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("✨ New Version v${update['version']} available!", style: const TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: const Color(0xFF6C63FF),
-          action: SnackBarAction(label: "GET", textColor: Colors.white, onPressed: () => launchUrlString(update['url'])),
-        ),
-      );
-    }
-    final bData = await CentralService.getBroadcast();
-    if (mounted && bData != null) setState(() => _broadcast = bData);
-  }
-
-  Future<void> _initFetch() async {
-    setState(() { _isLoading = true; _isError = false; });
-    try {
-      final headers = {'X-Auth-Token': widget.authToken};
-      final baseUrl = 'http://${widget.pcIpAddress}:5000';
-
-      final results = await Future.wait([
-        http.get(Uri.parse('$baseUrl/settings'), headers: headers),
-        http.get(Uri.parse('$baseUrl/system-stats'), headers: headers),
-        http.get(Uri.parse('$baseUrl/system/activity'), headers: headers),
-        http.get(Uri.parse('$baseUrl/ping'), headers: headers),
-      ]).timeout(const Duration(seconds: 8));
-
-      if (mounted) {
-        setState(() {
-          if (results[0].statusCode == 200) {
-            _pcName = jsonDecode(results[0].body)['device_name']?.toString().toUpperCase() ?? "COMPUTER";
-          }
-          if (results[1].statusCode == 200) {
-            _liveStats = Map<String, dynamic>.from(jsonDecode(results[1].body));
-          }
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() { _isLoading = false; _isError = true; });
-        Navigator.pushNamed(context, '/disconnected', arguments: {
-          'pcIpAddress': widget.pcIpAddress,
-          'authToken': widget.authToken,
-        });
-      }
-    }
-  }
-
-  Future<void> _fetchActivity() async {
-    try {
-      final headers = {'X-Auth-Token': widget.authToken};
-      final baseUrl = 'http://${widget.pcIpAddress}:5000';
-      final res = await http.get(Uri.parse('$baseUrl/system/activity'), headers: headers);
-      if (res.statusCode == 200) {
-        if (mounted) setState(() => _recentActivity = (jsonDecode(res.body) as List).take(3).toList());
-      }
-    } catch (_) {}
-  }
-
-  void _showMasterLogin() {
-    final theme = Provider.of<ThemeService>(context, listen: false);
-    final isDark = theme.isDarkMode;
-    HapticFeedback.heavyImpact();
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: Text("MASTER ACCESS", style: GoogleFonts.roboto(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
-        content: TextField(
-          controller: controller,
-          obscureText: true,
-          style: TextStyle(color: isDark ? Colors.white : Colors.black),
-          decoration: InputDecoration(
-            hintText: "Enter Management Key",
-            hintStyle: TextStyle(color: isDark ? Colors.white24 : Colors.black26),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.black12)),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text("CANCEL", style: GoogleFonts.roboto(color: isDark ? Colors.white38 : Colors.black38))),
-          ElevatedButton(
-            onPressed: () {
-              if (controller.text == "emerald-admin") {
-                Navigator.pop(ctx);
-                Navigator.pushNamed(context, '/master_control');
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
-            child: const Text("UNLOCK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _takeScreenshot() async {
-    HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Capturing system screen...")));
-    try {
-      final res = await http.get(
-        Uri.parse('http://${widget.pcIpAddress}:5000/screenshot'),
-        headers: {'X-Auth-Token': widget.authToken},
-      ).timeout(const Duration(seconds: 15));
-
-      if (res.statusCode == 200) {
-        if (Platform.isAndroid) {
-          if (!await Permission.manageExternalStorage.request().isGranted &&
-              !await Permission.storage.request().isGranted) {
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Storage permission required")));
-            return;
-          }
-        }
-
-        Directory? dir = Platform.isAndroid ? Directory('/storage/emulated/0/Download') : await getDownloadsDirectory();
-        if (dir == null || !await dir.exists()) dir = await getApplicationDocumentsDirectory();
-
-        final fileName = "screenshot_${DateTime.now().millisecondsSinceEpoch}.png";
-        final file = File('${dir.path}/$fileName');
-        await file.writeAsBytes(res.bodyBytes);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Saved to Downloads: $fileName"),
-              backgroundColor: const Color(0xFF10B981),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to capture screen")),
-        );
-      }
-    }
-  }
-
-  Future<void> _pushClipboard() async {
-    HapticFeedback.mediumImpact();
-    final data = await Clipboard.getData('text/plain');
-    if (data?.text == null || data!.text!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Phone clipboard is empty")));
-      return;
-    }
-
-    try {
-      final res = await http.post(
-        Uri.parse('http://${widget.pcIpAddress}:5000/clipboard'),
-        headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
-        body: jsonEncode({'content': data.text}),
-      );
-      if (res.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sent to PC Clipboard")));
-      }
-    } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to sync clipboard")));
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Provider.of<ThemeService>(context);
-    final isDark = theme.isDarkMode;
+    final cp = context.watch<ConnectionProvider>();
+    final sp = context.watch<SystemProvider>();
+
+    if (!cp.isConnected) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.wifi_off_rounded, size: 48, color: CypherColors.textMuted),
+              SizedBox(height: 12),
+              Text('Disconnected', style: TextStyle(color: CypherColors.textSecondary, fontSize: 16)),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: _isError
-              ? _buildErrorState()
-              : (_isLoading ? _buildShimmerLoading(isDark) : _buildDashboard(isDark)),
-          ),
-          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
-        ],
+      body: SafeArea(
+        child: Stack(
+          children: [
+            IndexedStack(
+              index: _activeTab,
+              children: [
+                _DashTab(cp: cp, sp: sp),
+                _MoreTab(),
+              ],
+            ),
+            _BottomNav(activeTab: _activeTab, onTab: (i) => setState(() => _activeTab = i)),
+          ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildDashboard(bool isDark) {
+// ── Dashboard Tab ─────────────────────────────────────────────
+class _DashTab extends StatelessWidget {
+  final ConnectionProvider cp;
+  final SystemProvider sp;
+  const _DashTab({required this.cp, required this.sp});
+
+  @override
+  Widget build(BuildContext context) {
     return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
       slivers: [
-        _buildSliverAppBar(isDark),
-
-        // System Overview Header
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("System Overview", style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.computer_rounded, size: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4)),
-                        const SizedBox(width: 6),
-                        Text("Connected", style: GoogleFonts.roboto(fontSize: 12, color: (isDark ? Colors.white : Colors.black).withOpacity(0.4))),
-                      ],
-                    ),
+                    const Text('CYPHER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: CypherColors.accent, letterSpacing: 3)),
+                    const SizedBox(height: 2),
+                    Text(cp.pcName ?? 'My PC', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: CypherColors.textPrimary)),
                   ],
                 ),
                 Row(
                   children: [
-                    _buildMiniHeaderStat(Icons.memory_rounded, "${(_liveStats['cpu_percent'] ?? 0).toInt()}%", "CPU", isDark),
-                    const SizedBox(width: 8),
-                    _buildMiniHeaderStat(Icons.speed_rounded, "${(_liveStats['ram_percent'] ?? 0).toInt()}%", "RAM", isDark),
+                    IconButton(
+                      icon: const Icon(Icons.notifications_outlined, color: CypherColors.textSecondary),
+                      onPressed: () => Navigator.pushNamed(context, '/notifications'),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.settings_outlined, color: CypherColors.textSecondary),
+                      onPressed: () => Navigator.pushNamed(context, '/settings'),
+                    ),
                   ],
                 ),
               ],
@@ -310,265 +120,349 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
 
-        // Main Transfer Actions
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          sliver: SliverGrid.count(
-            crossAxisCount: 2,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 1.1,
-            children: [
-              _buildQuickAction(
-                icon: Icons.upload_file_rounded,
-                title: "Send to PC",
-                subtitle: "Photos, Docs, Files",
-                color: const Color(0xFF6C63FF),
-                onTap: () => Navigator.pushNamed(context, '/send', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}),
-              ),
-              _buildQuickAction(
-                icon: Icons.download_for_offline_rounded,
-                title: "Get from PC",
-                subtitle: "Download files",
-                color: const Color(0xFF10B981),
-                onTap: () => Navigator.pushNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}),
-              ),
-              _buildQuickAction(
-                icon: Icons.screenshot_monitor_rounded,
-                title: "Screenshot",
-                subtitle: "Save PC screen",
-                color: const Color(0xFFFFB786),
-                onTap: _takeScreenshot,
-              ),
-              _buildQuickAction(
-                icon: Icons.assignment_return_rounded,
-                title: "Push Clipboard",
-                subtitle: "Sync to computer",
-                color: const Color(0xFFC0C6DB),
-                onTap: _pushClipboard,
-              ),
-            ],
+        // Stat rings
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                StatRing(value: sp.cpu / 100, label: 'CPU', sublabel: '${sp.cpu.toInt()}%', color: CypherColors.accent),
+                StatRing(value: sp.ram / 100, label: 'RAM', sublabel: '${sp.ram.toInt()}%', color: CypherColors.info),
+                StatRing(value: sp.disk / 100, label: 'Disk', sublabel: '${sp.disk.toInt()}%', color: CypherColors.warning),
+              ],
+            ),
           ),
         ),
 
-        // Live Performance Bento Wide
+        // Active window
+        if (sp.activeWindow.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: CypherCard(
+                child: Row(
+                  children: [
+                    const Icon(Icons.window_rounded, color: CypherColors.accentLight, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(sp.activeWindow,
+                        style: const TextStyle(fontSize: 13, color: CypherColors.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+        // Quick actions
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-            child: GlassContainer(
-              padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CypherSectionHeader(title: 'Quick Access', action: 'All', onAction: () {}),
+                const SizedBox(height: 10),
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 1.1,
+                  children: [
+                    _QuickTile(icon: Icons.folder_rounded, label: 'Files', color: CypherColors.warning, onTap: () => Navigator.pushNamed(context, '/browser')),
+                    _QuickTile(icon: Icons.keyboard_rounded, label: 'Controls', color: CypherColors.accent, onTap: () => Navigator.pushNamed(context, '/controls')),
+                    _QuickTile(icon: Icons.content_paste_rounded, label: 'Clipboard', color: CypherColors.info, onTap: () => Navigator.pushNamed(context, '/clipboard')),
+                    _QuickTile(icon: Icons.apps_rounded, label: 'Apps', color: CypherColors.success, onTap: () => Navigator.pushNamed(context, '/apps_launcher')),
+                    _QuickTile(icon: Icons.memory_rounded, label: 'Processes', color: CypherColors.error, onTap: () => Navigator.pushNamed(context, '/processes')),
+                    _QuickTile(icon: Icons.videocam_rounded, label: 'Recorder', color: const Color(0xFFEC4899), onTap: () => Navigator.pushNamed(context, '/recorder')),
+                    _QuickTile(icon: Icons.wifi_tethering_rounded, label: 'Drop', color: const Color(0xFF06B6D4), onTap: () => Navigator.pushNamed(context, '/drop')),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Recent activity
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: CypherSectionHeader(title: 'Recent Activity', action: 'See all', onAction: () => Navigator.pushNamed(context, '/activity')),
+          ),
+        ),
+        if (sp.activity.isEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('No recent activity', style: TextStyle(color: CypherColors.textMuted, fontSize: 13)),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            sliver: SliverList.separated(
+              itemCount: (sp.activity.length).clamp(0, 5),
+              separatorBuilder: (_, __) => const SizedBox(height: 6),
+              itemBuilder: (_, i) {
+                final item = sp.activity[i] as Map<String, dynamic>? ?? {};
+                return CypherCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.history_rounded, size: 16, color: CypherColors.accentLight),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(item['name'] ?? item['action'] ?? 'Action', style: const TextStyle(fontSize: 13, color: CypherColors.textPrimary))),
+                      Text(item['time'] ?? item['timestamp'] ?? '', style: const TextStyle(fontSize: 11, color: CypherColors.textMuted)),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+
+        // Power bar
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
+            child: CypherCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Text('Power', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: CypherColors.textMuted, letterSpacing: 0.5)),
+                  const SizedBox(height: 14),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      Text("System Performance", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: const Color(0xFF6C63FF).withOpacity(0.1), borderRadius: BorderRadius.circular(100)),
-                        child: Text("LIVE", style: GoogleFonts.roboto(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF6C63FF))),
-                      ),
+                      _PowerBtn(Icons.power_settings_new_rounded, 'Shutdown', CypherColors.error, () => _confirmPower(context, 'Shut down', () => context.read<SystemProvider>().shutdown(cp.ip!))),
+                      _PowerBtn(Icons.replay_rounded, 'Restart', CypherColors.warning, () => _confirmPower(context, 'Restart', () => context.read<SystemProvider>().restart(cp.ip!))),
+                      _PowerBtn(Icons.bedtime_rounded, 'Sleep', CypherColors.info, () => context.read<SystemProvider>().sleep(cp.ip!)),
+                      _PowerBtn(Icons.lock_rounded, 'Lock', CypherColors.textSecondary, () => context.read<SystemProvider>().lock(cp.ip!)),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  _buildProgressBar("CPU Usage", "${(_liveStats['cpu_percent'] ?? 0).toInt()}%", (_liveStats['cpu_percent'] ?? 0) / 100, const Color(0xFF6C63FF), isDark),
-                  const SizedBox(height: 20),
-                  _buildProgressBar("Memory", "${(_liveStats['ram_percent'] ?? 0).toInt()}%", (_liveStats['ram_percent'] ?? 0) / 100, const Color(0xFFC0C6DB), isDark),
-                  const SizedBox(height: 20),
-                  _buildProgressBar("Battery", "${(_liveStats['battery_percent'] ?? 0).toInt()}%", (_liveStats['battery_percent'] ?? 0) / 100, const Color(0xFFFFB786), isDark),
                 ],
               ),
             ),
           ),
         ),
-
-        const SliverToBoxAdapter(child: SizedBox(height: 120)),
       ],
     );
   }
 
-  Widget _buildSliverAppBar(bool isDark) {
-    return SliverAppBar(
-      floating: true,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      title: Row(
-        children: [
-          const Icon(Icons.shield_moon_outlined, color: Color(0xFF6C63FF), size: 28),
-          const SizedBox(width: 12),
-          Text("CYPHER", style: GoogleFonts.roboto(fontSize: 24, fontWeight: FontWeight.w800, color: const Color(0xFF6C63FF), letterSpacing: -1)),
-        ],
-      ),
-      actions: [
-        GestureDetector(
-          onLongPress: _showMasterLogin,
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-              borderRadius: BorderRadius.circular(100),
-              border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.1)),
-            ),
-            child: Row(
-              children: [
-                ScaleTransition(
-                  scale: _pulseController,
-                  child: Container(width: 6, height: 6, decoration: BoxDecoration(color: _isConnected ? const Color(0xFF10B981) : Colors.redAccent, shape: BoxShape.circle)),
-                ),
-                const SizedBox(width: 8),
-                Text(_pcName, style: GoogleFonts.roboto(fontSize: 9, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black87)),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-      ],
-    );
-  }
-
-  Widget _buildMiniHeaderStat(IconData icon, String value, String label, bool isDark) {
-    return GlassContainer(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      borderRadius: BorderRadius.circular(12),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: const Color(0xFF6C63FF)),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(label, style: GoogleFonts.roboto(fontSize: 7, color: (isDark ? Colors.white : Colors.black).withOpacity(0.38))),
-              Text(value, style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-            ],
-          ),
+  void _confirmPower(BuildContext context, String action, VoidCallback onConfirm) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('$action PC?'),
+        content: Text('This will $action your computer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () { Navigator.pop(context); onConfirm(); }, child: Text(action, style: const TextStyle(color: CypherColors.error))),
         ],
       ),
     );
   }
+}
 
-  Widget _buildProgressBar(String label, String value, double percent, Color color, bool isDark) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: GoogleFonts.roboto(fontSize: 14, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7))),
-            Text(value, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: LinearProgressIndicator(
-            value: percent.clamp(0.0, 1.0),
-            minHeight: 6,
-            backgroundColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-            valueColor: AlwaysStoppedAnimation(color),
-          ),
-        ),
-      ],
-    );
-  }
+class _QuickTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _QuickTile({required this.icon, required this.label, required this.color, required this.onTap});
 
-  Widget _buildQuickAction({required IconData icon, required String title, required String subtitle, required Color color, required VoidCallback onTap}) {
-    final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
-    return GestureDetector(
+  @override
+  Widget build(BuildContext context) {
+    return CypherCard(
       onTap: onTap,
-      child: GlassContainer(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 56, height: 56,
-              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(height: 16),
-            Text(title, style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: GoogleFonts.roboto(fontSize: 11, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    final theme = Provider.of<ThemeService>(context);
-    final isDark = theme.isDarkMode;
-    return GlassContainer(
-      height: 90,
-      borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(Icons.home_filled, "Home", true, null, isDark),
-          _navItem(Icons.folder_copy_rounded, "Files", false, () => Navigator.pushNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-          _navItem(Icons.grid_view_rounded, "Tools", false, () => Navigator.pushNamed(context, '/controls', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
-    final accent = const Color(0xFF6C63FF);
-    final inactiveColor = isDark ? Colors.white38 : Colors.black38;
-    return GestureDetector(
-      onTap: tap,
-      child: Opacity(
-        opacity: 1.0,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: active ? accent : inactiveColor, size: 24),
-            const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : inactiveColor)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildShimmerLoading(bool isDark) {
-    return Shimmer.fromColors(
-      baseColor: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-      highlightColor: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Container(height: 100, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(24))),
-          const SizedBox(height: 24),
-          Container(height: 200, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(24))),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(child: Container(height: 150, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(24)))),
-              const SizedBox(width: 16),
-              Expanded(child: Container(height: 150, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(24)))),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
+      padding: const EdgeInsets.all(12),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.wifi_off_rounded, color: Colors.redAccent, size: 60),
-          const SizedBox(height: 24),
-          Text("Connection Lost", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 32),
-          ElevatedButton(onPressed: _initFetch, child: const Text("RETRY")),
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: CypherColors.textPrimary)),
         ],
+      ),
+    );
+  }
+}
+
+class _PowerBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _PowerBtn(this.icon, this.label, this.color, this.onTap);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: color.withOpacity(0.25)),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 10, color: CypherColors.textMuted)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── More Tab ──────────────────────────────────────────────────
+class _MoreTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      children: [
+        const CypherSectionHeader(title: 'Apps & Tasks'),
+        const SizedBox(height: 8),
+        _MoreItem(icon: Icons.rocket_launch_rounded, title: 'App Launcher', subtitle: 'Open installed programs', onTap: () => Navigator.pushNamed(context, '/apps_launcher')),
+        _MoreItem(icon: Icons.task_alt_rounded,       title: 'Active Tasks',   subtitle: 'Manage transfers', onTap: () => Navigator.pushNamed(context, '/active_tasks')),
+        _MoreItem(icon: Icons.videocam_rounded,       title: 'Screen Recorder',subtitle: 'Record your PC screen', onTap: () => Navigator.pushNamed(context, '/recorder')),
+        _MoreItem(icon: Icons.memory_rounded,         title: 'Process Manager',subtitle: 'View & kill processes', onTap: () => Navigator.pushNamed(context, '/processes')),
+        const SizedBox(height: 20),
+        const CypherSectionHeader(title: 'Security'),
+        const SizedBox(height: 8),
+        _MoreItem(icon: Icons.people_outline,    title: 'Guest Access', subtitle: 'Share folders temporarily', onTap: () => Navigator.pushNamed(context, '/guest')),
+        _MoreItem(icon: Icons.power_settings_new_rounded, title: 'Wake on LAN', subtitle: 'Wake up sleeping PCs', onTap: () => Navigator.pushNamed(context, '/wol')),
+        const SizedBox(height: 20),
+        const CypherSectionHeader(title: 'Activity & Logs'),
+        const SizedBox(height: 8),
+        _MoreItem(icon: Icons.history_rounded,           title: 'Activity Log',   subtitle: 'Recent actions', onTap: () => Navigator.pushNamed(context, '/activity')),
+        _MoreItem(icon: Icons.notifications_none_rounded, title: 'Notifications', subtitle: 'PC alerts',      onTap: () => Navigator.pushNamed(context, '/notifications')),
+        const SizedBox(height: 20),
+        const CypherSectionHeader(title: 'System'),
+        const SizedBox(height: 8),
+        _MoreItem(icon: Icons.help_outline_rounded,   title: 'Guide',    subtitle: 'Setup & troubleshooting', onTap: () => Navigator.pushNamed(context, '/guide')),
+        _MoreItem(icon: Icons.settings_outlined,      title: 'Settings', subtitle: 'Connection & preferences', onTap: () => Navigator.pushNamed(context, '/settings')),
+        _MoreItem(icon: Icons.smartphone_rounded,     title: 'Send to PC', subtitle: 'Upload from your phone', onTap: () => Navigator.pushNamed(context, '/send')),
+        _MoreItem(icon: Icons.folder_special_rounded, title: 'Phone Files', subtitle: 'Browse local phone files', onTap: () => Navigator.pushNamed(context, '/phone_browser')),
+        const SizedBox(height: 20),
+        const CypherSectionHeader(title: 'Share'),
+        const SizedBox(height: 8),
+        _MoreItem(icon: Icons.wifi_tethering_rounded, title: 'CypherDrop', subtitle: 'Send files to nearby devices', onTap: () => Navigator.pushNamed(context, '/drop')),
+      ],
+    );
+  }
+}
+
+class _MoreItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _MoreItem({required this.icon, required this.title, required this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: CypherCard(
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(color: CypherColors.bgOverlay, borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, size: 18, color: CypherColors.textSecondary),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: CypherColors.textPrimary)),
+                  Text(subtitle, style: const TextStyle(fontSize: 12, color: CypherColors.textMuted)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: CypherColors.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Bottom Nav ────────────────────────────────────────────────
+class _BottomNav extends StatelessWidget {
+  final int activeTab;
+  final void Function(int) onTab;
+  const _BottomNav({required this.activeTab, required this.onTab});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      bottom: 16, left: 16, right: 16,
+      child: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          color: CypherColors.bgCard,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: CypherColors.border),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 24, offset: const Offset(0, 8))],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _NavItem(index: 0, active: activeTab, icon: Icons.dashboard_rounded, label: 'Home', onTap: onTab),
+            _NavItem(index: -1, active: -1, icon: Icons.send_rounded, label: 'Send', onTap: (_) => Navigator.pushNamed(context, '/send')),
+            _NavItem(index: -2, active: -1, icon: Icons.keyboard_alt_rounded, label: 'Controls', onTap: (_) => Navigator.pushNamed(context, '/controls')),
+            _NavItem(index: 1, active: activeTab, icon: Icons.more_horiz_rounded, label: 'More', onTap: onTab),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final int index;
+  final int active;
+  final IconData icon;
+  final String label;
+  final void Function(int) onTap;
+  const _NavItem({required this.index, required this.active, required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = index >= 0 && index == active;
+    final color = isActive ? CypherColors.accent : CypherColors.textMuted;
+    return GestureDetector(
+      onTap: () => onTap(index),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 3),
+            Text(label, style: TextStyle(fontSize: 10, fontWeight: isActive ? FontWeight.w600 : FontWeight.w400, color: color)),
+          ],
+        ),
       ),
     );
   }

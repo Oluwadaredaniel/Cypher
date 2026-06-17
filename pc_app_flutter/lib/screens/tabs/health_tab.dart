@@ -23,179 +23,153 @@ class HealthTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double cpu = (stats['cpu_percent'] as num?)?.toDouble() ?? 0.0;
+    final double cpu = (stats['cpu_percent'] as num?)?.toDouble() ?? 0.0;
+    final double ramP = (stats['ram_percent'] as num?)?.toDouble() ?? 0.0;
+    final double ramUsed = (stats['ram_used'] as num?)?.toDouble() ?? 0.0;
+    final double ramTotal = (stats['ram_total'] as num?)?.toDouble() ?? 0.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(40),
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(context),
+          const SizedBox(height: 28),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 7, child: _buildCpuCard(cpu)),
+              const SizedBox(width: 20),
+              Expanded(
+                flex: 3,
+                child: Column(
+                  children: [
+                    _buildMiniCard('System Uptime', stats['uptime'] ?? 'Active', Icons.timer_rounded, const Color(0xFFFFB786)),
+                    const SizedBox(height: 16),
+                    _buildMiniCard('Link Status', 'Secure', Icons.link_rounded, const Color(0xFF10B981)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _buildMemoryCard(ramP, ramUsed, ramTotal),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+                const SizedBox(width: 8),
+                Text('LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: const Color(0xFF10B981), letterSpacing: 2)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text('Performance', style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black, height: 1.1)),
+          ],
+        ),
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: isOptimizing ? null : onOptimize,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+              decoration: BoxDecoration(
+                color: isOptimizing ? accent.withOpacity(0.4) : accent,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: isOptimizing ? null : [BoxShadow(color: accent.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 4))],
+              ),
+              child: Row(
+                children: [
+                  if (isOptimizing)
+                    const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  else
+                    const Icon(Icons.bolt_rounded, color: Colors.white, size: 15),
+                  const SizedBox(width: 8),
+                  Text(isOptimizing ? 'Optimizing...' : 'Optimize System', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCpuCard(double cpu) {
+    final isHigh = cpu > 70;
+    final cpuColor = isHigh ? const Color(0xFFEF4444) : accent;
+
+    return GlassContainer(
+      padding: const EdgeInsets.all(28),
+      height: 300,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildHeader("Performance", "Monitoring live computer resources."),
-              _actionBtn(
-                isOptimizing ? "Optimizing..." : "Optimize System",
-                Icons.bolt_rounded,
-                onTap: isOptimizing ? null : onOptimize,
-                isLoading: isOptimizing,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: cpuColor.withOpacity(0.12), borderRadius: BorderRadius.circular(9)),
+                    child: Icon(Icons.memory_rounded, color: cpuColor, size: 16),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('Processor', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black)),
+                ],
               ),
+              _statusPill(isHigh ? 'High Load' : 'Stable', isHigh),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Expanded(
-                flex: 8,
-                child: GlassContainer(
-                  padding: const EdgeInsets.all(28),
-                  height: 320,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.memory_rounded, color: accent, size: 20),
-                              const SizedBox(width: 12),
-                              Text("Processor Performance", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                            ],
-                          ),
-                          _buildStatusPill(cpu > 70 ? "High Usage" : "Stable", cpu > 70),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text("${cpu.toInt()}", style: GoogleFonts.roboto(fontSize: 48, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12, left: 4),
-                            child: Text("%", style: GoogleFonts.roboto(fontSize: 18, color: isDark ? Colors.white24 : Colors.black26)),
-                          ),
-                          const SizedBox(width: 48),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("Active Threads", style: GoogleFonts.roboto(fontSize: 11, color: isDark ? Colors.white24 : Colors.black26)),
-                              Text("Dynamic", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                            ],
-                          )
-                        ],
-                      ),
-                      const Spacer(),
-                      AnimatedBuilder(
-                        animation: waveAnimation,
-                        builder: (context, child) {
-                          return SizedBox(
-                            height: 100, width: double.infinity,
-                            child: CustomPaint(painter: WaveformPainter(accent.withOpacity(0.3), waveAnimation.value, cpu)),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
+              Text('${cpu.toInt()}', style: GoogleFonts.inter(fontSize: 52, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black, height: 1)),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 9, left: 3),
+                child: Text('%', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w500, color: isDark ? Colors.white30 : Colors.black38)),
               ),
-              const SizedBox(width: 24),
-              Expanded(
-                flex: 4,
-                child: Column(
-                  children: [
-                    _buildSmallCard("System Uptime", stats['uptime'] ?? "Active", Icons.timer_rounded, const Color(0xFFFFB786), 1.0),
-                    const SizedBox(height: 24),
-                    _buildSmallCard("Link Status", "Secure", Icons.link_rounded, const Color(0xFFC0C6DB), 1.0),
-                  ],
-                ),
+              const SizedBox(width: 32),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Active Threads', style: GoogleFonts.inter(fontSize: 11, color: isDark ? Colors.white30 : Colors.black38)),
+                  const SizedBox(height: 2),
+                  Text('Dynamic', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black)),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          _buildMemoryCard(),
+          const Spacer(),
+          AnimatedBuilder(
+            animation: waveAnimation,
+            builder: (context, _) => SizedBox(
+              height: 90, width: double.infinity,
+              child: CustomPaint(painter: WaveformPainter(cpuColor.withOpacity(0.25), waveAnimation.value, cpu)),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildHeader(String title, String sub) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-            const SizedBox(width: 12),
-            Text("LIVE CONNECTION", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white24 : Colors.black26, letterSpacing: 2)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(title, style: GoogleFonts.roboto(fontSize: 32, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
-        Text(sub, style: GoogleFonts.roboto(fontSize: 14, color: isDark ? Colors.white24 : Colors.black38)),
-      ],
-    );
-  }
-
-  Widget _buildMemoryCard() {
-    double ramP = (stats['ram_percent'] as num?)?.toDouble() ?? 0.0;
-    double ramUsed = (stats['ram_used'] as num?)?.toDouble() ?? 0.0;
-    double ramTotal = (stats['ram_total'] as num?)?.toDouble() ?? 0.0;
-
+  Widget _buildMiniCard(String title, String val, IconData icon, Color color) {
     return GlassContainer(
-      padding: const EdgeInsets.all(28),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 100, height: 100,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(value: 1.0, strokeWidth: 8, color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
-                CircularProgressIndicator(value: (ramP / 100).clamp(0.0, 1.0), strokeWidth: 8, color: accent, strokeCap: StrokeCap.round),
-                Text("${ramP.toInt()}%", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 40),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.memory_rounded, color: accent, size: 20),
-                    const SizedBox(width: 12),
-                    Text("Memory Allocation", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      _metric("In Use", "$ramUsed GB"),
-                      const SizedBox(width: 48),
-                      _metric("Available", "${(ramTotal - ramUsed).toStringAsFixed(1)} GB"),
-                      const SizedBox(width: 48),
-                      _metric("Hardware Total", "$ramTotal GB"),
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-          _buildStatusPill("Healthy", false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSmallCard(String title, String val, IconData icon, Color color, double progress) {
-    return GlassContainer(
-      padding: const EdgeInsets.all(24),
-      height: 148,
+      padding: const EdgeInsets.all(20),
+      height: 140,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -203,71 +177,134 @@ class HealthTab extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, color: color, size: 20),
-              Text("Stable", style: GoogleFonts.roboto(fontSize: 10, color: isDark ? Colors.white12 : Colors.black12)),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+                child: Icon(icon, color: color, size: 14),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text('OK', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: const Color(0xFF10B981), letterSpacing: 1)),
+              ),
             ],
           ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(val.split(' ').first, style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-              const SizedBox(width: 4),
-              Text(val.contains(' ') ? val.split(' ').last : "", style: GoogleFonts.roboto(fontSize: 12, color: isDark ? Colors.white24 : Colors.black26)),
+              Text(title, style: GoogleFonts.inter(fontSize: 10, color: isDark ? Colors.white30 : Colors.black38, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 2),
+              Text(val, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black), overflow: TextOverflow.ellipsis),
             ],
           ),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(value: progress, minHeight: 2, backgroundColor: isDark ? Colors.white10 : Colors.black12, valueColor: AlwaysStoppedAnimation(color)),
+          Container(
+            height: 3,
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: 1.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 6)],
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _metric(String label, String val) {
+  Widget _buildMemoryCard(double ramP, double ramUsed, double ramTotal) {
+    final ramFree = ramTotal - ramUsed;
+    return GlassContainer(
+      padding: const EdgeInsets.all(28),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 110, height: 110,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(value: 1.0, strokeWidth: 10, color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.06)),
+                CircularProgressIndicator(value: (ramP / 100).clamp(0.0, 1.0), strokeWidth: 10, color: accent, strokeCap: StrokeCap.round),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('${ramP.toInt()}%', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black, height: 1.1)),
+                    Text('RAM', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w600, color: isDark ? Colors.white30 : Colors.black38, letterSpacing: 1)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 36),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: accent.withOpacity(0.12), borderRadius: BorderRadius.circular(9)),
+                      child: Icon(Icons.developer_board_rounded, color: accent, size: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    Text('Memory', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black)),
+                    const Spacer(),
+                    _statusPill('Healthy', false),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    _memMetric('In Use', '${ramUsed.toStringAsFixed(1)} GB', accent),
+                    const SizedBox(width: 32),
+                    _memMetric('Available', '${ramFree.toStringAsFixed(1)} GB', const Color(0xFF10B981)),
+                    const SizedBox(width: 32),
+                    _memMetric('Total', '${ramTotal.toStringAsFixed(0)} GB', isDark ? Colors.white38 : Colors.black38),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _memMetric(String label, String val, Color color) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.roboto(fontSize: 11, color: isDark ? Colors.white24 : Colors.black26)),
-        Text(val, style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+        Text(label, style: GoogleFonts.inter(fontSize: 10, color: isDark ? Colors.white30 : Colors.black38, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 3),
+        Text(val, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: color)),
       ],
     );
   }
 
-  Widget _buildStatusPill(String label, bool isWarning) {
+  Widget _statusPill(String label, bool isWarning) {
+    final c = isWarning ? const Color(0xFFEF4444) : const Color(0xFF10B981);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: (isWarning ? Colors.redAccent : (isDark ? Colors.white10 : Colors.black12)).withOpacity(0.1), borderRadius: BorderRadius.circular(100)),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: c.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: c.withOpacity(0.25))),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 6, height: 6, decoration: BoxDecoration(color: isWarning ? Colors.redAccent : (isDark ? Colors.white24 : Colors.black26), shape: BoxShape.circle)),
-          const SizedBox(width: 8),
-          Text(label, style: GoogleFonts.roboto(fontSize: 11, fontWeight: FontWeight.bold, color: isWarning ? Colors.redAccent : (isDark ? Colors.white38 : Colors.black38))),
+          Container(width: 5, height: 5, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+          const SizedBox(width: 6),
+          Text(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: c)),
         ],
-      ),
-    );
-  }
-
-  Widget _actionBtn(String label, IconData icon, {VoidCallback? onTap, bool isLoading = false}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isLoading ? accent.withOpacity(0.5) : accent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            if (isLoading)
-              const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            else
-              Icon(icon, color: Colors.white, size: 16),
-            const SizedBox(width: 8),
-            Text(label, style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-          ],
-        ),
       ),
     );
   }
@@ -283,12 +320,12 @@ class WaveformPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = color..style = PaintingStyle.fill;
     final path = Path();
-    double phase = animationValue * 2 * pi * (1 + (cpuUsage / 50));
+    final phase = animationValue * 2 * pi * (1 + (cpuUsage / 50));
     path.moveTo(0, size.height);
     for (double i = 0; i <= size.width; i++) {
-      double relativeX = i / size.width;
-      double amplitude = (size.height * 0.2) + (cpuUsage * 0.4);
-      double y = size.height * 0.6 + sin(relativeX * 5 * pi + phase) * amplitude * (1 - relativeX);
+      final relX = i / size.width;
+      final amplitude = (size.height * 0.2) + (cpuUsage * 0.4);
+      final y = size.height * 0.6 + sin(relX * 5 * pi + phase) * amplitude * (1 - relX);
       path.lineTo(i, y);
     }
     path.lineTo(size.width, size.height);

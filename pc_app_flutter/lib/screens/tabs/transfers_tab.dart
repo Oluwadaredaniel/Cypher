@@ -56,9 +56,9 @@ class TransfersTab extends StatelessWidget {
                               Icon(Icons.cloud_done_outlined, size: 64, color: isDark ? Colors.white10 : Colors.black12),
                               const SizedBox(height: 16),
                               Text("No active transfers",
-                                  style: GoogleFonts.roboto(color: isDark ? Colors.white24 : Colors.black26, fontSize: 16, fontWeight: FontWeight.bold)),
+                                  style: GoogleFonts.inter(color: isDark ? Colors.white24 : Colors.black26, fontSize: 16, fontWeight: FontWeight.bold)),
                               Text("Sync files from your mobile app to see them here.",
-                                  style: GoogleFonts.roboto(color: isDark ? Colors.white10 : Colors.black12, fontSize: 12)),
+                                  style: GoogleFonts.inter(color: isDark ? Colors.white10 : Colors.black12, fontSize: 12)),
                             ],
                           ),
                         ),
@@ -103,14 +103,14 @@ class TransfersTab extends StatelessWidget {
       children: [
         Row(
           children: [
-            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-            const SizedBox(width: 12),
-            Text("LIVE CONNECTION", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white24 : Colors.black26, letterSpacing: 2)),
+            Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Text('LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: const Color(0xFF10B981), letterSpacing: 2)),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(title, style: GoogleFonts.roboto(fontSize: 32, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
-        Text(sub, style: GoogleFonts.roboto(fontSize: 14, color: isDark ? Colors.white24 : Colors.black38)),
+        const SizedBox(height: 6),
+        Text(title, style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black, height: 1.1)),
+        Text(sub, style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white30 : Colors.black38)),
       ],
     );
   }
@@ -127,7 +127,7 @@ class TransfersTab extends StatelessWidget {
         children: [
           Icon(icon, color: isOutline ? accent : Colors.white, size: 16),
           const SizedBox(width: 8),
-          Text(label, style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.bold, color: isOutline ? accent : Colors.white)),
+          Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: isOutline ? accent : Colors.white)),
         ],
       ),
     );
@@ -150,9 +150,9 @@ class TransfersTab extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                    Text(name, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                     const SizedBox(height: 4),
-                    Text(direction, style: GoogleFonts.roboto(fontSize: 12, color: isDark ? Colors.white24 : Colors.black38)),
+                    Text(direction, style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white24 : Colors.black38)),
                   ],
                 ),
               ),
@@ -170,14 +170,26 @@ class TransfersTab extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(isPaused ? "Paused" : "Syncing...", style: GoogleFonts.roboto(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26)),
-              Text("${(progress * 100).toInt()}%", style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold, color: isPaused ? (isDark ? Colors.white24 : Colors.black26) : accent)),
+              Text(isPaused ? "Paused" : "Syncing...", style: GoogleFonts.inter(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26)),
+              Text("${(progress * 100).toInt()}%", style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isPaused ? (isDark ? Colors.white24 : Colors.black26) : accent)),
             ],
           ),
           const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(value: progress, minHeight: 4, backgroundColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05), valueColor: AlwaysStoppedAnimation(isPaused ? (isDark ? Colors.white10 : Colors.black12) : accent)),
+          Stack(
+            children: [
+              Container(height: 4, decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.06), borderRadius: BorderRadius.circular(10))),
+              FractionallySizedBox(
+                widthFactor: progress.clamp(0.0, 1.0),
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isPaused ? (isDark ? Colors.white12 : Colors.black12) : accent,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: isPaused ? null : [BoxShadow(color: accent.withOpacity(0.5), blurRadius: 8, spreadRadius: -1)],
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Row(
@@ -205,7 +217,7 @@ class TransfersTab extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: isDark ? Colors.white12 : Colors.black12),
         const SizedBox(width: 8),
-        Text(val, style: GoogleFonts.roboto(fontSize: 12, color: isDark ? Colors.white38 : Colors.black45)),
+        Text(val, style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white38 : Colors.black45)),
       ],
     );
   }
@@ -216,7 +228,7 @@ class TransfersTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("SYNC PERFORMANCE", style: GoogleFonts.roboto(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
+          Text("SYNC PERFORMANCE", style: GoogleFonts.inter(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -251,8 +263,8 @@ class TransfersTab extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.roboto(fontSize: 11, color: isDark ? Colors.white24 : Colors.black38)),
-        Text(val, style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+        Text(label, style: GoogleFonts.inter(fontSize: 11, color: isDark ? Colors.white24 : Colors.black38)),
+        Text(val, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
       ],
     );
   }
@@ -267,13 +279,13 @@ class TransfersTab extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("RECENT", style: GoogleFonts.roboto(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
-              Text("View All", style: GoogleFonts.roboto(fontSize: 11, color: accent, fontWeight: FontWeight.bold)),
+              Text("RECENT", style: GoogleFonts.inter(fontSize: 9, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
+              Text("View All", style: GoogleFonts.inter(fontSize: 11, color: accent, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 20),
           if (history.isEmpty)
-             Text("No recent transfers", style: GoogleFonts.roboto(fontSize: 12, color: isDark ? Colors.white10 : Colors.black12))
+             Text("No recent transfers", style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white10 : Colors.black12))
           else
             ...history.map((h) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -293,8 +305,8 @@ class TransfersTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(name, style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text(sub, style: GoogleFonts.roboto(fontSize: 10, color: isDark ? Colors.white12 : Colors.black12)),
+              Text(name, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(sub, style: GoogleFonts.inter(fontSize: 10, color: isDark ? Colors.white12 : Colors.black12)),
             ],
           ),
         )

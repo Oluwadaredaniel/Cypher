@@ -329,6 +329,7 @@ DEFAULT_SETTINGS = {
     "server_port": 5000,
     "device_name": "My PC",
     "battery_alert_threshold": 20,
+    "battery_alert_enabled": False,
     "notifications_enabled": True
 }
 
@@ -404,13 +405,26 @@ def verify_token_and_log():
 # --- HELPERS ---
 
 def get_local_ip():
-    """Returns the primary IP for display, prioritized by routeability and hotspot range."""
+    """Returns the primary IP, prioritizing Android/Windows hotspot ranges for phone connection."""
     try:
-        # 1. Try to get IP by connecting to a dummy address (best way to find active route)
+        all_addrs = psutil.net_if_addrs()
+
+        # Priority 1: Phone hotspot (Android = 192.168.43.x)
+        for _, addrs in all_addrs.items():
+            for addr in addrs:
+                if addr.family == socket.AF_INET and addr.address.startswith("192.168.43."):
+                    return addr.address
+
+        # Priority 2: Windows built-in hotspot (192.168.137.x)
+        for _, addrs in all_addrs.items():
+            for addr in addrs:
+                if addr.family == socket.AF_INET and addr.address.startswith("192.168.137."):
+                    return addr.address
+
+        # Priority 3: Active route detection (works for regular WiFi/LAN)
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0)
         try:
-            # doesn't even have to be reachable
             s.connect(('10.254.254.254', 1))
             ip = s.getsockname()[0]
         except Exception:
@@ -418,19 +432,18 @@ def get_local_ip():
         finally:
             s.close()
 
-        # 2. If we got a loopback or APIPA, check for a Hotspot range as a fallback
-        if ip == '127.0.0.1' or ip.startswith('169.254.'):
-            for _, addrs in psutil.net_if_addrs().items():
-                for addr in addrs:
-                    if addr.family == socket.AF_INET:
-                        # Windows Hotspot default range
-                        if addr.address.startswith("192.168.137."):
-                            return addr.address
-                        # Other common local ranges if primary failed
-                        if addr.address.startswith("10.") or addr.address.startswith("192.168."):
-                            ip = addr.address
+        if ip != '127.0.0.1' and not ip.startswith('169.254.'):
+            return ip
 
-        return ip
+        # Priority 4: Any private range
+        for _, addrs in all_addrs.items():
+            for addr in addrs:
+                if addr.family == socket.AF_INET:
+                    a = addr.address
+                    if (a.startswith("10.") or a.startswith("192.168.") or a.startswith("172.")):
+                        return a
+
+        return "127.0.0.1"
     except Exception:
         return "127.0.0.1"
 
@@ -495,7 +508,7 @@ def get_connect_code():
     global PAIRING_CODE
     if request.method == 'POST':
         PAIRING_CODE = _generate_dynamic_code()
-        add_activity("Security", "Pairing code was rotated for enhanced security.", category="Security")
+        add_activity("Security", "Pairing code was rotated for enhanced security.", category="Connections")
     return jsonify({"code": PAIRING_CODE})
 
 # --- SETTINGS ENDPOINTS ---
@@ -543,45 +556,27 @@ def handle_settings():
         with open(SETTINGS_FILE, 'r+') as f:
             current = json.load(f)
 
-            # Preserve critical device name logic
             old_name = current.get("device_name", socket.gethostname())
             new_name = new_settings.get("device_name")
 
             current.update(new_settings)
-            f.seek(0)
-            json.dump(current, f, indent=4)
-            f.truncate()
-
-            # [LIVE DISCOVERY UPDATE]
-            if new_name and new_name != old_name:
-                try:
-                    # Use get_discovery_node() lazy helper
-                    start_fn, get_inst_fn = get_discovery_node()
-                    disc = get_inst_fn()
-                    if disc:
-                        disc.update_name(new_name)
-                        log_to_ui(f"Discovery name updated to: {new_name}")
-                except Exception as e:
-                    print(f"Discovery update failed: {e}")
-
-            current.update(new_settings)
-
-            # Ensure name changes are synced to discovery
-            new_name = current.get("device_name")
-            if new_name and new_name != old_name:
-                try:
-                    from .discovery import get_discovery_instance
-                    disco = get_discovery_instance()
-                    if disco:
-                        disco.update_name(new_name)
-                except ImportError:
-                    pass
-
             battery_threshold = current.get("battery_alert_threshold", battery_threshold)
 
             f.seek(0)
             json.dump(current, f, indent=4)
             f.truncate()
+
+        # Live discovery update if name changed
+        if new_name and new_name != old_name:
+            try:
+                start_fn, get_inst_fn = get_discovery_node()
+                disc = get_inst_fn()
+                if disc:
+                    disc.update_name(new_name)
+                    log_to_ui(f"Discovery name updated to: {new_name}")
+            except Exception as e:
+                print(f"Discovery update failed: {e}")
+
         return jsonify({"success": True, "action": "settings_updated"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -744,23 +739,88 @@ def get_system_stats():
 
 @app.route('/system/optimize', methods=['POST'])
 def optimize_system():
-    """Cleans temporary files and flushes DNS to 'optimize'."""
+    """Real system optimization: temp cleanup, RAM working set trim, DNS flush."""
+    freed_bytes = 0
+    actions = []
+
     try:
         if WINDOWS:
-            # 1. Flush DNS
-            subprocess.run("ipconfig /flushdns", shell=True)
-            # 2. Clean Temp folders (basic)
-            temp_path = os.environ.get('TEMP')
-            if temp_path:
-                for file in os.listdir(temp_path):
-                    try:
-                        p = os.path.join(temp_path, file)
-                        if os.path.isfile(p): os.remove(p)
-                    except: pass
+            # 1. Flush DNS cache
+            subprocess.run("ipconfig /flushdns", shell=True, capture_output=True)
+            actions.append("DNS cache flushed")
 
-        add_activity("System Optimized", "Performance cleanup and DNS flush completed.", category="Commands")
+            # 2. Clear %TEMP% — files AND subdirectories
+            temp_path = os.environ.get('TEMP') or os.environ.get('TMP')
+            if temp_path and os.path.isdir(temp_path):
+                for entry in os.listdir(temp_path):
+                    entry_path = os.path.join(temp_path, entry)
+                    try:
+                        if os.path.isfile(entry_path):
+                            size = os.path.getsize(entry_path)
+                            os.remove(entry_path)
+                            freed_bytes += size
+                        elif os.path.isdir(entry_path):
+                            import shutil
+                            for root, dirs, files in os.walk(entry_path):
+                                for f in files:
+                                    try:
+                                        fp = os.path.join(root, f)
+                                        freed_bytes += os.path.getsize(fp)
+                                    except: pass
+                            shutil.rmtree(entry_path, ignore_errors=True)
+                    except: pass
+                actions.append(f"Temp files cleared ({freed_bytes // (1024*1024)} MB freed)")
+
+            # 3. Clear Windows prefetch (speeds up older HDDs, harmless on SSDs)
+            prefetch = r"C:\Windows\Prefetch"
+            if os.path.isdir(prefetch):
+                for f in os.listdir(prefetch):
+                    try:
+                        fp = os.path.join(prefetch, f)
+                        if os.path.isfile(fp):
+                            os.remove(fp)
+                    except: pass
+                actions.append("Prefetch cache cleared")
+
+            # 4. Trim RAM working sets of all processes (the real "memory optimizer")
+            # This releases unused RAM pages back to the OS — same as what RAM cleaner apps do
+            try:
+                import ctypes
+                import ctypes.wintypes
+                SE_DEBUG = 20
+                TOKEN_ADJUST_PRIVILEGES = 0x0020
+                TOKEN_QUERY = 0x0008
+                PROCESS_SET_QUOTA = 0x0100
+                PROCESS_QUERY_INFORMATION = 0x0400
+
+                # Enable SeDebugPrivilege so we can access system processes
+                hToken = ctypes.wintypes.HANDLE()
+                ctypes.windll.advapi32.OpenProcessToken(
+                    ctypes.windll.kernel32.GetCurrentProcess(),
+                    TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+                    ctypes.byref(hToken)
+                )
+
+                trimmed = 0
+                for proc in psutil.process_iter(['pid']):
+                    try:
+                        handle = ctypes.windll.kernel32.OpenProcess(
+                            PROCESS_SET_QUOTA | PROCESS_QUERY_INFORMATION, False, proc.info['pid']
+                        )
+                        if handle:
+                            ctypes.windll.psapi.EmptyWorkingSet(handle)
+                            ctypes.windll.kernel32.CloseHandle(handle)
+                            trimmed += 1
+                    except: pass
+                actions.append(f"RAM working sets trimmed ({trimmed} processes)")
+            except Exception as e:
+                print(f"RAM trim failed: {e}")
+
+        freed_mb = freed_bytes // (1024 * 1024)
+        summary = " | ".join(actions) if actions else "Optimization complete"
+        add_activity("System Optimized", summary, category="Commands")
         log_to_ui("System Optimization Complete")
-        return jsonify({"success": True})
+        return jsonify({"success": True, "freed_mb": freed_mb, "actions": actions})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -1035,29 +1095,59 @@ def stream_screen():
 def get_active_windows():
     """Returns a list of all visible application windows with process context."""
     _load_automation()
-    if not WINDOWS or not gw:
+    if not WINDOWS or not win32gui:
         return jsonify({"windows": []})
     try:
         import win32process
+        import win32con
         windows = []
-        for win in gw.getAllWindows():
-            if win.title and win.width > 0 and win.height > 0:
-                # Get process path for icon fetching
-                path = ""
-                try:
-                    _, pid = win32process.GetWindowThreadProcessId(win._hWnd)
-                    proc = psutil.Process(pid)
-                    path = proc.exe()
-                except: pass
 
-                windows.append({
-                    "title": win.title,
-                    "name": win.title,
-                    "id": win._hWnd,
-                    "path": path, # For icon fetching
-                    "is_minimized": win.isMinimized,
-                    "is_maximized": win.isMaximized
-                })
+        def enum_handler(hwnd, lparam):
+            # 1. Must be visible
+            if not win32gui.IsWindowVisible(hwnd):
+                return
+
+            # 2. Must have a title
+            title = win32gui.GetWindowText(hwnd)
+            if not title:
+                return
+
+            # 3. Filter out common system tool windows/shells
+            ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+            if ex_style & win32con.WS_EX_TOOLWINDOW:
+                return
+
+            # 4. Must have dimensions (ignore tray icons/cloaked windows)
+            rect = win32gui.GetWindowRect(hwnd)
+            w = rect[2] - rect[0]
+            h = rect[3] - rect[1]
+            if w <= 10 or h <= 10:
+                return
+
+            path = ""
+            try:
+                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                proc = psutil.Process(pid)
+                path = proc.exe()
+                # Filter out obvious system shells that aren't user apps
+                if "System32" in path or "WindowsApps" in path:
+                    if "ApplicationFrameHost" not in path: # Allow some WindowsApps
+                        return
+            except: pass
+
+            windows.append({
+                "title": title,
+                "name": title,
+                "id": hwnd,
+                "path": path,
+                "is_minimized": win32gui.IsIconic(hwnd),
+                "is_maximized": win32gui.IsZoomed(hwnd)
+            })
+
+        win32gui.EnumWindows(enum_handler, None)
+
+        # Sort by title for better UI experience
+        windows.sort(key=lambda x: x['title'].lower())
         return jsonify({"windows": windows})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -1585,288 +1675,549 @@ def guest_landing():
     if not session:
         return jsonify({"error": "Invalid or expired token"}), 401
     
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-        <title>Cypher - Guest Secure Access</title>
-        <style>
-            :root {{
-                --accent: #6C63FF;
-                --bg: #050505;
-                --surface: #121212;
-                --surface-bright: #1c1c1e;
-                --text: #ffffff;
-                --text-dim: #8e8e93;
-                --glass: rgba(255, 255, 255, 0.03);
-            }}
+    mode = request.args.get('mode', '')
+    is_drop = mode == 'drop'
 
-            * {{ margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }}
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>CYPHER{'Drop' if is_drop else ' — Shared Files'}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-            body {{
-                font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Display", sans-serif;
-                background: var(--bg);
-                color: var(--text);
-                line-height: 1.6;
-                padding: max(20px, env(safe-area-inset-top)) 20px 40px;
-            }}
+    :root {{
+      --accent:      #7C3AED;
+      --accent-light:#A78BFA;
+      --accent-glow: rgba(124,58,237,0.25);
+      --bg:          #0F0F11;
+      --surface:     #18181B;
+      --surface2:    #1F1F23;
+      --surface3:    #27272B;
+      --text:        #F4F4F5;
+      --text2:       #A1A1AA;
+      --text3:       #71717A;
+      --border:      rgba(255,255,255,0.07);
+      --border2:     rgba(124,58,237,0.3);
+      --success:     #22C55E;
+      --error:       #EF4444;
+      --warning:     #F59E0B;
+      --radius-sm:   10px;
+      --radius:      16px;
+      --radius-lg:   22px;
+    }}
 
-            .container {{ max-width: 900px; margin: 0 auto; }}
+    *, *::before, *::after {{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }}
 
-            .header {{
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 32px;
-                padding: 24px;
-                background: var(--surface);
-                border-radius: 24px;
-                border: 1px solid rgba(255, 255, 255, 0.05);
-                box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-            }}
+    body {{
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      padding: max(env(safe-area-inset-top),20px) 0 max(env(safe-area-inset-bottom),40px);
+    }}
 
-            .header h1 {{ font-size: 24px; font-weight: 800; letter-spacing: -1px; color: var(--accent); }}
+    .wrap {{ max-width: 680px; margin: 0 auto; padding: 0 16px; }}
 
-            .timer {{
-                font-size: 13px;
-                font-weight: 700;
-                color: var(--text-dim);
-                padding: 8px 16px;
-                background: rgba(255, 255, 255, 0.05);
-                border-radius: 12px;
-                letter-spacing: 1px;
-            }}
+    /* ── Top bar ── */
+    .topbar {{
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(20px);
+    }}
+    .logo {{
+      display: flex; align-items: center; gap: 10px;
+    }}
+    .logo-mark {{
+      width: 34px; height: 34px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), #4F46E5);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }}
+    .logo-mark svg {{ width:18px; height:18px; fill:white; }}
+    .logo-name {{ font-size:15px; font-weight:800; color:var(--text); letter-spacing:-0.5px; }}
+    .logo-name span {{ color:var(--accent-light); }}
 
-            .timer.warning {{ color: #ff9f0a; background: rgba(255, 159, 10, 0.1); }}
-            .timer.critical {{ color: #ff453a; background: rgba(255, 69, 58, 0.1); }}
+    .timer-badge {{
+      font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+      padding: 7px 14px; border-radius: 20px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text2); transition: all 0.4s;
+    }}
+    .timer-badge.warn  {{ color: var(--warning); border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.08); }}
+    .timer-badge.crit  {{ color: var(--error);   border-color: rgba(239,68,68,0.3);  background: rgba(239,68,68,0.08);  }}
 
-            .breadcrumb {{
-                display: flex;
-                gap: 8px;
-                margin-bottom: 24px;
-                overflow-x: auto;
-                padding: 4px;
-                scrollbar-width: none;
-            }}
-            .breadcrumb::-webkit-scrollbar {{ display: none; }}
+    /* ── Install banner ── */
+    .install-banner {{
+      margin: 16px 0 0;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(79,70,229,0.08));
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      display: flex; align-items: center; gap: 12px;
+    }}
+    .install-icon {{
+      width: 44px; height: 44px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--accent), #4F46E5);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }}
+    .install-icon svg {{ width:22px; height:22px; fill:white; }}
+    .install-text {{ flex:1; min-width:0; }}
+    .install-text strong {{ font-size:13px; font-weight:700; color:var(--text); display:block; }}
+    .install-text span {{ font-size:11px; color:var(--text2); }}
+    .install-btn {{
+      padding: 8px 14px; border-radius: 8px; font-size:12px; font-weight:700;
+      background: var(--accent); color: white; border: none; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0; transition: 0.2s;
+    }}
+    .install-btn:active {{ opacity:0.8; transform:scale(0.96); }}
+    #installBanner {{ display:none; }}
 
-            .breadcrumb span {{
-                padding: 10px 18px;
-                background: var(--surface);
-                border-radius: 14px;
-                color: var(--accent);
-                font-size: 13px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.2s;
-                border: 1px solid rgba(255, 255, 255, 0.05);
-                white-space: nowrap;
-            }}
+    /* ── Drop hero ── */
+    .drop-hero {{
+      margin: 20px 0 0;
+      text-align: center;
+      padding: 28px 20px;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+    }}
+    .drop-hero h2 {{ font-size:20px; font-weight:800; color:var(--text); margin-bottom:6px; }}
+    .drop-hero p  {{ font-size:13px; color:var(--text2); line-height:1.6; }}
 
-            .breadcrumb span:last-child {{ color: var(--text-dim); cursor: default; background: transparent; border-color: transparent; }}
+    /* ── Section header ── */
+    .section-head {{
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 24px 0 10px;
+    }}
+    .section-title {{
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 1.5px; color: var(--text3); text-transform: uppercase;
+    }}
+    .section-count {{
+      font-size: 11px; font-weight: 600; color: var(--text3);
+    }}
 
-            .upload-zone {{
-                background: var(--surface);
-                border: 2px dashed rgba(108, 99, 255, 0.2);
-                border-radius: 24px;
-                padding: 40px;
-                text-align: center;
-                margin-bottom: 32px;
-                transition: 0.3s;
-                cursor: pointer;
-            }}
+    /* ── Upload zone ── */
+    .upload-zone {{
+      border: 2px dashed rgba(124,58,237,0.25);
+      border-radius: var(--radius-lg);
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s;
+      background: rgba(124,58,237,0.03);
+      position: relative;
+    }}
+    .upload-zone:hover, .upload-zone.drag {{ border-color:var(--accent); background:rgba(124,58,237,0.07); }}
+    .upload-zone-icon {{
+      width: 56px; height: 56px; margin: 0 auto 14px;
+      background: rgba(124,58,237,0.1);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }}
+    .upload-zone-icon svg {{ width:26px; height:26px; stroke:var(--accent-light); fill:none; stroke-width:2; }}
+    .upload-zone h3 {{ font-size:15px; font-weight:700; color:var(--text); margin-bottom:4px; }}
+    .upload-zone p  {{ font-size:12px; color:var(--text2); }}
+    .upload-zone input {{ position:absolute; inset:0; opacity:0; cursor:pointer; }}
 
-            .upload-zone:hover {{ border-color: var(--accent); background: rgba(108, 99, 255, 0.05); }}
+    /* ── Upload progress ── */
+    #uploadProgress {{ display:none; margin-top:16px; }}
+    .upload-item {{
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+      background: var(--surface2); border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+    }}
+    .upload-item-icon {{
+      width: 36px; height: 36px; flex-shrink:0;
+      background: rgba(124,58,237,0.1); border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+    }}
+    .upload-item-icon svg {{ width:18px; height:18px; stroke:var(--accent-light); fill:none; stroke-width:2; }}
+    .upload-item-info {{ flex:1; min-width:0; }}
+    .upload-item-name {{ font-size:12px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+    .upload-item-bar {{ height:3px; border-radius:2px; background:var(--surface3); margin-top:6px; overflow:hidden; }}
+    .upload-item-fill {{ height:100%; background:var(--accent); border-radius:2px; transition:width 0.2s; }}
+    .upload-item-pct {{ font-size:11px; color:var(--text3); flex-shrink:0; width:34px; text-align:right; }}
 
-            .file-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }}
+    /* ── Breadcrumb ── */
+    .breadcrumb {{
+      display: flex; gap: 6px; margin-bottom: 12px;
+      overflow-x: auto; scrollbar-width: none; padding: 2px;
+    }}
+    .breadcrumb::-webkit-scrollbar {{ display:none; }}
+    .crumb {{
+      padding: 7px 14px; border-radius: 20px; font-size:12px; font-weight:600;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--accent-light); cursor: pointer; white-space: nowrap; transition: 0.2s;
+    }}
+    .crumb:last-child {{ color:var(--text3); cursor:default; background:transparent; border-color:transparent; }}
+    .crumb:not(:last-child):hover {{ background:var(--surface3); border-color:var(--border2); }}
 
-            .item {{
-                background: var(--surface);
-                border-radius: 20px;
-                padding: 20px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                text-align: center;
-                transition: 0.2s;
-                border: 1px solid rgba(255, 255, 255, 0.03);
-                position: relative;
-            }}
+    /* ── File list ── */
+    .file-list {{ display:flex; flex-direction:column; gap:8px; }}
 
-            .item:hover {{ transform: translateY(-4px); background: var(--surface-bright); border-color: var(--accent); }}
+    .file-item {{
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 14px;
+      background: var(--surface); border-radius: var(--radius);
+      border: 1px solid var(--border);
+      transition: all 0.18s; cursor: default;
+    }}
+    .file-item.is-folder {{ cursor:pointer; }}
+    .file-item.is-folder:hover {{ background:var(--surface2); border-color:var(--border2); transform:translateX(2px); }}
+    .file-item:not(.is-folder):hover {{ background:var(--surface2); }}
 
-            .icon {{
-                font-size: 32px;
-                margin-bottom: 12px;
-                width: 64px;
-                height: 64px;
-                background: rgba(255, 255, 255, 0.03);
-                border-radius: 16px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }}
+    .file-icon {{
+      width: 40px; height: 40px; flex-shrink:0; border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
+    }}
+    .file-icon svg {{ width:20px; height:20px; }}
 
-            .name {{ font-weight: 600; font-size: 14px; margin-bottom: 4px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-            .meta {{ font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }}
+    .file-info {{ flex:1; min-width:0; }}
+    .file-name {{ font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+    .file-meta {{ font-size:11px; color:var(--text3); margin-top:2px; }}
 
-            .btn-download {{
-                margin-top: 16px;
-                width: 100%;
-                padding: 10px;
-                border-radius: 12px;
-                background: var(--accent);
-                color: white;
-                border: none;
-                font-weight: 700;
-                font-size: 12px;
-                cursor: pointer;
-                transition: 0.2s;
-            }}
+    .btn-dl {{
+      padding: 8px 14px; border-radius: 8px; font-size:12px; font-weight:700;
+      background: rgba(124,58,237,0.12); color:var(--accent-light);
+      border: 1px solid rgba(124,58,237,0.2);
+      cursor: pointer; white-space:nowrap; transition: 0.2s;
+      display: flex; align-items: center; gap: 5px;
+    }}
+    .btn-dl:hover {{ background:rgba(124,58,237,0.22); border-color:var(--accent); }}
+    .btn-dl:active {{ transform:scale(0.95); opacity:0.8; }}
+    .btn-dl svg {{ width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2.5; }}
 
-            .btn-download:active {{ opacity: 0.8; transform: scale(0.95); }}
+    .folder-chevron {{ width:16px; height:16px; stroke:var(--text3); fill:none; stroke-width:2; }}
 
-            #alertBox {{ position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; }}
-            .alert {{ padding: 12px 24px; border-radius: 12px; font-weight: 600; font-size: 13px; color: #fff; background: var(--accent); box-shadow: 0 10px 20px rgba(0,0,0,0.3); }}
+    /* ── Empty state ── */
+    .empty {{
+      text-align: center; padding: 52px 20px;
+    }}
+    .empty-icon {{
+      width: 64px; height: 64px; margin: 0 auto 16px;
+      background: var(--surface2); border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+    }}
+    .empty-icon svg {{ width:30px; height:30px; stroke:var(--text3); fill:none; stroke-width:1.5; }}
+    .empty h3 {{ font-size:15px; font-weight:700; color:var(--text); margin-bottom:6px; }}
+    .empty p  {{ font-size:13px; color:var(--text2); }}
 
-            @media (max-width: 600px) {{
-                .file-grid {{ grid-template-columns: 1fr; }}
-                .item {{ flex-direction: row; text-align: left; padding: 16px; gap: 16px; }}
-                .icon {{ margin-bottom: 0; width: 48px; height: 48px; }}
-                .btn-download {{ width: auto; margin-top: 0; padding: 12px; }}
-            }}
-        </style>
-    </head>
-    <body>
-        <div id="alertBox"></div>
-        <div class="container">
-            <div class="header">
-                <h1>CYPHER CORE</h1>
-                <div class="timer" id="timerDisplay">SESSION ACTIVE</div>
-            </div>
+    /* ── Toast ── */
+    #toastBox {{
+      position: fixed; bottom: max(env(safe-area-inset-bottom),24px); left:50%;
+      transform: translateX(-50%); z-index:999; display:flex;
+      flex-direction:column; align-items:center; gap:8px;
+    }}
+    .toast {{
+      padding: 11px 20px; border-radius: 12px;
+      font-size: 13px; font-weight: 600; color: #fff;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      animation: slideUp 0.2s ease;
+      white-space: nowrap;
+    }}
+    .toast.ok    {{ background: #16a34a; }}
+    .toast.err   {{ background: var(--error); }}
+    .toast.info  {{ background: var(--accent); }}
+    @keyframes slideUp {{ from {{ transform:translateY(12px); opacity:0; }} to {{ transform:translateY(0); opacity:1; }} }}
 
-            <div class="breadcrumb" id="breadcrumb">
-                <span onclick="navigateTo('')">ROOT</span>
-            </div>
+    /* ── Loading skeleton ── */
+    .skeleton {{
+      height: 64px; border-radius: var(--radius);
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+    }}
+    @keyframes shimmer {{ 0% {{ background-position:200% 0; }} 100% {{ background-position:-200% 0; }} }}
 
-            <div class="upload-zone" onclick="document.getElementById('uploadInput').click()">
-                <p style="font-weight: 700; font-size: 14px;">SECURE UPLOAD</p>
-                <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Drag and drop or tap to browse</p>
-                <input type="file" id="uploadInput" multiple style="display:none" onchange="handleUpload(this.files)">
-            </div>
+    @media (max-width: 480px) {{
+      .btn-dl span {{ display:none; }}
+      .btn-dl {{ padding:8px; }}
+      .install-banner {{ flex-wrap:nowrap; }}
+    }}
+  </style>
+</head>
+<body>
 
-            <div class="file-grid" id="fileList"></div>
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24"><path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6l-8-4z"/></svg>
+      </div>
+      <div class="logo-name">CYPHER<span>{'Drop' if is_drop else ''}</span></div>
+    </div>
+    <div class="timer-badge" id="timerEl">--:--</div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- Install banner -->
+    <div class="install-banner" id="installBanner">
+      <div class="install-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6l-8-4z"/></svg>
+      </div>
+      <div class="install-text">
+        <strong>Get CYPHER on your phone</strong>
+        <span>Control your PC from anywhere on your WiFi — free forever</span>
+      </div>
+      <button class="install-btn" onclick="showToast('Search \\'CYPHER Remote\\' on your app store', 'info')">Get App</button>
+    </div>
+
+    {'<div class="drop-hero"><h2>Files dropped for you</h2><p>Everything below was shared by the sender. Download to your device or send files back.</p></div>' if is_drop else ''}
+
+    <!-- Upload section -->
+    <div class="section-head" style="margin-top:20px">
+      <span class="section-title">{'Send to Them' if is_drop else 'Upload Files'}</span>
+    </div>
+
+    <div class="upload-zone" id="dropZone">
+      <div class="upload-zone-icon">
+        <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+      </div>
+      <h3>{'Drop files to send back' if is_drop else 'Drop files here'}</h3>
+      <p>Tap to browse or drag and drop · No size limit</p>
+      <input type="file" id="uploadInput" multiple>
+    </div>
+
+    <div id="uploadProgress"></div>
+
+    <!-- File list section -->
+    <div class="section-head">
+      <span class="section-title">{'Shared Files' if is_drop else 'Files'}</span>
+      <span class="section-count" id="fileCount"></span>
+    </div>
+
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="file-list" id="fileList">
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+      <div class="skeleton" style="opacity:.6"></div>
+    </div>
+
+  </div>
+
+  <div id="toastBox"></div>
+
+  <script>
+    const TOKEN = "{token}";
+    const BASE = window.location.origin;
+    const IS_DROP = {'true' if is_drop else 'false'};
+    let path = "";
+
+    // ── Timer ──
+    async function updateTimer() {{
+      try {{
+        const r = await fetch(`${{BASE}}/guest/session?token=${{TOKEN}}`);
+        const d = await r.json();
+        if (!d.success) return;
+        const s = d.time_remaining_seconds || 0;
+        const m = Math.floor(s/60), sc = s%60;
+        const el = document.getElementById('timerEl');
+        el.textContent = `${{String(m).padStart(2,'0')}}:${{String(sc).padStart(2,'0')}}`;
+        el.className = s < 60 ? 'timer-badge crit' : s < 300 ? 'timer-badge warn' : 'timer-badge';
+      }} catch(_) {{}}
+    }}
+
+    // ── Load files ──
+    async function loadFiles() {{
+      const list = document.getElementById('fileList');
+      list.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
+      try {{
+        const r = await fetch(`${{BASE}}/guest/files?token=${{TOKEN}}&path=${{encodeURIComponent(path)}}`);
+        const d = await r.json();
+        const files = d.files || [];
+        document.getElementById('fileCount').textContent = files.length ? `${{files.length}} item${{files.length===1?'':'s'}}` : '';
+        updateBreadcrumb();
+        if (!files.length) {{
+          list.innerHTML = `<div class="empty">
+            <div class="empty-icon"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></div>
+            <h3>No files here</h3><p>This folder is empty</p></div>`;
+          return;
+        }}
+        list.innerHTML = files.map(f => fileCard(f)).join('');
+      }} catch(e) {{
+        list.innerHTML = '<div class="empty"><h3>Could not load files</h3><p>Check your connection</p></div>';
+      }}
+    }}
+
+    function fileCard(f) {{
+      const isDir = f.type === 'folder';
+      const icon = isDir ? folderIcon() : fileIconFor(f.extension);
+      const meta = isDir ? `${{f.item_count || 0}} items` : formatSize(f.size);
+      const safe = f.path.replace(/\\\\/g,'/').replace(/'/g, "\\'");
+      const action = isDir
+        ? `onclick="nav('${{safe}}')" `
+        : ``;
+      const dlBtn = !isDir ? `<button class="btn-dl" onclick="dl(event,'${{safe}}')">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Download</span></button>` : '';
+      const chevron = isDir ? `<svg class="folder-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>` : '';
+      return `<div class="file-item ${{isDir?'is-folder':''}}" ${{action}}>
+        <div class="file-icon" style="background:${{isDir ? 'rgba(245,158,11,0.1)' : 'rgba(124,58,237,0.08)'}}">${{icon}}</div>
+        <div class="file-info">
+          <div class="file-name">${{esc(f.name)}}</div>
+          <div class="file-meta">${{meta}}</div>
         </div>
+        ${{dlBtn}}${{chevron}}
+      </div>`;
+    }}
 
-        <script>
-            const TOKEN = "{token}";
-            const BASE_URL = window.location.origin;
-            let currentPath = "";
+    function nav(p) {{ path = p; loadFiles(); }}
 
-            async function updateTimer() {{
-                try {{
-                    const res = await fetch(`${{BASE_URL}}/guest/session?token=${{TOKEN}}`);
-                    const data = await res.json();
-                    if (!data.success) window.location.reload();
-                    const seconds = data.time_remaining_seconds;
-                    const mins = Math.floor(seconds / 60);
-                    const secs = seconds % 60;
-                    const display = document.getElementById('timerDisplay');
-                    display.textContent = `${{mins.toString().padStart(2, '0')}}:${{secs.toString().padStart(2, '0')}} REMAINING`;
-                    if (seconds < 60) display.className = 'timer critical';
-                    else if (seconds < 300) display.className = 'timer warning';
-                }} catch (e) {{}}
-            }}
+    function dl(e, p) {{
+      e.stopPropagation();
+      showToast('Download starting…', 'info');
+      window.location.href = `${{BASE}}/guest/files/download?token=${{TOKEN}}&path=${{encodeURIComponent(p)}}`;
+    }}
 
-            async function loadFiles() {{
-                try {{
-                    const res = await fetch(`${{BASE_URL}}/guest/files?token=${{TOKEN}}&path=${{encodeURIComponent(currentPath)}}`);
-                    const data = await res.json();
-                    const list = document.getElementById('fileList');
-                    list.innerHTML = data.files.map(f => {{
-                        const isDir = f.type === 'folder';
-                        return `
-                            <div class="item" onclick="if(${{isDir}}) navigateTo('${{f.path.replace(/\\\\/g, '/')}}')">
-                                <div class="icon">${{isDir ? '📁' : '📄'}}</div>
-                                <div style="flex:1; min-width:0">
-                                    <div class="name">${{f.name}}</div>
-                                    <div class="meta">${{isDir ? 'FOLDER' : formatSize(f.size)}}</div>
-                                </div>
-                                ${{isDir ? '' : `<button class="btn-download" onclick="downloadFile(event, '${{f.path.replace(/\\\\/g, '/')}}')">DOWNLOAD</button>`}}
-                            </div>
-                        `;
-                    }}).join('');
-                }} catch (e) {{}}
-            }}
+    // ── Breadcrumb ──
+    function updateBreadcrumb() {{
+      const bc = document.getElementById('breadcrumb');
+      const parts = path.split(/[\\/]/).filter(Boolean);
+      const crumbs = [{{label:'Root', p:''}}];
+      parts.forEach((part, i) => crumbs.push({{label:part, p:parts.slice(0,i+1).join('/')}}));
+      bc.innerHTML = crumbs.map((c,i) =>
+        `<div class="crumb" onclick="if(${{i<crumbs.length-1}})nav('${{c.p}}')">${{esc(c.label)}}</div>`
+      ).join('');
+    }}
 
-            async function downloadFile(e, path) {{
-                e.stopPropagation();
-                window.location.href = `${{BASE_URL}}/guest/files/download?token=${{TOKEN}}&path=${{encodeURIComponent(path)}}`;
-            }}
+    // ── Upload ──
+    const dropZone = document.getElementById('dropZone');
+    const uploadInput = document.getElementById('uploadInput');
 
-            function navigateTo(path) {{
-                currentPath = path;
-                loadFiles();
-                updateBreadcrumb();
-            }}
+    dropZone.addEventListener('dragover', e => {{ e.preventDefault(); dropZone.classList.add('drag'); }});
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+    dropZone.addEventListener('drop', e => {{
+      e.preventDefault(); dropZone.classList.remove('drag');
+      handleUpload(e.dataTransfer.files);
+    }});
+    uploadInput.addEventListener('change', () => handleUpload(uploadInput.files));
 
-            function updateBreadcrumb() {{
-                const bc = document.getElementById('breadcrumb');
-                const parts = currentPath.split('/').filter(p => p);
-                bc.innerHTML = '<span onclick="navigateTo(\\'\\')">ROOT</span>' +
-                    parts.map((p, i) => `<span onclick="navigateTo(\\'${{parts.slice(0,i+1).join('/')}}\\' )">${{p.toUpperCase()}}</span>`).join('');
-            }}
+    async function handleUpload(files) {{
+      if (!files.length) return;
+      const prog = document.getElementById('uploadProgress');
+      prog.style.display = 'block';
+      prog.innerHTML = '';
 
-            function formatSize(b) {{
-                if (b < 1024) return b + ' B';
-                if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
-                return (b/1048576).toFixed(1) + ' MB';
-            }}
+      const items = Array.from(files);
+      const rows = {{}};
 
-            async function handleUpload(files) {{
-                if (!files.length) return;
-                const fd = new FormData();
-                for (const f of files) fd.append('file', f);
-                fd.append('destination', currentPath);
-                try {{
-                    const res = await fetch(`${{BASE_URL}}/guest/files/upload?token=${{TOKEN}}`, {{ method: 'POST', body: fd }});
-                    const data = await res.json();
-                    if (data.success) {{
-                        showAlert('Uploaded successfully', 'success');
-                        loadFiles();
-                    }} else showAlert(data.error, 'error');
-                }} catch (e) {{ showAlert(e.message, 'error'); }}
-            }}
+      items.forEach(f => {{
+        const id = 'up_' + Math.random().toString(36).slice(2);
+        rows[f.name] = id;
+        prog.innerHTML += `<div class="upload-item">
+          <div class="upload-item-icon">${{fileIconFor(f.name.split('.').pop())}}</div>
+          <div class="upload-item-info">
+            <div class="upload-item-name">${{esc(f.name)}}</div>
+            <div class="upload-item-bar"><div class="upload-item-fill" id="${{id}}" style="width:0%"></div></div>
+          </div>
+          <div class="upload-item-pct" id="${{id}}_pct">0%</div>
+        </div>`;
+      }});
 
-            function showAlert(msg, type) {{
-                const box = document.getElementById('alertBox');
-                const div = document.createElement('div');
-                div.className = 'alert ' + type;
-                div.textContent = msg;
-                box.appendChild(div);
-                setTimeout(() => div.remove(), 3000);
-            }}
+      for (const f of items) {{
+        const id = rows[f.name];
+        const xhr = new XMLHttpRequest();
+        const fd = new FormData();
+        fd.append('file', f);
+        fd.append('destination', path || 'CypherDrop');
 
-            function getIcon(ext) {{
-                const m = {{'.pdf':'📄','.jpg':'🖼️','.png':'🖼️','.mp4':'🎬','.zip':'📦','.mp3':'🎵','.txt':'📝'}};
-                return m[ext.toLowerCase()] || '📄';
-            }}
+        xhr.upload.onprogress = e => {{
+          if (!e.lengthComputable) return;
+          const pct = Math.round(e.loaded/e.total*100);
+          const el = document.getElementById(id);
+          const pelEl = document.getElementById(id+'_pct');
+          if (el) el.style.width = pct+'%';
+          if (pelEl) pelEl.textContent = pct+'%';
+        }};
 
-            function formatSize(b) {{
-                if (!b) return '0 B';
-                const i = Math.floor(Math.log(b)/Math.log(1024));
-                return (b/Math.pow(1024,i)).toFixed(1) + ' ' + ['B','KB','MB','GB'][i];
-            }}
+        await new Promise(resolve => {{
+          xhr.onload = () => {{
+            const el = document.getElementById(id);
+            if (el) el.style.background = xhr.status===200 ? 'var(--success)' : 'var(--error)';
+            resolve();
+          }};
+          xhr.onerror = resolve;
+          xhr.open('POST', `${{BASE}}/guest/files/upload?token=${{TOKEN}}`);
+          xhr.send(fd);
+        }});
+      }}
 
-            setInterval(updateTimer, 1000);
-            updateTimer();
-            loadFiles();
-        </script>
-    </body>
-    </html>
-    """
+      showToast('Upload complete!', 'ok');
+      setTimeout(() => {{ prog.style.display='none'; prog.innerHTML=''; }}, 2500);
+      loadFiles();
+    }}
+
+    // ── Icon helpers ──
+    function folderIcon() {{
+      return `<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:#F59E0B;fill:none;stroke-width:2">
+        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>`;
+    }}
+
+    function fileIconFor(ext) {{
+      ext = (ext||'').toLowerCase().replace('.','');
+      const imgs = ['jpg','jpeg','png','gif','webp','bmp','svg','heic'];
+      const vids = ['mp4','mkv','mov','avi','webm','m4v'];
+      const auds = ['mp3','wav','aac','flac','m4a','ogg'];
+      const docs = ['pdf','doc','docx','xls','xlsx','ppt','pptx'];
+      const code = ['js','ts','py','dart','html','css','json','xml','sh'];
+      const arch = ['zip','rar','7z','tar','gz'];
+      const txts = ['txt','md','csv','log'];
+
+      let stroke = '#A78BFA', d = 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z';
+      if (imgs.includes(ext)) {{ stroke='#06B6D4'; d='M21 9v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h10'; }}
+      if (vids.includes(ext)) {{ stroke='#EC4899'; d='M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.899L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z'; }}
+      if (auds.includes(ext)) {{ stroke='#8B5CF6'; d='M9 18V5l12-2v13'; }}
+      if (docs.includes(ext)) {{ stroke='#3B82F6'; }}
+      if (code.includes(ext)) {{ stroke='#22C55E'; d='M16 18l6-6-6-6M8 6l-6 6 6 6'; }}
+      if (arch.includes(ext)) {{ stroke='#F59E0B'; d='M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z'; }}
+      if (txts.includes(ext)) {{ stroke='#94A3B8'; }}
+      return `<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:${{stroke}};fill:none;stroke-width:2"><path d="${{d}}"/></svg>`;
+    }}
+
+    // ── Utilities ──
+    function formatSize(b) {{
+      if (!b) return '0 B';
+      const u = ['B','KB','MB','GB','TB'];
+      const i = Math.min(Math.floor(Math.log(b)/Math.log(1024)), u.length-1);
+      return (b/Math.pow(1024,i)).toFixed(i>0?1:0)+' '+u[i];
+    }}
+
+    function esc(s) {{
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }}
+
+    function showToast(msg, type='info') {{
+      const box = document.getElementById('toastBox');
+      const el = document.createElement('div');
+      el.className = 'toast '+type;
+      el.textContent = msg;
+      box.appendChild(el);
+      setTimeout(() => el.remove(), 3000);
+    }}
+
+    // ── Install banner: show on mobile ──
+    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {{
+      document.getElementById('installBanner').style.display = 'flex';
+    }}
+
+    // ── Boot ──
+    setInterval(updateTimer, 1000);
+    updateTimer();
+    loadFiles();
+    updateBreadcrumb();
+  </script>
+</body>
+</html>"""
     return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 @app.route('/guest/files', methods=['GET'])
@@ -2115,8 +2466,8 @@ def guest_end_session():
     data = request.json
     guest_token = data.get("guest_token")
 
-    if guest_manager.end_session(guest_token):
-        add_activity("Access Revoked", f"Guest session {guest_token[:8]} was manually terminated.", category="Connections", is_urgent=True)
+    if get_guest_manager().end_session(guest_token):
+        add_activity("Access Revoked", f"Guest session {(guest_token or '')[:8]} terminated.", category="Connections", is_urgent=True)
         return jsonify({"success": True, "action": "ended"}), 200
 
     return jsonify({"success": False, "error": "Session not found"}), 404
@@ -2315,24 +2666,6 @@ def remote_hotkey():
         return jsonify({"success": True, "keys": keys})
     return jsonify({"success": False, "error": "No keys provided"}), 400
 
-@app.route('/mouse/move', methods=['POST'])
-def mouse_move():
-    _load_automation()
-    if not WINDOWS or not pyautogui:
-        return jsonify({"success": False, "error": "Not available on this platform"}), 400
-    data = request.json
-    dx, dy = data.get('x', 0), data.get('y', 0)
-    pyautogui.moveRel(dx, dy)
-    return jsonify({"success": True})
-
-@app.route('/mouse/click', methods=['POST'])
-def mouse_click():
-    _load_automation()
-    if not WINDOWS or not pyautogui:
-        return jsonify({"success": False, "error": "Not available on this platform"}), 400
-    btn = request.json.get('button', 'left')
-    pyautogui.click(button=btn)
-    return jsonify({"success": True})
 
 @app.route('/media/volume/get', methods=['GET'])
 def get_volume():
@@ -2434,53 +2767,19 @@ def add_notification():
     if len(notifications_list) > 20: notifications_list.pop(0)
     return jsonify({"success": True})
 
-@app.route('/macros', methods=['GET'])
-def get_macros():
+@app.route('/wol', methods=['POST'])
+def wake_on_lan():
+    data = request.json or {}
+    mac = data.get('mac', '').replace(':', '').replace('-', '').replace('.', '')
+    if len(mac) != 12:
+        return jsonify({"success": False, "error": "Invalid MAC address (expected xx:xx:xx:xx:xx:xx)"}), 400
     try:
-        with open(MACROS_FILE, 'r') as f: return jsonify(json.load(f))
-    except:
-        return jsonify([])
-
-@app.route('/macros/create', methods=['POST'])
-def create_macro():
-    data = request.json
-    try:
-        with open(MACROS_FILE, 'r+') as f:
-            macros = json.load(f)
-            macros.append({"name": data.get("name"), "actions": data.get("actions", [])})
-            f.seek(0)
-            json.dump(macros, f, indent=4); f.truncate()
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/macros/run', methods=['POST'])
-def run_macro():
-    if not WINDOWS:
-        return jsonify({"success": False, "error": "Not available on this platform"}), 400
-    macro_name = request.json.get("name")
-    try:
-        with open(MACROS_FILE, 'r') as f: macros = json.load(f)
-        macro = next((m for m in macros if m["name"] == macro_name), None)
-        if not macro: return jsonify({"success": False, "error": "Macro not found"}), 404
-        for action in macro["actions"]:
-            a_type, val = action["type"], action.get("value")
-            if a_type == "open_app" and WINDOWS: os.startfile(val)
-            elif a_type == "lock" and WINDOWS and ctypes: ctypes.windll.user32.LockWorkStation()
-            elif a_type == "volume_up": set_volume(0.05)
-            elif a_type == "wait": time.sleep(float(val))
-        return jsonify({"success": True, "action": f"Executed: {macro_name}"})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/macros/delete', methods=['DELETE'])
-def delete_macro():
-    macro_name = request.json.get("name")
-    try:
-        with open(MACROS_FILE, 'r+') as f:
-            macros = json.load(f)
-            macros = [m for m in macros if m["name"] != macro_name]
-            f.seek(0); json.dump(macros, f, indent=4); f.truncate()
+        mac_bytes = bytes.fromhex(mac)
+        magic = b'\xff' * 6 + mac_bytes * 16
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            s.sendto(magic, ('<broadcast>', 9))
+        log_to_ui(f"WOL: Magic packet sent to {data.get('mac')}")
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

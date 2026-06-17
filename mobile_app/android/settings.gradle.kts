@@ -24,7 +24,7 @@ plugins {
     // while avoiding the Windows-specific hang of 8.9.1
     id("com.android.application") version "8.7.2" apply false
 
-    // ✅ Match Kotlin to the latest stable expected by Gradle/Flutter tools
+    // ✅ Updated Kotlin
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
     
     // ✅ Add Google Services Plugin for Firebase

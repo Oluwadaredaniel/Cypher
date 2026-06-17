@@ -1,336 +1,181 @@
-import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:animate_do/animate_do.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import '../services/theme_service.dart';
-import '../widgets/glass_container.dart';
+import '../providers/connection_provider.dart';
+import '../providers/system_provider.dart';
+import '../theme/colors.dart';
+import '../theme/app_theme.dart';
+import '../widgets/cypher_card.dart';
+import '../widgets/shimmer_box.dart';
 
 class AppLauncherScreen extends StatefulWidget {
-  final String pcIpAddress;
-  final String authToken;
-
-  const AppLauncherScreen({super.key, required this.pcIpAddress, required this.authToken});
+  const AppLauncherScreen({super.key});
 
   @override
   State<AppLauncherScreen> createState() => _AppLauncherScreenState();
 }
 
 class _AppLauncherScreenState extends State<AppLauncherScreen> {
-  bool _isLoading = true;
-  bool _isGridView = true;
-  List<dynamic> _apps = [];
-  List<dynamic> _filteredApps = [];
-  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  final _searchCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _fetchApps();
-  }
-
-  Future<void> _fetchApps() async {
-    setState(() => _isLoading = true);
-    try {
-      final res = await http.get(
-        Uri.parse('http://${widget.pcIpAddress}:5000/apps'),
-        headers: {'X-Auth-Token': widget.authToken},
-      );
-      if (res.statusCode == 200) {
-        final List data = jsonDecode(res.body);
-        data.sort((a, b) => (a['name'] as String).toLowerCase().compareTo(b['name'].toLowerCase()));
-        setState(() {
-          _apps = data;
-          _filteredApps = data;
-        });
-      }
-    } catch (_) {}
-    setState(() => _isLoading = false);
-  }
-
-  void _filterApps(String query) {
-    setState(() {
-      _filteredApps = _apps.where((app) => (app['name'] as String).toLowerCase().contains(query.toLowerCase())).toList();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ip = context.read<ConnectionProvider>().ip ?? '';
+      if (ip.isNotEmpty) context.read<SystemProvider>().fetchApps(ip);
     });
   }
 
-  Future<void> _launchApp(String path) async {
-    HapticFeedback.lightImpact();
-    try {
-      await http.post(
-        Uri.parse('http://${widget.pcIpAddress}:5000/apps/launch'),
-        headers: {'X-Auth-Token': widget.authToken, 'Content-Type': 'application/json'},
-        body: jsonEncode({'path': path}),
-      );
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Launching...")));
-    } catch (_) {}
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List _filtered(List apps) {
+    if (_searchQuery.isEmpty) return apps;
+    final q = _searchQuery.toLowerCase();
+    return apps.where((a) => (a['name']?.toString().toLowerCase() ?? '').contains(q)).toList();
+  }
+
+  Future<void> _closeApp(Map app) async {
+    final name = app['name']?.toString() ?? 'Unknown';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Close App?'),
+        content: Text('Close $name?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Close', style: TextStyle(color: CypherColors.error, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      final ip = context.read<ConnectionProvider>().ip ?? '';
+      final ok = await context.read<SystemProvider>().closeApp(ip, name);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok ? 'App closed' : 'Failed to close app'),
+        backgroundColor: ok ? CypherColors.accent : CypherColors.error,
+      ));
+    }
+  }
+
+  IconData _iconFor(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('chrome'))   return Icons.public_rounded;
+    if (n.contains('spotify'))  return Icons.music_note_rounded;
+    if (n.contains('vlc'))      return Icons.video_library_rounded;
+    if (n.contains('word'))     return Icons.description_rounded;
+    if (n.contains('excel'))    return Icons.table_chart_rounded;
+    if (n.contains('discord'))  return Icons.chat_bubble_rounded;
+    if (n.contains('code') || n.contains('visual')) return Icons.code_rounded;
+    if (n.contains('steam'))    return Icons.videogame_asset_rounded;
+    if (n.contains('notepad'))  return Icons.edit_note_rounded;
+    if (n.contains('explorer')) return Icons.folder_rounded;
+    return Icons.apps_rounded;
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Provider.of<ThemeService>(context);
-    final isDark = theme.isDarkMode;
-    final accent = const Color(0xFF6C63FF);
+    final sp   = context.watch<SystemProvider>();
+    final ip   = context.read<ConnectionProvider>().ip ?? '';
+    final list = _filtered(sp.apps);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF080F17) : const Color(0xFFF2F2F7),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                _buildTopBar(accent, isDark),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 8),
-                        _buildSearchBox(isDark),
-                        const SizedBox(height: 32),
-                        _buildSectionHeader("INSTALLED APPLICATIONS", _buildViewToggle(isDark), isDark),
-                        const SizedBox(height: 16),
-                        _isLoading
-                          ? Center(child: Padding(padding: const EdgeInsets.all(40), child: CircularProgressIndicator(color: accent)))
-                          : (_isGridView ? _buildAppsGrid(accent, isDark) : _buildAppsList(accent, isDark)),
-                        const SizedBox(height: 120),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      appBar: AppBar(
+        title: const Text('App Launcher'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () => sp.fetchApps(ip),
           ),
-          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
         ],
       ),
-    );
-  }
-
-  Widget _buildTopBar(Color accent, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Column(
         children: [
-          Row(
-            children: [
-              IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 20), onPressed: () => Navigator.pop(context)),
-              Text("APP LAUNCHER", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
-            ],
-          ),
-          IconButton(icon: Icon(Icons.refresh_rounded, color: accent.withOpacity(0.5)), onPressed: _fetchApps),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBox(bool isDark) {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.search_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), size: 20),
-          const SizedBox(width: 12),
-          Expanded(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: TextField(
-              controller: _searchController,
-              onChanged: _filterApps,
-              style: GoogleFonts.roboto(color: isDark ? Colors.white : Colors.black),
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: "Search your computer...",
-                hintStyle: GoogleFonts.roboto(color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), fontSize: 14),
+              controller: _searchCtrl,
+              onChanged: (v) => setState(() => _searchQuery = v),
+              decoration: const InputDecoration(
+                hintText: 'Search apps...',
+                prefixIcon: Icon(Icons.search_rounded, size: 18),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title, Widget? trailing, bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(title, style: GoogleFonts.roboto(fontSize: 10, color: (isDark ? Colors.white : Colors.black).withOpacity(0.24), letterSpacing: 2, fontWeight: FontWeight.bold)),
-        if (trailing != null) trailing,
-      ],
-    );
-  }
-
-  Widget _buildViewToggle(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: (isDark ? Colors.white : Colors.black).withOpacity(0.03), borderRadius: BorderRadius.circular(10)),
-      child: Row(
-        children: [
-          _toggleBtn(Icons.grid_view_rounded, _isGridView, () => setState(() => _isGridView = true)),
-          const SizedBox(width: 4),
-          _toggleBtn(Icons.list_alt_rounded, !_isGridView, () => setState(() => _isGridView = false)),
-        ],
-      ),
-    );
-  }
-
-  Widget _toggleBtn(IconData icon, bool active, VoidCallback tap) {
-    final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
-    return GestureDetector(
-      onTap: tap,
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(color: active ? const Color(0xFF6C63FF).withOpacity(0.1) : Colors.transparent, borderRadius: BorderRadius.circular(8)),
-        child: Icon(icon, color: active ? const Color(0xFF6C63FF) : (isDark ? Colors.white24 : Colors.black26), size: 16),
-      ),
-    );
-  }
-
-  Widget _buildAppsGrid(Color accent, bool isDark) {
-    if (_filteredApps.isEmpty) return _buildNoApps(isDark);
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: _filteredApps.length,
-      itemBuilder: (context, index) {
-        final app = _filteredApps[index];
-        final iconUrl = 'http://${widget.pcIpAddress}:5000/system/window-icon?path=${Uri.encodeComponent(app['path'])}&token=${widget.authToken}';
-
-        return FadeInUp(
-          delay: Duration(milliseconds: index * 20),
-          child: GestureDetector(
-            onTap: () => _launchApp(app['path']),
-            child: Column(
-              children: [
-                AspectRatio(
-                  aspectRatio: 1,
-                  child: GlassContainer(
-                    width: double.infinity,
-                    child: Center(
-                      child: Image.network(
-                        iconUrl,
-                        width: 32, height: 32,
-                        errorBuilder: (context, error, stackTrace) => Icon(Icons.rocket_launch_rounded, color: accent.withOpacity(0.5), size: 32),
-                      ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: sp.isLoading
+              ? GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 0.85, mainAxisSpacing: 16, crossAxisSpacing: 16),
+                  itemCount: 12,
+                  itemBuilder: (_, __) => const ShimmerBox(width: double.infinity, height: double.infinity, radius: 12),
+                )
+              : list.isEmpty
+                ? const Center(child: Text('No apps found', style: TextStyle(color: CypherColors.textMuted)))
+                : GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      childAspectRatio: 0.85,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
                     ),
+                    itemCount: list.length,
+                    itemBuilder: (_, i) {
+                      final app  = list[i] as Map;
+                      final name = app['name']?.toString() ?? '';
+
+                      return GestureDetector(
+                        onTap: () async {
+                          HapticFeedback.mediumImpact();
+                          await sp.launchApp(ip, app['path']?.toString() ?? '');
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text('Launching $name…'),
+                              backgroundColor: CypherColors.accent,
+                            ));
+                          }
+                        },
+                        onLongPress: () {
+                          HapticFeedback.heavyImpact();
+                          _closeApp(app);
+                        },
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 60, height: 60,
+                              decoration: BoxDecoration(
+                                color: CypherColors.bgCard,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: CypherColors.border),
+                              ),
+                              child: Icon(_iconFor(name), color: CypherColors.accentLight, size: 28),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              name,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: CypherColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  app['name'],
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.roboto(fontSize: 11, fontWeight: FontWeight.w600, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7)),
-                ),
-              ],
-            ),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAppsList(Color accent, bool isDark) {
-    if (_filteredApps.isEmpty) return _buildNoApps(isDark);
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _filteredApps.length,
-      itemBuilder: (context, index) {
-        final app = _filteredApps[index];
-        final iconUrl = 'http://${widget.pcIpAddress}:5000/system/window-icon?path=${Uri.encodeComponent(app['path'])}&token=${widget.authToken}';
-
-        return FadeInUp(
-          delay: Duration(milliseconds: index * 10),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: GestureDetector(
-              onTap: () => _launchApp(app['path']),
-              child: GlassContainer(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Image.network(
-                      iconUrl,
-                      width: 24, height: 24,
-                      errorBuilder: (context, error, stackTrace) => Icon(Icons.rocket_launch_rounded, color: accent.withOpacity(0.5), size: 24),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(app['name'], style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600, color: (isDark ? Colors.white : Colors.black).withOpacity(0.7))),
-                    ),
-                    Icon(Icons.rocket_launch_rounded, color: (isDark ? Colors.white : Colors.black).withOpacity(0.1), size: 16),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildNoApps(bool isDark) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Text("No applications found", style: GoogleFonts.roboto(color: (isDark ? Colors.white : Colors.black).withOpacity(0.24))),
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    final theme = Provider.of<ThemeService>(context, listen: false);
-    final isDark = theme.isDarkMode;
-    return GlassContainer(
-      height: 90,
-      borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context), isDark),
-          _navItem(Icons.folder_copy_rounded, "Files", false, () => Navigator.pushReplacementNamed(context, '/browser', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
-          _navItem(Icons.grid_view_rounded, "Tools", true, null, isDark),
-          _navItem(Icons.tune_rounded, "Settings", false, () => Navigator.pushReplacementNamed(context, '/settings', arguments: {'pcIpAddress': widget.pcIpAddress, 'authToken': widget.authToken}), isDark),
         ],
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap, bool isDark = true]) {
-    final accent = const Color(0xFF6C63FF);
-    final inactiveColor = isDark ? Colors.white38 : Colors.black38;
-    return GestureDetector(
-      onTap: tap,
-      child: Opacity(
-        opacity: 1.0,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: active ? accent : inactiveColor, size: 24),
-            const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : inactiveColor)),
-          ],
-        ),
       ),
     );
   }

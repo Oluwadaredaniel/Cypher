@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -93,7 +92,6 @@ class StartupScreen extends StatefulWidget {
 class _StartupScreenState extends State<StartupScreen> {
   final BackendManager _backend = BackendManager();
   bool _hasError = false;
-  bool _isInitializing = true;
 
   @override
   void initState() {
@@ -103,20 +101,12 @@ class _StartupScreenState extends State<StartupScreen> {
 
   Future<void> _initSystem() async {
     if (!mounted) return;
-    setState(() {
-      _isInitializing = true;
-      _hasError = false;
-    });
+    setState(() { _hasError = false; });
 
     // 1. Start Python subprocess
     final started = await _backend.start();
     if (!started) {
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _hasError = true;
-        });
-      }
+      if (mounted) setState(() { _hasError = true; });
       return;
     }
 
@@ -130,60 +120,61 @@ class _StartupScreenState extends State<StartupScreen> {
         );
       }
     } else {
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _hasError = true;
-        });
-      }
+      if (mounted) setState(() { _hasError = true; });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final accent = const Color(0xFF6C63FF);
+    final accent = const Color(0xFF7C3AED);
 
     if (_hasError) {
+      final errMsg = _backend.errorLog.isNotEmpty
+          ? (_backend.errorLog.length > 400 ? "...${_backend.errorLog.substring(_backend.errorLog.length - 400)}" : _backend.errorLog)
+          : "The backend service failed to respond in time.";
       return Scaffold(
-        backgroundColor: const Color(0xFF08080A),
+        backgroundColor: const Color(0xFF0F0F11),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
-              const SizedBox(height: 24),
-              Text(
-                "COULD NOT START CYPHER",
-                style: GoogleFonts.roboto(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 2,
+              Container(
+                width: 80, height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.08),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.redAccent.withOpacity(0.2), width: 1.5),
+                  boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.2), blurRadius: 40, spreadRadius: -4)],
                 ),
+                child: const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 36),
               ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Text(
-                  _backend.errorLog.isNotEmpty
-                      ? _backend.errorLog.length > 500
-                          ? "...${_backend.errorLog.substring(_backend.errorLog.length - 500)}"
-                          : _backend.errorLog
-                      : "The backend service failed to respond in time.",
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.roboto(fontSize: 10, color: Colors.white24),
+              const SizedBox(height: 32),
+              Text('Launch Failed', style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white)),
+              const SizedBox(height: 8),
+              Text('Could not start the CYPHER backend.', style: GoogleFonts.inter(fontSize: 13, color: Colors.white30)),
+              const SizedBox(height: 32),
+              Container(
+                width: 480,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.02),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withOpacity(0.06)),
                 ),
+                child: Text(errMsg, style: GoogleFonts.inter(fontSize: 10, color: Colors.white24, height: 1.6)),
               ),
-              const SizedBox(height: 48),
-              ElevatedButton(
-                onPressed: _initSystem,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 36),
+              GestureDetector(
+                onTap: _initSystem,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: accent.withOpacity(0.4), blurRadius: 24, offset: const Offset(0, 4))],
+                  ),
+                  child: Text('Try Again', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
                 ),
-                child: const Text("TRY AGAIN"),
               ),
             ],
           ),
@@ -192,46 +183,47 @@ class _StartupScreenState extends State<StartupScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF08080A),
+      backgroundColor: const Color(0xFF0F0F11),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              width: 96, height: 96,
               decoration: BoxDecoration(
-                color: accent.withOpacity(0.05),
+                color: accent.withOpacity(0.1),
                 shape: BoxShape.circle,
-                border: Border.all(color: accent.withOpacity(0.1), width: 1),
+                border: Border.all(color: accent.withOpacity(0.25), width: 1.5),
+                boxShadow: [BoxShadow(color: accent.withOpacity(0.25), blurRadius: 40, spreadRadius: -4)],
               ),
-              child: Icon(Icons.shield_moon_outlined, color: accent, size: 64),
+              child: Icon(Icons.shield_rounded, color: accent, size: 44),
             ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 40),
             Text(
-              "LOADING CYPHER",
-              style: GoogleFonts.roboto(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: 8,
-              ),
+              'CYPHER',
+              style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 6),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             Text(
-              "STARTING UP SYSTEM...",
-              style: GoogleFonts.roboto(
-                fontSize: 10,
-                color: Colors.white24,
-                letterSpacing: 2,
-              ),
+              'Starting up system...',
+              style: GoogleFonts.inter(fontSize: 12, color: Colors.white30, letterSpacing: 1),
             ),
             const SizedBox(height: 48),
             SizedBox(
-              width: 280,
-              child: LinearProgressIndicator(
-                backgroundColor: Colors.white.withOpacity(0.03),
-                valueColor: AlwaysStoppedAnimation(accent),
-                minHeight: 2,
+              width: 240,
+              child: Stack(
+                children: [
+                  Container(height: 2, decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(10))),
+                  Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [BoxShadow(color: accent.withOpacity(0.6), blurRadius: 10)],
+                    ),
+                    child: LinearProgressIndicator(backgroundColor: Colors.transparent, valueColor: AlwaysStoppedAnimation(accent), minHeight: 2),
+                  ),
+                ],
               ),
             ),
           ],

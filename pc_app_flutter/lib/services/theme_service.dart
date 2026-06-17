@@ -15,10 +15,10 @@ class ThemeService extends ChangeNotifier {
   static ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
     scaffoldBackgroundColor: const Color(0xFFF2F2F7),
-    primaryColor: const Color(0xFF6C63FF),
-    textTheme: GoogleFonts.robotoTextTheme(ThemeData.light().textTheme),
+    primaryColor: const Color(0xFF7C3AED),
+    textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
     colorScheme: const ColorScheme.light(
-      primary: Color(0xFF6C63FF),
+      primary: Color(0xFF7C3AED),
       surface: Colors.white,
       onSurface: Color(0xFF1C1C1E),
     ),
@@ -26,12 +26,12 @@ class ThemeService extends ChangeNotifier {
 
   static ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
-    scaffoldBackgroundColor: const Color(0xFF08080A),
-    primaryColor: const Color(0xFF6C63FF),
-    textTheme: GoogleFonts.robotoTextTheme(ThemeData.dark().textTheme),
+    scaffoldBackgroundColor: const Color(0xFF0F0F11),
+    primaryColor: const Color(0xFF7C3AED),
+    textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
     colorScheme: const ColorScheme.dark(
-      primary: Color(0xFF6C63FF),
-      surface: Color(0xFF0C0C0E),
+      primary: Color(0xFF7C3AED),
+      surface: Color(0xFF1A1A1E),
       onSurface: Colors.white,
     ),
   );

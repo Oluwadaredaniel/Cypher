@@ -1,250 +1,168 @@
-import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:animate_do/animate_do.dart';
-import 'package:http/http.dart' as http;
-import 'dart:ui';
-import '../widgets/glass_container.dart';
+import 'package:provider/provider.dart';
+import '../providers/file_provider.dart';
+import '../theme/colors.dart';
+import '../theme/app_theme.dart';
+import '../widgets/cypher_card.dart';
 
-class TransferProgressScreen extends StatefulWidget {
-  final String pcIpAddress;
-  final String authToken;
-  final List<dynamic>? transfers;
-
-  const TransferProgressScreen({super.key, required this.pcIpAddress, required this.authToken, this.transfers});
+class TransferProgressScreen extends StatelessWidget {
+  const TransferProgressScreen({super.key});
 
   @override
-  State<TransferProgressScreen> createState() => _TransferProgressScreenState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Transfers'),
+        actions: [
+          Consumer<FileProvider>(
+            builder: (_, fp, __) {
+              final hasDone = fp.transfers.any(
+                (t) => t.status == TransferStatus.done || t.status == TransferStatus.error,
+              );
+              if (!hasDone) return const SizedBox.shrink();
+              return TextButton(
+                onPressed: fp.clearTransfers,
+                child: const Text('Clear Done', style: TextStyle(color: CypherColors.accent)),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Consumer<FileProvider>(
+        builder: (_, fp, __) {
+          final transfers = fp.transfers;
+          if (transfers.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.swap_horiz_rounded, color: CypherColors.textMuted, size: 48),
+                  SizedBox(height: 12),
+                  Text('No active transfers', style: TextStyle(color: CypherColors.textMuted, fontSize: 15)),
+                  SizedBox(height: 4),
+                  Text('Downloads and uploads appear here', style: TextStyle(color: CypherColors.textDisabled, fontSize: 12)),
+                ],
+              ),
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+            itemCount: transfers.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (_, i) => _TransferCard(task: transfers[i]),
+          );
+        },
+      ),
+    );
+  }
 }
 
-class _TransferProgressScreenState extends State<TransferProgressScreen> {
-  Map<String, dynamic> _activeTransfers = {};
-  Timer? _refreshTimer;
+class _TransferCard extends StatelessWidget {
+  final TransferTask task;
+  const _TransferCard({required this.task});
 
-  @override
-  void initState() {
-    super.initState();
-    _startAutoRefresh();
-  }
-
-  void _startAutoRefresh() {
-    _refreshTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      try {
-        final res = await http.get(
-          Uri.parse('http://${widget.pcIpAddress}:5000/files/transfers'),
-          headers: {'X-Auth-Token': widget.authToken},
-        );
-        if (res.statusCode == 200 && mounted) {
-          setState(() => _activeTransfers = jsonDecode(res.body));
-        }
-      } catch (_) {}
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
+  String _fmtSize(int b) {
+    if (b < 1024)       return '$b B';
+    if (b < 1048576)    return '${(b / 1024).toStringAsFixed(1)} KB';
+    if (b < 1073741824) return '${(b / 1048576).toStringAsFixed(1)} MB';
+    return '${(b / 1073741824).toStringAsFixed(1)} GB';
   }
 
   @override
   Widget build(BuildContext context) {
-    final accent = const Color(0xFF6C63FF);
+    final isDone   = task.status == TransferStatus.done;
+    final isError  = task.status == TransferStatus.error;
+    final isActive = task.status == TransferStatus.downloading || task.status == TransferStatus.uploading;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D141D),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                _buildTopBar(),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                    physics: const BouncingScrollPhysics(),
-                    children: [
-                      _buildSummaryBento(),
-                      const SizedBox(height: 40),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text("Transfer Queue", style: GoogleFonts.roboto(fontSize: 20, fontWeight: FontWeight.bold)),
-                          IconButton(onPressed: () {}, icon: const Icon(Icons.pause_circle_rounded, color: Colors.white24)),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (_activeTransfers.isEmpty)
-                        _buildEmptyState()
-                      else
-                        ..._activeTransfers.entries.map((e) => _buildTransferCard(e.value)).toList(),
-                      const SizedBox(height: 120),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomNav()),
-        ],
-      ),
-    );
-  }
+    final statusColor = isError ? CypherColors.error : isDone ? CypherColors.success : CypherColors.accent;
+    final statusIcon  = isError
+        ? Icons.error_outline_rounded
+        : isDone
+            ? Icons.check_circle_outline_rounded
+            : task.isUpload
+                ? Icons.upload_rounded
+                : Icons.download_rounded;
 
-  Widget _buildTopBar() {
-    final accent = const Color(0xFF6C63FF);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return CypherCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 20), onPressed: () => Navigator.pop(context)),
-              Text("TRANSFERS", style: GoogleFonts.roboto(fontSize: 22, fontWeight: FontWeight.w800, color: accent, letterSpacing: -1)),
+              Icon(statusIcon, color: statusColor, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  task.name,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: CypherColors.textPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              _StatusBadge(task.status),
             ],
           ),
-          const Icon(Icons.sensors_rounded, color: Color(0xFF6C63FF)),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSummaryBento() {
-    int uploads = _activeTransfers.values.where((v) => v['status'] == 'sending').length;
-    int downloads = _activeTransfers.values.where((v) => v['status'] == 'receiving').length;
-
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.4,
-      children: [
-        _buildSummaryCard("UPLOADS", uploads.toString(), Icons.upload_rounded, const Color(0xFF6C63FF)),
-        _buildSummaryCard("DOWNLOADS", downloads.toString(), Icons.download_rounded, const Color(0xFFFFB786)),
-      ],
-    );
-  }
-
-  Widget _buildSummaryCard(String label, String value, IconData icon, Color color) {
-    return GlassContainer(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Icon(icon, color: color, size: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white)),
-              Text(label, style: GoogleFonts.roboto(fontSize: 8, color: Colors.white24, letterSpacing: 1)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTransferCard(Map<String, dynamic> data) {
-    final bool isCompleted = data['status'] == 'completed';
-    final double progress = (data['progress'] as num).toDouble() / 100;
-    final accent = isCompleted ? const Color(0xFF10B981) : const Color(0xFF6C63FF);
-
-    return FadeInUp(
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF192029).withOpacity(0.5),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.05)),
-        ),
-        child: Column(
-          children: [
+          if (isActive || task.total > 0) ...[
+            const SizedBox(height: 12),
+            LinearProgressIndicator(
+              value: task.progress.clamp(0.0, 1.0),
+              color: statusColor,
+              backgroundColor: CypherColors.bgOverlay,
+              minHeight: 3,
+              borderRadius: BorderRadius.circular(2),
+            ),
+            const SizedBox(height: 6),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                  child: Icon(Icons.description_rounded, color: accent, size: 22),
+                Text(
+                  task.total > 0
+                      ? '${_fmtSize(task.received)} / ${_fmtSize(task.total)}'
+                      : _fmtSize(task.received),
+                  style: AppTheme.caption(context),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(data['name'], style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
-                      Text(isCompleted ? "FINISHED" : "${data['speed']} • SYNCING", style: GoogleFonts.roboto(fontSize: 9, color: Colors.white24)),
-                    ],
-                  ),
+                Text(
+                  '${(task.progress * 100).clamp(0, 100).toInt()}%',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: CypherColors.accentLight),
                 ),
-                Text("${(progress * 100).toInt()}%", style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white70)),
               ],
             ),
-            const SizedBox(height: 20),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 3,
-                backgroundColor: Colors.white.withOpacity(0.05),
-                valueColor: AlwaysStoppedAnimation(accent),
-              ),
-            ),
           ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60),
-      child: Column(
-        children: [
-          const Icon(Icons.auto_awesome_motion_rounded, color: Colors.white10, size: 48),
-          const SizedBox(height: 16),
-          Text("No active transfers", style: GoogleFonts.roboto(color: Colors.white24)),
+          if (isError && task.error != null) ...[
+            const SizedBox(height: 6),
+            Text(task.error!, style: const TextStyle(fontSize: 11, color: CypherColors.error)),
+          ],
         ],
       ),
     );
   }
+}
 
-  Widget _buildBottomNav() {
-    return GlassContainer(
-      height: 90,
-      borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(Icons.home_rounded, "Home", false, () => Navigator.pop(context)),
-          _navItem(Icons.folder_copy_rounded, "Files", true),
-          _navItem(Icons.settings_input_component_rounded, "Controls", false),
-          _navItem(Icons.tune_rounded, "Settings", false),
-        ],
-      ),
-    );
-  }
+class _StatusBadge extends StatelessWidget {
+  final TransferStatus status;
+  const _StatusBadge(this.status);
 
-  Widget _navItem(IconData icon, String label, bool active, [VoidCallback? tap]) {
-    final accent = const Color(0xFF6C63FF);
-    return GestureDetector(
-      onTap: tap,
-      child: Opacity(
-        opacity: active ? 1.0 : 0.4,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: active ? accent : Colors.white, size: 24),
-            const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: active ? accent : Colors.white)),
-          ],
-        ),
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (status) {
+      TransferStatus.done        => ('Done', CypherColors.success),
+      TransferStatus.error       => ('Error', CypherColors.error),
+      TransferStatus.uploading   => ('Uploading', CypherColors.accent),
+      TransferStatus.downloading => ('Downloading', CypherColors.info),
+      TransferStatus.paused      => ('Paused', CypherColors.warning),
+      TransferStatus.idle        => ('Queued', CypherColors.textMuted),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
+      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
     );
   }
 }

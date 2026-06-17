@@ -182,16 +182,16 @@ class BridgeService {
     return false;
   }
 
-  // Optimize system
-  Future<bool> optimizeSystem() async {
+  // Optimize system — returns freed MB and action list, or null on failure
+  Future<Map<String, dynamic>?> optimizeSystem() async {
     try {
       final res = await http.post(
         Uri.parse("$baseUrl/system/optimize"),
         headers: {"X-Auth-Token": internalToken},
-      ).timeout(const Duration(seconds: 5));
-      return res.statusCode == 200;
+      ).timeout(const Duration(seconds: 30));
+      if (res.statusCode == 200) return jsonDecode(res.body);
     } catch (_) {}
-    return false;
+    return null;
   }
 
   // Get all settings

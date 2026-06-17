@@ -109,7 +109,7 @@ class _SecurityTabState extends State<SecurityTab> {
                       Flexible(
                         child: Text("Secure Connection Active",
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold, color: widget.accent)),
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: widget.accent)),
                       ),
                     ],
                   ),
@@ -149,14 +149,14 @@ class _SecurityTabState extends State<SecurityTab> {
       children: [
         Row(
           children: [
-            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-            const SizedBox(width: 12),
-            Text("LIVE CONNECTION", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white24 : Colors.black26, letterSpacing: 2)),
+            Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Text('LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: const Color(0xFF10B981), letterSpacing: 2)),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(title, style: GoogleFonts.roboto(fontSize: 32, fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white : Colors.black)),
-        Text(sub, style: GoogleFonts.roboto(fontSize: 14, color: widget.isDark ? Colors.white24 : Colors.black38)),
+        const SizedBox(height: 6),
+        Text(title, style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white : Colors.black, height: 1.1)),
+        Text(sub, style: GoogleFonts.inter(fontSize: 12, color: widget.isDark ? Colors.white30 : Colors.black38)),
       ],
     );
   }
@@ -175,11 +175,11 @@ class _SecurityTabState extends State<SecurityTab> {
                 child: Icon(Icons.link_rounded, color: widget.accent, size: 20),
               ),
               const SizedBox(width: 12),
-              Expanded(child: Text("Create Guest Link", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black), overflow: TextOverflow.ellipsis)),
+              Expanded(child: Text("Create Guest Link", style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black), overflow: TextOverflow.ellipsis)),
             ],
           ),
           const SizedBox(height: 24),
-          Text("LINK EXPIRATION", style: GoogleFonts.roboto(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
+          Text("LINK EXPIRATION", style: GoogleFonts.inter(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -190,7 +190,7 @@ class _SecurityTabState extends State<SecurityTab> {
                 isExpanded: true,
                 dropdownColor: widget.isDark ? const Color(0xFF1A1A1E) : Colors.white,
                 items: ["15 Minutes", "1 Hour", "1 Day"].map((String val) {
-                  return DropdownMenuItem<String>(value: val, child: Text(val, style: GoogleFonts.roboto(fontSize: 14, color: widget.isDark ? Colors.white70 : Colors.black87)));
+                  return DropdownMenuItem<String>(value: val, child: Text(val, style: GoogleFonts.inter(fontSize: 14, color: widget.isDark ? Colors.white70 : Colors.black87)));
                 }).toList(),
                 onChanged: (v) => setState(() => _selectedExpiration = v!),
               ),
@@ -216,7 +216,7 @@ class _SecurityTabState extends State<SecurityTab> {
                   else
                     const Icon(Icons.add_link_rounded, color: Colors.white),
                   const SizedBox(width: 12),
-                  Flexible(child: Text(_isGenerating ? "GENERATING..." : "Generate Link", style: GoogleFonts.roboto(fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis)),
+                  Flexible(child: Text(_isGenerating ? "GENERATING..." : "Generate Link", style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis)),
                 ],
               ),
             ),
@@ -234,8 +234,8 @@ class _SecurityTabState extends State<SecurityTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Quick Connect", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black), overflow: TextOverflow.ellipsis),
-          Text(_generatedToken != null ? "Guest link active." : "Scan to open the file portal.", style: GoogleFonts.roboto(fontSize: 13, color: widget.isDark ? Colors.white24 : Colors.black38), overflow: TextOverflow.ellipsis),
+          Text("Quick Connect", style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black), overflow: TextOverflow.ellipsis),
+          Text(_generatedToken != null ? "Guest link active." : "Scan to open the file portal.", style: GoogleFonts.inter(fontSize: 13, color: widget.isDark ? Colors.white24 : Colors.black38), overflow: TextOverflow.ellipsis),
           const SizedBox(height: 24),
           Center(
             child: Container(
@@ -247,7 +247,7 @@ class _SecurityTabState extends State<SecurityTab> {
           if (_generatedToken != null)
             Padding(
               padding: const EdgeInsets.only(top: 16),
-              child: SelectableText(_generatedUrl!, style: GoogleFonts.roboto(fontSize: 9, color: widget.accent), textAlign: TextAlign.center),
+              child: SelectableText(_generatedUrl!, style: GoogleFonts.inter(fontSize: 9, color: widget.accent), textAlign: TextAlign.center),
             ),
         ],
       ),
@@ -272,14 +272,14 @@ class _SecurityTabState extends State<SecurityTab> {
                       child: Icon(Icons.devices_rounded, color: widget.accent, size: 20),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(child: Text("Active Sessions", style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black), overflow: TextOverflow.ellipsis)),
+                    Expanded(child: Text("Active Sessions", style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black), overflow: TextOverflow.ellipsis)),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(color: widget.isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.03), borderRadius: BorderRadius.circular(10)),
-                child: Text("${widget.sessions.length} ACTIVE", style: GoogleFonts.roboto(fontSize: 9, color: widget.isDark ? Colors.white38 : Colors.black38, fontWeight: FontWeight.bold)),
+                child: Text("${widget.sessions.length} ACTIVE", style: GoogleFonts.inter(fontSize: 9, color: widget.isDark ? Colors.white38 : Colors.black38, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -292,7 +292,7 @@ class _SecurityTabState extends State<SecurityTab> {
                   children: [
                     Icon(Icons.person_off_outlined, size: 48, color: widget.isDark ? Colors.white10 : Colors.black.withOpacity(0.1)),
                     const SizedBox(height: 16),
-                    Text("No active guest sessions.", style: GoogleFonts.roboto(color: widget.isDark ? Colors.white12 : Colors.black12)),
+                    Text("No active guest sessions.", style: GoogleFonts.inter(color: widget.isDark ? Colors.white12 : Colors.black12)),
                   ],
                 ),
               ),
@@ -338,13 +338,13 @@ class _SecurityTabState extends State<SecurityTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black), overflow: TextOverflow.ellipsis),
+                Text(name, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black), overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),
                 Row(
                   children: [
                     Container(width: 6, height: 6, decoration: BoxDecoration(color: active ? const Color(0xFF10B981) : Colors.amber, shape: BoxShape.circle)),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(sub, style: GoogleFonts.roboto(fontSize: 11, color: widget.isDark ? Colors.white24 : Colors.black38), overflow: TextOverflow.ellipsis)),
+                    Expanded(child: Text(sub, style: GoogleFonts.inter(fontSize: 11, color: widget.isDark ? Colors.white24 : Colors.black38), overflow: TextOverflow.ellipsis)),
                   ],
                 ),
               ],
@@ -353,7 +353,7 @@ class _SecurityTabState extends State<SecurityTab> {
           const SizedBox(width: 12),
           TextButton(
             onPressed: token.isEmpty ? null : () => widget.onRevokeSession(token),
-            child: Text("Revoke", style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.redAccent.withOpacity(0.7))),
+            child: Text("Revoke", style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.redAccent.withOpacity(0.7))),
           ),
         ],
       ),

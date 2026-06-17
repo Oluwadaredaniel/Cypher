@@ -4,9 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path/path.dart' as p;
 import '../services/bridge_service.dart';
 import '../services/theme_service.dart';
+import '../services/update_service.dart';
 
 // Tab Modules
 import 'tabs/home_tab.dart';
@@ -48,6 +48,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   };
   Map<String, dynamic> _activeTransfers = {};
   Map<String, dynamic> _settings = {};
+  UpdateResult? _updateResult;
+  bool _updateBannerDismissed = false;
 
   @override
   void initState() {
@@ -55,6 +57,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     _waveController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
     _startSync();
     _loadSettings();
+    _checkForUpdate();
+  }
+
+  Future<void> _checkForUpdate() async {
+    final result = await UpdateService.check();
+    if (mounted) setState(() => _updateResult = result);
   }
 
   @override
@@ -135,12 +143,18 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     if (_isOptimizing) return;
     setState(() => _isOptimizing = true);
     try {
-      await _bridge.optimizeSystem();
+      final result = await _bridge.optimizeSystem();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("System Optimization Complete.")));
+        if (result != null && result['success'] == true) {
+          final mb = result['freed_mb'] ?? 0;
+          final msg = mb > 0 ? "Optimization complete — ${mb} MB freed" : "Optimization complete";
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Optimization failed — check backend logs.")));
+        }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Optimization Failed: $e")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Optimization error: $e")));
     } finally {
       if (mounted) setState(() => _isOptimizing = false);
     }
@@ -224,7 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeService>(context);
     final isDark = theme.isDarkMode;
-    final accent = const Color(0xFF6C63FF);
+    final accent = const Color(0xFF7C3AED);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -235,6 +249,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             child: Column(
               children: [
                 _buildTopBar(accent, isDark),
+                if (_updateResult != null && !_updateBannerDismissed)
+                  _buildUpdateBanner(accent),
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 600),
@@ -287,153 +303,222 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     }
   }
 
-  Widget _buildSidebar(Color accent, bool isDark, ThemeService theme) {
+  Widget _buildUpdateBanner(Color accent) {
     return Container(
-      width: 260,
-      color: isDark ? const Color(0xFF0C0C0E) : const Color(0xFFE5E5EA),
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF59E0B).withOpacity(0.08),
+        border: Border(bottom: BorderSide(color: const Color(0xFFF59E0B).withOpacity(0.2))),
+      ),
+      child: Row(
         children: [
-            Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                  child: Icon(Icons.shield_moon_outlined, color: accent, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Text("CYPHER",
-                    style: GoogleFonts.roboto(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : Colors.black,
-                        letterSpacing: -1)),
-              ],
+          const Icon(Icons.system_update_rounded, color: Color(0xFFF59E0B), size: 15),
+          const SizedBox(width: 10),
+          Text(
+            'CYPHER v${_updateResult!.latestVersion} is available',
+            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B)),
+          ),
+          const SizedBox(width: 16),
+          GestureDetector(
+            onTap: () => UpdateService.openReleasePage(_updateResult!.downloadUrl),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text('Download', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black)),
             ),
           ),
-          const SizedBox(height: 48),
-          _navItem("Home", Icons.home_filled, accent, isDark),
-          _navItem("Transfers", Icons.sync_alt_rounded, accent, isDark),
-          _navItem("System Health", Icons.analytics_rounded, accent, isDark),
-          _navItem("Shared Files", Icons.folder_shared_rounded, accent, isDark),
-          _navItem("Security", Icons.shield_rounded, accent, isDark),
-          _navItem("Activity Log", Icons.list_alt_rounded, accent, isDark),
           const Spacer(),
-          // Live System Status
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: (isDark ? Colors.white : Colors.black).withOpacity(0.02), borderRadius: BorderRadius.circular(12)),
-            child: Row(
-              children: [
-                Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                        color: _isSystemActive ? const Color(0xFF10B981) : Colors.amber.withOpacity(0.5),
-                        shape: BoxShape.circle)),
-                const SizedBox(width: 12),
-                Text(_isSystemActive ? "System Secure" : "Linking...",
-                    style: GoogleFonts.roboto(fontSize: 9, color: isDark ? Colors.white24 : Colors.black38)),
-              ],
-            ),
+          GestureDetector(
+            onTap: () => setState(() => _updateBannerDismissed = true),
+            child: const Icon(Icons.close_rounded, size: 15, color: Color(0xFFF59E0B)),
           ),
-          _buildThemeToggle(theme, isDark, accent),
-          const Divider(color: Colors.white10),
-          _navItem("Settings", Icons.settings_rounded, accent, isDark),
         ],
       ),
     );
   }
 
+  Widget _buildSidebar(Color accent, bool isDark, ThemeService theme) {
+    return Container(
+      width: 230,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0A0A0C) : const Color(0xFFF0F0F5),
+        border: Border(right: BorderSide(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.07))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Logo
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+            child: Row(
+              children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: accent.withOpacity(0.3), width: 1),
+                    boxShadow: [BoxShadow(color: accent.withOpacity(0.2), blurRadius: 12, spreadRadius: -2)],
+                  ),
+                  child: Icon(Icons.shield_rounded, color: accent, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('CYPHER', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black, letterSpacing: 0.5)),
+                    Text('Control Tower', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w500, color: isDark ? Colors.white30 : Colors.black38)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Nav groups
+          _sectionLabel('MAIN', isDark),
+          _navItem('Home', Icons.home_rounded, accent, isDark),
+          _navItem('Transfers', Icons.sync_alt_rounded, accent, isDark),
+
+          const SizedBox(height: 12),
+          _sectionLabel('SYSTEM', isDark),
+          _navItem('System Health', Icons.analytics_rounded, accent, isDark),
+          _navItem('Shared Files', Icons.folder_shared_rounded, accent, isDark),
+
+          const SizedBox(height: 12),
+          _sectionLabel('ACCESS', isDark),
+          _navItem('Security', Icons.shield_rounded, accent, isDark),
+          _navItem('Activity Log', Icons.list_alt_rounded, accent, isDark),
+
+          const Spacer(),
+
+          // Status pill
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: (_isSystemActive ? const Color(0xFF10B981) : Colors.amber).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: (_isSystemActive ? const Color(0xFF10B981) : Colors.amber).withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 7, height: 7,
+                    decoration: BoxDecoration(
+                      color: _isSystemActive ? const Color(0xFF10B981) : Colors.amber,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: (_isSystemActive ? const Color(0xFF10B981) : Colors.amber).withOpacity(0.6), blurRadius: 6, spreadRadius: 1)],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _isSystemActive ? 'System Secure' : 'Reconnecting...',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: _isSystemActive ? const Color(0xFF10B981) : Colors.amber),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          _buildThemeToggle(theme, isDark, accent),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(height: 1, color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.07)),
+          ),
+          const SizedBox(height: 8),
+          _navItem('Settings', Icons.settings_rounded, accent, isDark),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String label, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+      child: Text(label, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white24 : Colors.black26, letterSpacing: 1.8)),
+    );
+  }
+
   Widget _navItem(String title, IconData icon, Color accent, bool isDark) {
-    bool active = _activeTab == title;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
+      child: _NavItem(
+        title: title,
+        icon: icon,
+        active: _activeTab == title,
+        accent: accent,
+        isDark: isDark,
+        onTap: () => setState(() => _activeTab = title),
+      ),
+    );
+  }
+
+  Widget _buildTopBar(Color accent, bool isDark) {
     return GestureDetector(
-      onTap: () => setState(() => _activeTab = title),
+      onPanStart: (_) => windowManager.startDragging(),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        height: 52,
         decoration: BoxDecoration(
-          color: active ? accent.withOpacity(0.05) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isDark ? const Color(0xFF0F0F11) : const Color(0xFFF2F2F7),
+          border: Border(bottom: BorderSide(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.06))),
         ),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Row(
           children: [
-            Icon(icon, color: active ? accent : (isDark ? Colors.white30 : Colors.black26), size: 20),
-            const SizedBox(width: 16),
-            Text(title,
-                style: GoogleFonts.roboto(
-                    fontSize: 14,
-                    fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                    color: active ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white38 : Colors.black45))),
+            // Breadcrumb
+            Text('CYPHER', style: GoogleFonts.inter(fontSize: 11, color: isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.w500)),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded, size: 13, color: isDark ? Colors.white12 : Colors.black12),
+            const SizedBox(width: 8),
+            Text(_activeTab, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: accent)),
+            const Spacer(),
+            // IP address badge
+            if (_pcIp != '127.0.0.1')
+              Container(
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.06)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.wifi_rounded, size: 11, color: isDark ? Colors.white30 : Colors.black38),
+                    const SizedBox(width: 5),
+                    Text(_pcIp, style: GoogleFonts.inter(fontSize: 11, color: isDark ? Colors.white38 : Colors.black45)),
+                  ],
+                ),
+              ),
+            // Window controls
+            _windowBtn(Icons.remove_rounded, () => windowManager.minimize(), isDark),
+            _windowBtn(Icons.check_box_outline_blank_rounded, () async {
+              if (await windowManager.isMaximized()) windowManager.unmaximize();
+              else windowManager.maximize();
+            }, isDark),
+            _windowBtn(Icons.close_rounded, () => windowManager.close(), isDark, isClose: true),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTopBar(Color accent, bool isDark) {
-    return Container(
-      height: 48,
-      color: isDark ? const Color(0xFF08080A) : const Color(0xFFF2F2F7),
-      padding: const EdgeInsets.only(left: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Flexible(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text("CYPHER", style: GoogleFonts.roboto(fontSize: 10, color: isDark ? Colors.white12 : Colors.black12)),
-                Icon(Icons.chevron_right_rounded, size: 14, color: isDark ? Colors.white10 : Colors.black12),
-                Flexible(
-                  child: Text(_activeTab.toUpperCase(),
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.roboto(fontSize: 10, color: accent, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-          Row(
-            children: [
-              _windowBtn(Icons.remove_rounded, () => windowManager.minimize(), isDark),
-              _windowBtn(Icons.check_box_outline_blank_rounded, () async {
-                if (await windowManager.isMaximized()) {
-                  windowManager.unmaximize();
-                } else {
-                  windowManager.maximize();
-                }
-              }, isDark),
-              _windowBtn(Icons.close_rounded, () => windowManager.close(), isDark, isClose: true),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _windowBtn(IconData icon, VoidCallback tap, bool isDark, {bool isClose = false}) {
-    return GestureDetector(
-      onTap: tap,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          width: 48,
-          height: 48,
-          color: Colors.transparent,
-          child: Icon(icon,
-              size: 16, color: isClose ? Colors.redAccent.withOpacity(0.5) : (isDark ? Colors.white24 : Colors.black26)),
-        ),
-      ),
-    );
+    return _WindowButton(icon: icon, onTap: tap, isDark: isDark, isClose: isClose);
   }
 
   Widget _buildConnectionLostState(Color accent) {
     return Container(
-      color: const Color(0xFF08080A),
+      color: const Color(0xFF0F0F11),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -463,7 +548,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             const SizedBox(height: 48),
             Text(
               "CONNECTION LOST",
-              style: GoogleFonts.roboto(
+              style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
@@ -474,7 +559,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             Text(
               "CHECK IF MOBILE APP IS RUNNING ON THE SAME NETWORK",
               textAlign: TextAlign.center,
-              style: GoogleFonts.roboto(
+              style: GoogleFonts.inter(
                 fontSize: 10,
                 color: Colors.white24,
                 letterSpacing: 2,
@@ -513,19 +598,153 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   Widget _buildThemeToggle(ThemeService theme, bool isDark, Color accent) {
-    return GestureDetector(
-      onTap: theme.toggleTheme,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(color: accent.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
-        child: Row(
-          children: [
-            Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded, color: accent, size: 18),
-            const SizedBox(width: 12),
-            Text(isDark ? "Light Mode" : "Dark Mode",
-                style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.bold, color: accent)),
-          ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: theme.toggleTheme,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.06)),
+            ),
+            child: Row(
+              children: [
+                Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded, color: isDark ? Colors.white38 : Colors.black38, size: 15),
+                const SizedBox(width: 10),
+                Text(isDark ? 'Light Mode' : 'Dark Mode', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: isDark ? Colors.white38 : Colors.black45)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Sidebar nav item with hover + active state ──────────────────
+class _NavItem extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final bool active;
+  final Color accent;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.title,
+    required this.icon,
+    required this.active,
+    required this.accent,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          decoration: BoxDecoration(
+            color: widget.active
+                ? widget.accent.withOpacity(0.1)
+                : _hovered
+                    ? (widget.isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04))
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                width: 3, height: 38,
+                decoration: BoxDecoration(
+                  color: widget.active ? widget.accent : Colors.transparent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      Icon(widget.icon,
+                          size: 17,
+                          color: widget.active
+                              ? widget.accent
+                              : (widget.isDark ? Colors.white38 : Colors.black38)),
+                      const SizedBox(width: 11),
+                      Text(widget.title,
+                          style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: widget.active ? FontWeight.w600 : FontWeight.w400,
+                              color: widget.active
+                                  ? (widget.isDark ? Colors.white : Colors.black)
+                                  : (widget.isDark ? Colors.white54 : Colors.black54))),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Window control button with hover ───────────────────────────
+class _WindowButton extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isDark;
+  final bool isClose;
+
+  const _WindowButton({required this.icon, required this.onTap, required this.isDark, this.isClose = false});
+
+  @override
+  State<_WindowButton> createState() => _WindowButtonState();
+}
+
+class _WindowButtonState extends State<_WindowButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final hoverBg = widget.isClose
+        ? Colors.redAccent.withOpacity(0.15)
+        : (widget.isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.06));
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          width: 46, height: 52,
+          color: _hovered ? hoverBg : Colors.transparent,
+          child: Icon(widget.icon,
+              size: 15,
+              color: widget.isClose
+                  ? (_hovered ? Colors.redAccent : Colors.redAccent.withOpacity(0.45))
+                  : (widget.isDark ? Colors.white30 : Colors.black38)),
         ),
       ),
     );

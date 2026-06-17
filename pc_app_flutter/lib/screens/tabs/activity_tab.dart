@@ -51,9 +51,9 @@ class _ActivityTabState extends State<ActivityTab> {
                     Icon(Icons.history_rounded, size: 64, color: widget.isDark ? Colors.white10 : Colors.black12),
                     const SizedBox(height: 16),
                     Text("No activity recorded yet.",
-                        style: GoogleFonts.roboto(color: widget.isDark ? Colors.white24 : Colors.black26, fontSize: 16, fontWeight: FontWeight.bold)),
+                        style: GoogleFonts.inter(color: widget.isDark ? Colors.white24 : Colors.black26, fontSize: 16, fontWeight: FontWeight.bold)),
                     Text("Interactions from your mobile app will appear here.",
-                        style: GoogleFonts.roboto(color: widget.isDark ? Colors.white10 : Colors.black12, fontSize: 12)),
+                        style: GoogleFonts.inter(color: widget.isDark ? Colors.white10 : Colors.black12, fontSize: 12)),
                   ],
                 ),
               ),
@@ -71,14 +71,14 @@ class _ActivityTabState extends State<ActivityTab> {
       children: [
         Row(
           children: [
-            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-            const SizedBox(width: 12),
-            Text("LIVE CONNECTION", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white24 : Colors.black26, letterSpacing: 2)),
+            Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Text('LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: const Color(0xFF10B981), letterSpacing: 2)),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(title, style: GoogleFonts.roboto(fontSize: 32, fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white : Colors.black)),
-        Text(sub, style: GoogleFonts.roboto(fontSize: 14, color: widget.isDark ? Colors.white24 : Colors.black38)),
+        const SizedBox(height: 6),
+        Text(title, style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white : Colors.black, height: 1.1)),
+        Text(sub, style: GoogleFonts.inter(fontSize: 12, color: widget.isDark ? Colors.white30 : Colors.black38)),
       ],
     );
   }
@@ -88,7 +88,7 @@ class _ActivityTabState extends State<ActivityTab> {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(color: widget.isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.03), borderRadius: BorderRadius.circular(12), border: Border.all(color: widget.isDark ? Colors.white10 : Colors.black12)),
       child: Row(
-        children: ["All Events", "Transfers", "Commands", "Connections"].map((f) {
+        children: ["All Events", "Connections", "Transfers", "Commands", "Security"].map((f) {
           bool active = _activityFilter == f;
           return GestureDetector(
             onTap: () => setState(() => _activityFilter = f),
@@ -96,7 +96,7 @@ class _ActivityTabState extends State<ActivityTab> {
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(color: active ? widget.accent : Colors.transparent, borderRadius: BorderRadius.circular(8)),
-              child: Text(f, style: GoogleFonts.roboto(fontSize: 12, fontWeight: active ? FontWeight.bold : FontWeight.normal, color: active ? Colors.white : (widget.isDark ? Colors.white38 : Colors.black38))),
+              child: Text(f, style: GoogleFonts.inter(fontSize: 12, fontWeight: active ? FontWeight.bold : FontWeight.normal, color: active ? Colors.white : (widget.isDark ? Colors.white38 : Colors.black38))),
             ),
           );
         }).toList(),
@@ -127,6 +127,7 @@ class _ActivityTabState extends State<ActivityTab> {
       case "Connections": return Icons.smartphone_rounded;
       case "Transfers": return Icons.sync_alt_rounded;
       case "Commands": return Icons.terminal_rounded;
+      case "Security": return Icons.shield_rounded;
       default: return Icons.info_outline_rounded;
     }
   }
@@ -136,6 +137,7 @@ class _ActivityTabState extends State<ActivityTab> {
       case "Connections": return widget.accent;
       case "Transfers": return const Color(0xFFFFB786);
       case "Commands": return Colors.redAccent;
+      case "Security": return const Color(0xFFF59E0B);
       default: return const Color(0xFF10B981);
     }
   }
@@ -166,25 +168,25 @@ class _ActivityTabState extends State<ActivityTab> {
                         children: [
                           Icon(icon, color: color, size: 20),
                           const SizedBox(width: 12),
-                          Text(title, style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black)),
+                          Text(title, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black)),
                         ],
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(time, style: GoogleFonts.roboto(fontSize: 9, color: widget.isDark ? Colors.white12 : Colors.black12)),
+                          Text(time, style: GoogleFonts.inter(fontSize: 9, color: widget.isDark ? Colors.white12 : Colors.black12)),
                           const SizedBox(height: 4),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(color: (isUrgent ? Colors.redAccent : const Color(0xFF10B981)).withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                            child: Text(isUrgent ? "CRITICAL" : "SUCCESS", style: GoogleFonts.roboto(fontSize: 7, fontWeight: FontWeight.bold, color: isUrgent ? Colors.redAccent : const Color(0xFF10B981))),
+                            child: Text(isUrgent ? "CRITICAL" : "SUCCESS", style: GoogleFonts.inter(fontSize: 7, fontWeight: FontWeight.bold, color: isUrgent ? Colors.redAccent : const Color(0xFF10B981))),
                           ),
                         ],
                       )
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(desc, style: GoogleFonts.roboto(fontSize: 13, color: widget.isDark ? Colors.white38 : Colors.black45)),
+                  Text(desc, style: GoogleFonts.inter(fontSize: 13, color: widget.isDark ? Colors.white38 : Colors.black45)),
                   if (attachment != null) ...[
                     const SizedBox(height: 16),
                     Container(
@@ -195,7 +197,7 @@ class _ActivityTabState extends State<ActivityTab> {
                         children: [
                           Icon(Icons.folder_zip_rounded, size: 14, color: widget.isDark ? Colors.white24 : Colors.black26),
                           const SizedBox(width: 8),
-                          Text(attachment, style: GoogleFonts.roboto(fontSize: 9, color: widget.isDark ? Colors.white38 : Colors.black45)),
+                          Text(attachment, style: GoogleFonts.inter(fontSize: 9, color: widget.isDark ? Colors.white38 : Colors.black45)),
                         ],
                       ),
                     )

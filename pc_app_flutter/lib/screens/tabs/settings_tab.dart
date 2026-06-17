@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/theme_service.dart';
+import '../../services/update_service.dart';
 import '../../widgets/glass_container.dart';
 
 class SettingsTab extends StatefulWidget {
@@ -27,6 +28,9 @@ class _SettingsTabState extends State<SettingsTab> {
   late TextEditingController _pcNameController;
   late int _batteryThreshold;
   bool _isLoading = false;
+  UpdateResult? _updateResult;
+  bool _isCheckingUpdate = false;
+  bool _updateCheckFailed = false;
 
   @override
   void initState() {
@@ -35,6 +39,19 @@ class _SettingsTabState extends State<SettingsTab> {
       text: widget.settings['device_name'] ?? "WORKSYSTEM-01",
     );
     _batteryThreshold = widget.settings['battery_alert_threshold'] ?? 20;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+  }
+
+  Future<void> _checkForUpdate() async {
+    if (!mounted) return;
+    setState(() { _isCheckingUpdate = true; _updateCheckFailed = false; });
+    final result = await UpdateService.check();
+    if (!mounted) return;
+    setState(() {
+      _updateResult = result;
+      _isCheckingUpdate = false;
+      _updateCheckFailed = result == null;
+    });
   }
 
   @override
@@ -84,14 +101,14 @@ class _SettingsTabState extends State<SettingsTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("PC NAME", style: GoogleFonts.roboto(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
+                Text("PC NAME", style: GoogleFonts.inter(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _pcNameController,
-                        style: GoogleFonts.roboto(color: widget.isDark ? Colors.white : Colors.black),
+                        style: GoogleFonts.inter(color: widget.isDark ? Colors.white : Colors.black),
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: widget.isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.02),
@@ -131,8 +148,8 @@ class _SettingsTabState extends State<SettingsTab> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("ALERT AT $_batteryThreshold%", style: GoogleFonts.roboto(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
-                    Text("Range: 10% - 50%", style: GoogleFonts.roboto(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26)),
+                    Text("ALERT AT $_batteryThreshold%", style: GoogleFonts.inter(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26, fontWeight: FontWeight.bold)),
+                    Text("Range: 10% - 50%", style: GoogleFonts.inter(fontSize: 9, color: widget.isDark ? Colors.white24 : Colors.black26)),
                   ],
                 ),
                 Slider(
@@ -178,6 +195,62 @@ class _SettingsTabState extends State<SettingsTab> {
               ),
             ],
           ),
+
+          const SizedBox(height: 24),
+
+          _buildBentoSection(
+            icon: Icons.info_outline_rounded,
+            title: "About CYPHER",
+            sub: "Version & update info.",
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Current Version", style: GoogleFonts.inter(fontSize: 13, color: widget.isDark ? Colors.white38 : Colors.black45)),
+                    Text("v${UpdateService.currentVersion}", style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: widget.isDark ? Colors.white : Colors.black)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Updates", style: GoogleFonts.inter(fontSize: 13, color: widget.isDark ? Colors.white38 : Colors.black45)),
+                    if (_isCheckingUpdate)
+                      const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF7C3AED)))
+                    else if (_updateResult != null)
+                      GestureDetector(
+                        onTap: () => UpdateService.openReleasePage(_updateResult!.downloadUrl),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: widget.accent, borderRadius: BorderRadius.circular(8)),
+                          child: Text('v${_updateResult!.latestVersion} — Download', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+                        ),
+                      )
+                    else
+                      Row(
+                        children: [
+                          Text(
+                            _updateCheckFailed ? 'Check failed' : 'Up to date',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: _updateCheckFailed
+                                ? (widget.isDark ? Colors.white24 : Colors.black26)
+                                : const Color(0xFF10B981),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: _checkForUpdate,
+                            child: Icon(Icons.refresh_rounded, size: 14, color: widget.isDark ? Colors.white24 : Colors.black26),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -189,14 +262,14 @@ class _SettingsTabState extends State<SettingsTab> {
       children: [
         Row(
           children: [
-            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-            const SizedBox(width: 12),
-            Text("LIVE CONNECTION", style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white24 : Colors.black26, letterSpacing: 2)),
+            Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Text('LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: const Color(0xFF10B981), letterSpacing: 2)),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(title, style: GoogleFonts.roboto(fontSize: 32, fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white : Colors.black)),
-        Text(sub, style: GoogleFonts.roboto(fontSize: 14, color: widget.isDark ? Colors.white24 : Colors.black38)),
+        const SizedBox(height: 6),
+        Text(title, style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white : Colors.black, height: 1.1)),
+        Text(sub, style: GoogleFonts.inter(fontSize: 12, color: widget.isDark ? Colors.white30 : Colors.black38)),
       ],
     );
   }
@@ -214,8 +287,8 @@ class _SettingsTabState extends State<SettingsTab> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black)),
-                  Text(sub, style: GoogleFonts.roboto(fontSize: 12, color: widget.isDark ? Colors.white24 : Colors.black38)),
+                  Text(title, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDark ? Colors.white : Colors.black)),
+                  Text(sub, style: GoogleFonts.inter(fontSize: 12, color: widget.isDark ? Colors.white24 : Colors.black38)),
                 ],
               ),
             ],
@@ -231,7 +304,7 @@ class _SettingsTabState extends State<SettingsTab> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.white : Colors.black)),
+        Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.white : Colors.black)),
         Switch.adaptive(value: val, onChanged: tap, activeColor: widget.accent),
       ],
     );
