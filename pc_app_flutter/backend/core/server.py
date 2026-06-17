@@ -405,74 +405,62 @@ def verify_token_and_log():
 # --- HELPERS ---
 
 def get_local_ip():
-    """Returns the primary IP with internet connectivity (has default gateway), prioritizing common phone-connection ranges."""
+    """Returns IP from the FIRST UP (connected) interface with a private range. No hardcoded ranges."""
     try:
         all_addrs = psutil.net_if_addrs()
         all_stats = psutil.net_if_stats()
 
-        # Helper to check if interface is UP and has internet
-        def get_connected_ip_from_iface(iface_name):
-            if iface_name not in all_stats:
-                return None
-            if not all_stats[iface_name].isup:
-                return None
-            # Return first valid IPv4
+        # Helper: Check if IP is private (not loopback or link-local)
+        def is_private_ip(ip):
+            if ip.startswith('127.') or ip.startswith('169.254.'):
+                return False
+            # Private ranges: 10.x, 172.16-31.x, 192.168.x
+            if ip.startswith('10.'):
+                return True
+            if ip.startswith('172.'):
+                parts = ip.split('.')
+                if len(parts) >= 2:
+                    try:
+                        second_octet = int(parts[1])
+                        if 16 <= second_octet <= 31:
+                            return True
+                    except ValueError:
+                        pass
+            if ip.startswith('192.168.'):
+                return True
+            return False
+
+        # Strategy: Return first CONNECTED interface with private IP
+        # Sorted order ensures consistent selection across restarts
+        for iface_name in sorted(all_addrs.keys()):
+            # Skip disconnected interfaces
+            if iface_name not in all_stats or not all_stats[iface_name].isup:
+                continue
+
+            # Get IPv4 from this connected interface
             if iface_name in all_addrs:
                 for addr in all_addrs[iface_name]:
-                    if addr.family == socket.AF_INET and not addr.address.startswith('127.') and not addr.address.startswith('169.254.'):
-                        return addr.address
-            return None
-
-        # Priority 1: USB Tethering (192.168.42.x or 192.168.19.x for USB)
-        for iface_name in sorted(all_addrs.keys()):
-            if any(x in iface_name.lower() for x in ['usb', 'rndis', 'ncm', 'teth']):
-                ip = get_connected_ip_from_iface(iface_name)
-                if ip and (ip.startswith("192.168.42.") or ip.startswith("192.168.19.") or ip.startswith("192.168.235.")):
-                    return ip
-
-        # Priority 2: Phone hotspot (192.168.43.x)
-        for iface_name in sorted(all_addrs.keys()):
-            for addr in all_addrs[iface_name]:
-                if addr.family == socket.AF_INET and addr.address.startswith("192.168.43."):
-                    if iface_name in all_stats and all_stats[iface_name].isup:
+                    if addr.family == socket.AF_INET and is_private_ip(addr.address):
                         return addr.address
 
-        # Priority 3: Windows built-in hotspot (192.168.137.x)
-        for iface_name in sorted(all_addrs.keys()):
-            for addr in all_addrs[iface_name]:
-                if addr.family == socket.AF_INET and addr.address.startswith("192.168.137."):
-                    if iface_name in all_stats and all_stats[iface_name].isup:
-                        return addr.address
-
-        # Priority 4: Active route detection (works for regular WiFi/LAN)
+        # Fallback: If no connected interface found, try active route detection
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0)
         try:
             s.connect(('10.254.254.254', 1))
             ip = s.getsockname()[0]
-            if ip != '127.0.0.1' and not ip.startswith('169.254.'):
+            if is_private_ip(ip):
                 return ip
         except Exception:
             pass
         finally:
             s.close()
 
-        # Priority 5: Any UP interface with private range (prefer connected ones)
-        for iface_name in sorted(all_addrs.keys()):
-            if iface_name in all_stats and all_stats[iface_name].isup:
-                for addr in all_addrs[iface_name]:
-                    if addr.family == socket.AF_INET:
-                        a = addr.address
-                        if (a.startswith("10.") or a.startswith("192.168.") or a.startswith("172.")):
-                            return a
-
-        # Priority 6: Last resort - any private IP
+        # Last resort: any private IP from any interface
         for iface_name in sorted(all_addrs.keys()):
             for addr in all_addrs[iface_name]:
-                if addr.family == socket.AF_INET:
-                    a = addr.address
-                    if (a.startswith("10.") or a.startswith("192.168.") or a.startswith("172.")):
-                        return a
+                if addr.family == socket.AF_INET and is_private_ip(addr.address):
+                    return addr.address
 
         return "127.0.0.1"
     except Exception:
