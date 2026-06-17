@@ -179,8 +179,6 @@ class SystemProvider extends ChangeNotifier {
 
   // ── Apps ──────────────────────────────────────────────────────
   Future<void> launchApp(String ip, String path) async => ApiService.launchApp(ip, path);
-  Future<void> closeApp(String ip, {String? name, int? windowId}) async =>
-      ApiService.closeApp(ip, name: name, windowId: windowId);
 
   @override
   void dispose() {

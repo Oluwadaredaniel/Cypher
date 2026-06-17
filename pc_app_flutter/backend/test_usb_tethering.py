@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 USB Tethering Detection Test
 Tests the improved get_local_ip() function for USB tethering support.
@@ -6,6 +7,12 @@ Tests the improved get_local_ip() function for USB tethering support.
 
 import socket
 import psutil
+import sys
+import io
+
+# Fix Unicode on Windows
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 def get_local_ip_improved():
     """Returns the primary IP, prioritizing USB tethering → Android hotspot → Windows hotspot → WiFi/LAN."""

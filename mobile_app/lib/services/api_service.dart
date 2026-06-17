@@ -390,6 +390,15 @@ class ApiService {
 
   static Future<void> pasteFromPhone(String ip) async => _postVoid(ip, '/clipboard/paste-from-phone');
 
+  static Future<void> pasteClipboard(String ip, String text) async {
+    final res = await http.post(
+      Uri.parse('${_baseUrl(ip)}/clipboard/paste-from-phone'),
+      headers: await _headers(),
+      body: jsonEncode({'text': text}),
+    ).timeout(const Duration(seconds: 5));
+    await _handleResponse(res);
+  }
+
   static Future<void> openLink(String ip, String url) async {
     final res = await http.post(
       Uri.parse('${_baseUrl(ip)}/open-link'),

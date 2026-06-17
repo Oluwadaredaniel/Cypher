@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StorageService {
@@ -39,6 +40,23 @@ class StorageService {
     await p.remove(_keyIp);
     await p.remove(_keyIsPaired);
     await p.remove(_keyPcName);
+  }
+
+  // ── JSON Storage ──────────────────────────────────────────────
+  static Future<dynamic> getJson(String key) async {
+    final p = await _prefs;
+    final str = p.getString(key);
+    if (str == null) return null;
+    try {
+      return jsonDecode(str);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> saveJson(String key, dynamic value) async {
+    final p = await _prefs;
+    await p.setString(key, jsonEncode(value));
   }
 
   // ── Convenience ───────────────────────────────────────────────
