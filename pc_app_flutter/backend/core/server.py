@@ -405,29 +405,44 @@ def verify_token_and_log():
 # --- HELPERS ---
 
 def get_local_ip():
-    """Returns the primary IP, prioritizing USB tethering → Android hotspot → Windows hotspot → WiFi/LAN."""
+    """Returns the primary IP with internet connectivity (has default gateway), prioritizing common phone-connection ranges."""
     try:
         all_addrs = psutil.net_if_addrs()
+        all_stats = psutil.net_if_stats()
 
-        # Priority 1: USB Tethering (192.168.42.x) — Most reliable for direct tether
-        for iface_name, addrs in all_addrs.items():
-            # USB tethering interfaces are named: usb0, usb1, rndis0, etc.
+        # Helper to check if interface is UP and has internet
+        def get_connected_ip_from_iface(iface_name):
+            if iface_name not in all_stats:
+                return None
+            if not all_stats[iface_name].isup:
+                return None
+            # Return first valid IPv4
+            if iface_name in all_addrs:
+                for addr in all_addrs[iface_name]:
+                    if addr.family == socket.AF_INET and not addr.address.startswith('127.') and not addr.address.startswith('169.254.'):
+                        return addr.address
+            return None
+
+        # Priority 1: USB Tethering (192.168.42.x or 192.168.19.x for USB)
+        for iface_name in sorted(all_addrs.keys()):
             if any(x in iface_name.lower() for x in ['usb', 'rndis', 'ncm', 'teth']):
-                for addr in addrs:
-                    if addr.family == socket.AF_INET and addr.address.startswith("192.168.42."):
+                ip = get_connected_ip_from_iface(iface_name)
+                if ip and (ip.startswith("192.168.42.") or ip.startswith("192.168.19.") or ip.startswith("192.168.235.")):
+                    return ip
+
+        # Priority 2: Phone hotspot (192.168.43.x)
+        for iface_name in sorted(all_addrs.keys()):
+            for addr in all_addrs[iface_name]:
+                if addr.family == socket.AF_INET and addr.address.startswith("192.168.43."):
+                    if iface_name in all_stats and all_stats[iface_name].isup:
                         return addr.address
 
-        # Priority 2: Phone hotspot (Android = 192.168.43.x)
-        for _, addrs in all_addrs.items():
-            for addr in addrs:
-                if addr.family == socket.AF_INET and addr.address.startswith("192.168.43."):
-                    return addr.address
-
         # Priority 3: Windows built-in hotspot (192.168.137.x)
-        for _, addrs in all_addrs.items():
-            for addr in addrs:
+        for iface_name in sorted(all_addrs.keys()):
+            for addr in all_addrs[iface_name]:
                 if addr.family == socket.AF_INET and addr.address.startswith("192.168.137."):
-                    return addr.address
+                    if iface_name in all_stats and all_stats[iface_name].isup:
+                        return addr.address
 
         # Priority 4: Active route detection (works for regular WiFi/LAN)
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -435,17 +450,25 @@ def get_local_ip():
         try:
             s.connect(('10.254.254.254', 1))
             ip = s.getsockname()[0]
+            if ip != '127.0.0.1' and not ip.startswith('169.254.'):
+                return ip
         except Exception:
-            ip = '127.0.0.1'
+            pass
         finally:
             s.close()
 
-        if ip != '127.0.0.1' and not ip.startswith('169.254.'):
-            return ip
+        # Priority 5: Any UP interface with private range (prefer connected ones)
+        for iface_name in sorted(all_addrs.keys()):
+            if iface_name in all_stats and all_stats[iface_name].isup:
+                for addr in all_addrs[iface_name]:
+                    if addr.family == socket.AF_INET:
+                        a = addr.address
+                        if (a.startswith("10.") or a.startswith("192.168.") or a.startswith("172.")):
+                            return a
 
-        # Priority 5: Any private range (fallback)
-        for _, addrs in all_addrs.items():
-            for addr in addrs:
+        # Priority 6: Last resort - any private IP
+        for iface_name in sorted(all_addrs.keys()):
+            for addr in all_addrs[iface_name]:
                 if addr.family == socket.AF_INET:
                     a = addr.address
                     if (a.startswith("10.") or a.startswith("192.168.") or a.startswith("172.")):
