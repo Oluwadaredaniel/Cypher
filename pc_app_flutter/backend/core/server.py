@@ -754,6 +754,51 @@ def get_status():
         "platform": platform.system().lower()
     })
 
+@app.route('/connection-info', methods=['GET'])
+def get_connection_info():
+    """Diagnostic endpoint showing current connection type and IP."""
+    try:
+        local_ip = get_local_ip()
+        all_addrs = psutil.net_if_addrs()
+        all_stats = psutil.net_if_stats()
+
+        # Detect connection type
+        conn_type = "UNKNOWN"
+        if local_ip:
+            if local_ip.startswith('192.168.19.'):
+                conn_type = "USB_TETHERING"
+            elif local_ip.startswith('192.168.42.'):
+                conn_type = "USB_TETHERING_ALT"
+            elif local_ip.startswith('192.168.235.'):
+                conn_type = "USB_TETHERING_VB"
+            elif local_ip.startswith('192.168.43.'):
+                conn_type = "ANDROID_HOTSPOT"
+            elif local_ip.startswith('192.168.137.'):
+                conn_type = "WINDOWS_HOTSPOT"
+            elif local_ip.startswith('10.') or local_ip.startswith('172.') or (local_ip.startswith('192.168.') and not local_ip.startswith('192.168.1')):
+                conn_type = "WIFI_OR_LAN"
+
+        # Collect all UP interfaces
+        up_interfaces = []
+        for iface_name in sorted(all_addrs.keys()):
+            if iface_name in all_stats and all_stats[iface_name].isup:
+                for addr in all_addrs[iface_name]:
+                    if addr.family == socket.AF_INET and not addr.address.startswith('127.'):
+                        up_interfaces.append({
+                            "name": iface_name,
+                            "ip": addr.address,
+                            "is_active": addr.address == local_ip
+                        })
+
+        return jsonify({
+            "ip": local_ip,
+            "connection_type": conn_type,
+            "up_interfaces": up_interfaces,
+            "device_name": socket.gethostname()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "ip": get_local_ip()}), 500
+
 @app.route('/system-stats', methods=['GET'])
 def get_system_stats():
     return jsonify(current_system_stats)
