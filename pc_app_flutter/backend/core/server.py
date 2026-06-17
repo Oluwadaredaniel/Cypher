@@ -405,7 +405,7 @@ def verify_token_and_log():
 # --- HELPERS ---
 
 def get_local_ip():
-    """Returns IP from the FIRST UP (connected) interface with a private range. No hardcoded ranges."""
+    """Returns IP from interface with active internet connectivity (default gateway). No hardcoded ranges."""
     try:
         all_addrs = psutil.net_if_addrs()
         all_stats = psutil.net_if_stats()
@@ -430,20 +430,9 @@ def get_local_ip():
                 return True
             return False
 
-        # Strategy: Return first CONNECTED interface with private IP
-        # Sorted order ensures consistent selection across restarts
-        for iface_name in sorted(all_addrs.keys()):
-            # Skip disconnected interfaces
-            if iface_name not in all_stats or not all_stats[iface_name].isup:
-                continue
-
-            # Get IPv4 from this connected interface
-            if iface_name in all_addrs:
-                for addr in all_addrs[iface_name]:
-                    if addr.family == socket.AF_INET and is_private_ip(addr.address):
-                        return addr.address
-
-        # Fallback: If no connected interface found, try active route detection
+        # STRATEGY: Active route detection - returns IP from interface with internet connectivity
+        # This correctly identifies the real internet-connected adapter (USB tether, WiFi, LAN)
+        # and ignores virtual adapters (VirtualBox, Hyper-V) that are UP but not connected
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0)
         try:
@@ -455,6 +444,19 @@ def get_local_ip():
             pass
         finally:
             s.close()
+
+        # Fallback: Return first UP interface with private IP if active route detection fails
+        # Sorted order ensures consistent selection across restarts
+        for iface_name in sorted(all_addrs.keys()):
+            # Skip disconnected interfaces
+            if iface_name not in all_stats or not all_stats[iface_name].isup:
+                continue
+
+            # Get IPv4 from this connected interface
+            if iface_name in all_addrs:
+                for addr in all_addrs[iface_name]:
+                    if addr.family == socket.AF_INET and is_private_ip(addr.address):
+                        return addr.address
 
         # Last resort: any private IP from any interface
         for iface_name in sorted(all_addrs.keys()):
