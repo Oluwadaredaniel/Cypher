@@ -2,10 +2,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 
-class StatRing extends StatelessWidget {
+class StatRing extends StatefulWidget {
   final double value;
   final String label;
-  final String? sublabel;
+  final IconData? icon;
   final Color color;
   final double size;
 
@@ -13,42 +13,83 @@ class StatRing extends StatelessWidget {
     super.key,
     required this.value,
     required this.label,
-    this.sublabel,
+    this.icon,
     this.color = CypherColors.accent,
-    this.size  = 80,
+    this.size  = 110,
   });
+
+  @override
+  State<StatRing> createState() => _StatRingState();
+}
+
+class _StatRingState extends State<StatRing> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(StatRing oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: size,
-      height: size,
+      width: widget.size,
+      height: widget.size,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          CustomPaint(
-            size: Size(size, size),
-            painter: _RingPainter(value: value.clamp(0.0, 1.0), color: color),
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) => CustomPaint(
+              size: Size(widget.size, widget.size),
+              painter: _RingPainter(
+                value: (widget.value * _controller.value).clamp(0.0, 1.0),
+                color: widget.color,
+              ),
+            ),
           ),
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.icon != null)
+                Icon(widget.icon, color: widget.color, size: widget.size * 0.25),
+              const SizedBox(height: 4),
               Text(
-                '${(value * 100).round()}%',
+                '${(widget.value * 100).round()}%',
                 style: TextStyle(
-                  fontSize: size * 0.18,
-                  fontWeight: FontWeight.w700,
-                  color: CypherColors.textPrimary,
+                  fontSize: widget.size * 0.22,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
-              if (sublabel != null)
-                Text(
-                  sublabel!,
-                  style: TextStyle(
-                    fontSize: size * 0.13,
-                    color: CypherColors.textMuted,
-                  ),
+              const SizedBox(height: 2),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: widget.size * 0.11,
+                  fontWeight: FontWeight.w500,
+                  color: CypherColors.textMuted,
                 ),
+              ),
             ],
           ),
         ],
@@ -65,26 +106,26 @@ class _RingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const strokeWidth = 5.0;
+    const strokeWidth = 8.0;
     final cx = size.width / 2;
     final cy = size.height / 2;
-    final r  = (size.width - strokeWidth) / 2;
+    final r = (size.width - strokeWidth) / 2;
 
     final trackPaint = Paint()
-      ..color  = CypherColors.bgOverlay
-      ..style  = PaintingStyle.stroke
+      ..color = const Color(0xFF1A1A24)
+      ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
-      ..strokeCap   = StrokeCap.round;
+      ..strokeCap = StrokeCap.round;
 
     final valuePaint = Paint()
       ..shader = SweepGradient(
-          colors: [color.withOpacity(0.6), color],
-          startAngle: -math.pi / 2,
-          endAngle:   -math.pi / 2 + 2 * math.pi * value,
-        ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r))
-      ..style  = PaintingStyle.stroke
+        colors: [color.withOpacity(0.5), color],
+        startAngle: -math.pi / 2,
+        endAngle: -math.pi / 2 + 2 * math.pi * value,
+      ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r))
+      ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
-      ..strokeCap   = StrokeCap.round;
+      ..strokeCap = StrokeCap.round;
 
     canvas.drawCircle(Offset(cx, cy), r, trackPaint);
     canvas.drawArc(

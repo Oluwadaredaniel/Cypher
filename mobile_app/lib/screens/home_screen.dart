@@ -5,10 +5,8 @@ import '../providers/connection_provider.dart';
 import '../providers/system_provider.dart';
 import '../theme/colors.dart';
 import '../theme/app_theme.dart';
-import '../widgets/cypher_card.dart';
 import '../widgets/stat_ring.dart';
-import '../widgets/connection_badge.dart';
-import '../widgets/shimmer_box.dart';
+import '../widgets/cypher_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,8 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (cp.ip != null) {
         context.read<SystemProvider>()
           ..startPolling(cp.ip!)
-          ..fetchActivity(cp.ip!)
-          ..fetchApps(cp.ip!);
+          ..fetchActivity(cp.ip!);
       }
     });
   }
@@ -46,14 +43,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final sp = context.watch<SystemProvider>();
 
     if (!cp.isConnected) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.wifi_off_rounded, size: 48, color: CypherColors.textMuted),
-              SizedBox(height: 12),
-              Text('Disconnected', style: TextStyle(color: CypherColors.textSecondary, fontSize: 16)),
+              const SizedBox(height: 12),
+              const Text('Disconnected', style: TextStyle(color: CypherColors.textSecondary, fontSize: 16)),
             ],
           ),
         ),
@@ -67,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
             IndexedStack(
               index: _activeTab,
               children: [
-                _DashTab(cp: cp, sp: sp),
+                _HomeTab(cp: cp, sp: sp),
                 _MoreTab(),
               ],
             ),
@@ -79,291 +76,393 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ── Dashboard Tab ─────────────────────────────────────────────
-class _DashTab extends StatelessWidget {
+// ── HOME TAB ──────────────────────────────────────────────────
+class _HomeTab extends StatelessWidget {
   final ConnectionProvider cp;
   final SystemProvider sp;
-  const _DashTab({required this.cp, required this.sp});
+  const _HomeTab({required this.cp, required this.sp});
 
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
+        // Header
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('CYPHER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: CypherColors.accent, letterSpacing: 3)),
-                    const SizedBox(height: 2),
-                    Text(cp.pcName ?? 'My PC', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: CypherColors.textPrimary)),
-                  ],
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.notifications_outlined, color: CypherColors.textSecondary),
-                      onPressed: () => Navigator.pushNamed(context, '/notifications'),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.settings_outlined, color: CypherColors.textSecondary),
-                      onPressed: () => Navigator.pushNamed(context, '/settings'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // Stat rings
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                StatRing(value: sp.cpu / 100, label: 'CPU', sublabel: '${sp.cpu.toInt()}%', color: CypherColors.accent),
-                StatRing(value: sp.ram / 100, label: 'RAM', sublabel: '${sp.ram.toInt()}%', color: CypherColors.info),
-                StatRing(value: sp.disk / 100, label: 'Disk', sublabel: '${sp.disk.toInt()}%', color: CypherColors.warning),
-              ],
-            ),
-          ),
-        ),
-
-        // Active window
-        if (sp.activeWindow.isNotEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: CypherCard(
-                child: Row(
-                  children: [
-                    const Icon(Icons.window_rounded, color: CypherColors.accentLight, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(sp.activeWindow,
-                        style: const TextStyle(fontSize: 13, color: CypherColors.textSecondary),
-                        overflow: TextOverflow.ellipsis,
+                    Text(
+                      _getGreeting(),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: CypherColors.textMuted,
+                        letterSpacing: 0.5,
                       ),
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      cp.pcName ?? 'CYPHER PC',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: CypherColors.textPrimary,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: CypherColors.battery,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Connected',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: CypherColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-              ),
-            ),
-          ),
-
-        // Quick actions
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CypherSectionHeader(title: 'Quick Access', action: 'All', onAction: () {}),
-                const SizedBox(height: 10),
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 1.1,
-                  children: [
-                    _QuickTile(icon: Icons.folder_rounded, label: 'Files', color: CypherColors.warning, onTap: () => Navigator.pushNamed(context, '/browser')),
-                    _QuickTile(icon: Icons.keyboard_rounded, label: 'Controls', color: CypherColors.accent, onTap: () => Navigator.pushNamed(context, '/controls')),
-                    _QuickTile(icon: Icons.content_paste_rounded, label: 'Clipboard', color: CypherColors.info, onTap: () => Navigator.pushNamed(context, '/clipboard')),
-                    _QuickTile(icon: Icons.apps_rounded, label: 'Apps', color: CypherColors.success, onTap: () => Navigator.pushNamed(context, '/apps_launcher')),
-                    _QuickTile(icon: Icons.memory_rounded, label: 'Processes', color: CypherColors.error, onTap: () => Navigator.pushNamed(context, '/processes')),
-                    _QuickTile(icon: Icons.videocam_rounded, label: 'Recorder', color: const Color(0xFFEC4899), onTap: () => Navigator.pushNamed(context, '/recorder')),
-                    _QuickTile(icon: Icons.wifi_tethering_rounded, label: 'Drop', color: const Color(0xFF06B6D4), onTap: () => Navigator.pushNamed(context, '/drop')),
-                  ],
+                IconButton(
+                  icon: const Icon(Icons.notifications_outlined, color: CypherColors.textSecondary),
+                  onPressed: () => Navigator.pushNamed(context, '/notifications'),
                 ),
               ],
             ),
           ),
         ),
 
-        // Recent activity
+        // Stat Gauges (2x2 grid)
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: CypherSectionHeader(title: 'Recent Activity', action: 'See all', onAction: () => Navigator.pushNamed(context, '/activity')),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 1,
+              children: [
+                _StatCard(
+                  ring: StatRing(
+                    value: sp.cpu / 100,
+                    label: 'CPU',
+                    icon: Icons.speed_rounded,
+                    color: CypherColors.cpu,
+                    size: 110,
+                  ),
+                ),
+                _StatCard(
+                  ring: StatRing(
+                    value: sp.ram / 100,
+                    label: 'RAM',
+                    icon: Icons.memory_rounded,
+                    color: CypherColors.ram,
+                    size: 110,
+                  ),
+                ),
+                _StatCard(
+                  ring: StatRing(
+                    value: sp.disk / 100,
+                    label: 'Storage',
+                    icon: Icons.storage_rounded,
+                    color: CypherColors.storage,
+                    size: 110,
+                  ),
+                ),
+                _StatCard(
+                  ring: StatRing(
+                    value: (sp.battery['percent'] as num?)?.toDouble() ?? 0 / 100,
+                    label: 'Battery',
+                    icon: Icons.battery_full_rounded,
+                    color: CypherColors.battery,
+                    size: 110,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        if (sp.activity.isEmpty)
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('No recent activity', style: TextStyle(color: CypherColors.textMuted, fontSize: 13)),
-            ),
-          )
-        else
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            sliver: SliverList.separated(
-              itemCount: (sp.activity.length).clamp(0, 5),
-              separatorBuilder: (_, __) => const SizedBox(height: 6),
-              itemBuilder: (_, i) {
-                final item = sp.activity[i] as Map<String, dynamic>? ?? {};
-                return CypherCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.history_rounded, size: 16, color: CypherColors.accentLight),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(item['name'] ?? item['action'] ?? 'Action', style: const TextStyle(fontSize: 13, color: CypherColors.textPrimary))),
-                      Text(item['time'] ?? item['timestamp'] ?? '', style: const TextStyle(fontSize: 11, color: CypherColors.textMuted)),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
 
-        // Power bar
+        const SliverSizedBox(height: 24),
+
+        // Quick Controls (2x2)
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
-            child: CypherCard(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              children: [
+                _QuickControlTile(
+                  icon: Icons.folder_open_rounded,
+                  label: 'Get Files',
+                  subtitle: 'from PC',
+                  color: CypherColors.storage,
+                  onTap: () => Navigator.pushNamed(context, '/browser'),
+                ),
+                _QuickControlTile(
+                  icon: Icons.send_rounded,
+                  label: 'Send Files',
+                  subtitle: 'to PC',
+                  color: CypherColors.accent,
+                  onTap: () => Navigator.pushNamed(context, '/send'),
+                ),
+                _QuickControlTile(
+                  icon: Icons.screenshot_monitor_rounded,
+                  label: 'Screenshot',
+                  subtitle: 'capture screen',
+                  color: CypherColors.info,
+                  onTap: () => _takeScreenshot(context),
+                ),
+                _QuickControlTile(
+                  icon: Icons.lock_rounded,
+                  label: 'Lock PC',
+                  subtitle: 'secure now',
+                  color: CypherColors.error,
+                  onTap: () => context.read<SystemProvider>().lock(Provider.of<ConnectionProvider>(context, listen: false).ip!),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SliverSizedBox(height: 24),
+
+        // Recent Activity
+        if (sp.activity.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Power', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: CypherColors.textMuted, letterSpacing: 0.5)),
-                  const SizedBox(height: 14),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _PowerBtn(Icons.power_settings_new_rounded, 'Shutdown', CypherColors.error, () => _confirmPower(context, 'Shut down', () => context.read<SystemProvider>().shutdown(cp.ip!))),
-                      _PowerBtn(Icons.replay_rounded, 'Restart', CypherColors.warning, () => _confirmPower(context, 'Restart', () => context.read<SystemProvider>().restart(cp.ip!))),
-                      _PowerBtn(Icons.bedtime_rounded, 'Sleep', CypherColors.info, () => context.read<SystemProvider>().sleep(cp.ip!)),
-                      _PowerBtn(Icons.lock_rounded, 'Lock', CypherColors.textSecondary, () => context.read<SystemProvider>().lock(cp.ip!)),
+                      const Text(
+                        'Recent Activity',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: CypherColors.textMuted,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/activity'),
+                        child: const Text(
+                          'See all',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: CypherColors.accentLight,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  ...List.generate(
+                    (sp.activity.length).clamp(0, 3),
+                    (i) {
+                      final item = sp.activity[i] as Map<String, dynamic>? ?? {};
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: CypherCard(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          child: Row(
+                            children: [
+                              Icon(Icons.history_rounded, size: 14, color: CypherColors.accentLight),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  item['name'] ?? item['action'] ?? 'Action',
+                                  style: const TextStyle(fontSize: 12, color: CypherColors.textPrimary),
+                                ),
+                              ),
+                              Text(
+                                item['time'] ?? '',
+                                style: const TextStyle(fontSize: 10, color: CypherColors.textMuted),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
             ),
           ),
-        ),
+
+        const SliverSizedBox(height: 100),
       ],
     );
   }
 
-  void _confirmPower(BuildContext context, String action, VoidCallback onConfirm) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('$action PC?'),
-        content: Text('This will $action your computer.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(onPressed: () { Navigator.pop(context); onConfirm(); }, child: Text(action, style: const TextStyle(color: CypherColors.error))),
-        ],
-      ),
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  void _takeScreenshot(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Taking screenshot...')),
     );
   }
 }
 
-class _QuickTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _QuickTile({required this.icon, required this.label, required this.color, required this.onTap});
+// ── STAT CARD ─────────────────────────────────────────────────
+class _StatCard extends StatelessWidget {
+  final StatRing ring;
+  const _StatCard({required this.ring});
 
   @override
   Widget build(BuildContext context) {
     return CypherCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(height: 6),
-          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: CypherColors.textPrimary)),
-        ],
-      ),
+      padding: const EdgeInsets.all(16),
+      child: Center(child: ring),
     );
   }
 }
 
-class _PowerBtn extends StatelessWidget {
+// ── QUICK CONTROL TILE ────────────────────────────────────────
+class _QuickControlTile extends StatefulWidget {
   final IconData icon;
   final String label;
+  final String subtitle;
   final Color color;
   final VoidCallback onTap;
-  const _PowerBtn(this.icon, this.label, this.color, this.onTap);
+
+  const _QuickControlTile({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_QuickControlTile> createState() => _QuickControlTileState();
+}
+
+class _QuickControlTileState extends State<_QuickControlTile> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withOpacity(0.25)),
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        child: Container(
+          decoration: BoxDecoration(
+            color: widget.color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: widget.color.withOpacity(0.2),
+              width: 1.5,
             ),
-            child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 10, color: CypherColors.textMuted)),
-        ],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(widget.icon, color: widget.color, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                widget.label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: CypherColors.textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                widget.subtitle,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: CypherColors.textMuted,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-// ── More Tab ──────────────────────────────────────────────────
+// ── MORE TAB ──────────────────────────────────────────────────
 class _MoreTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
       children: [
-        const CypherSectionHeader(title: 'Apps & Tasks'),
-        const SizedBox(height: 8),
-        _MoreItem(icon: Icons.rocket_launch_rounded, title: 'App Launcher', subtitle: 'Open installed programs', onTap: () => Navigator.pushNamed(context, '/apps_launcher')),
-        _MoreItem(icon: Icons.task_alt_rounded,       title: 'Active Tasks',   subtitle: 'Manage transfers', onTap: () => Navigator.pushNamed(context, '/active_tasks')),
-        _MoreItem(icon: Icons.videocam_rounded,       title: 'Screen Recorder',subtitle: 'Record your PC screen', onTap: () => Navigator.pushNamed(context, '/recorder')),
-        _MoreItem(icon: Icons.memory_rounded,         title: 'Process Manager',subtitle: 'View & kill processes', onTap: () => Navigator.pushNamed(context, '/processes')),
+        _SectionHeader(title: 'Files & Transfer'),
+        const SizedBox(height: 10),
+        _MoreItem(icon: Icons.folder_rounded, title: 'Browse Files', subtitle: 'PC files', onTap: () => Navigator.pushNamed(context, '/browser')),
+        _MoreItem(icon: Icons.send_rounded, title: 'Send to PC', subtitle: 'Upload files', onTap: () => Navigator.pushNamed(context, '/send')),
         const SizedBox(height: 20),
-        const CypherSectionHeader(title: 'Security'),
-        const SizedBox(height: 8),
-        _MoreItem(icon: Icons.people_outline,    title: 'Guest Access', subtitle: 'Share folders temporarily', onTap: () => Navigator.pushNamed(context, '/guest')),
-        _MoreItem(icon: Icons.power_settings_new_rounded, title: 'Wake on LAN', subtitle: 'Wake up sleeping PCs', onTap: () => Navigator.pushNamed(context, '/wol')),
+        _SectionHeader(title: 'Control & Commands'),
+        const SizedBox(height: 10),
+        _MoreItem(icon: Icons.keyboard_rounded, title: 'Remote Control', subtitle: 'Type & hotkeys', onTap: () => Navigator.pushNamed(context, '/controls')),
+        _MoreItem(icon: Icons.screenshot_monitor_rounded, title: 'Screenshot', subtitle: 'Capture screen', onTap: () => Navigator.pushNamed(context, '/recorder')),
         const SizedBox(height: 20),
-        const CypherSectionHeader(title: 'Activity & Logs'),
-        const SizedBox(height: 8),
-        _MoreItem(icon: Icons.history_rounded,           title: 'Activity Log',   subtitle: 'Recent actions', onTap: () => Navigator.pushNamed(context, '/activity')),
-        _MoreItem(icon: Icons.notifications_none_rounded, title: 'Notifications', subtitle: 'PC alerts',      onTap: () => Navigator.pushNamed(context, '/notifications')),
-        const SizedBox(height: 20),
-        const CypherSectionHeader(title: 'System'),
-        const SizedBox(height: 8),
-        _MoreItem(icon: Icons.help_outline_rounded,   title: 'Guide',    subtitle: 'Setup & troubleshooting', onTap: () => Navigator.pushNamed(context, '/guide')),
-        _MoreItem(icon: Icons.settings_outlined,      title: 'Settings', subtitle: 'Connection & preferences', onTap: () => Navigator.pushNamed(context, '/settings')),
-        _MoreItem(icon: Icons.smartphone_rounded,     title: 'Send to PC', subtitle: 'Upload from your phone', onTap: () => Navigator.pushNamed(context, '/send')),
-        _MoreItem(icon: Icons.folder_special_rounded, title: 'Phone Files', subtitle: 'Browse local phone files', onTap: () => Navigator.pushNamed(context, '/phone_browser')),
-        const SizedBox(height: 20),
-        const CypherSectionHeader(title: 'Share'),
-        const SizedBox(height: 8),
-        _MoreItem(icon: Icons.wifi_tethering_rounded, title: 'CypherDrop', subtitle: 'Send files to nearby devices', onTap: () => Navigator.pushNamed(context, '/drop')),
+        _SectionHeader(title: 'System'),
+        const SizedBox(height: 10),
+        _MoreItem(icon: Icons.settings_rounded, title: 'Settings', subtitle: 'Configuration', onTap: () => Navigator.pushNamed(context, '/settings')),
+        _MoreItem(icon: Icons.history_rounded, title: 'Activity', subtitle: 'Recent actions', onTap: () => Navigator.pushNamed(context, '/activity')),
       ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: CypherColors.textMuted,
+        letterSpacing: 0.8,
+      ),
     );
   }
 }
@@ -373,23 +472,33 @@ class _MoreItem extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  const _MoreItem({required this.icon, required this.title, required this.subtitle, required this.onTap});
+
+  const _MoreItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 8),
       child: CypherCard(
         onTap: onTap,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
             Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(color: CypherColors.bgOverlay, borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, size: 18, color: CypherColors.textSecondary),
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: CypherColors.bgOverlay,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 20, color: CypherColors.textSecondary),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,30 +516,32 @@ class _MoreItem extends StatelessWidget {
   }
 }
 
-// ── Bottom Nav ────────────────────────────────────────────────
+// ── BOTTOM NAV ────────────────────────────────────────────────
 class _BottomNav extends StatelessWidget {
   final int activeTab;
   final void Function(int) onTab;
+
   const _BottomNav({required this.activeTab, required this.onTab});
 
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: 16, left: 16, right: 16,
+      bottom: 20,
+      left: 20,
+      right: 20,
       child: Container(
         height: 64,
         decoration: BoxDecoration(
           color: CypherColors.bgCard,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: CypherColors.border),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 24, offset: const Offset(0, 8))],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _NavItem(index: 0, active: activeTab, icon: Icons.dashboard_rounded, label: 'Home', onTap: onTab),
+            _NavItem(index: 0, active: activeTab, icon: Icons.home_rounded, label: 'Home', onTap: onTab),
             _NavItem(index: -1, active: -1, icon: Icons.send_rounded, label: 'Send', onTap: (_) => Navigator.pushNamed(context, '/send')),
-            _NavItem(index: -2, active: -1, icon: Icons.keyboard_alt_rounded, label: 'Controls', onTap: (_) => Navigator.pushNamed(context, '/controls')),
+            _NavItem(index: -2, active: -1, icon: Icons.keyboard_rounded, label: 'Control', onTap: (_) => Navigator.pushNamed(context, '/controls')),
             _NavItem(index: 1, active: activeTab, icon: Icons.more_horiz_rounded, label: 'More', onTap: onTab),
           ],
         ),
@@ -445,24 +556,27 @@ class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final void Function(int) onTap;
-  const _NavItem({required this.index, required this.active, required this.icon, required this.label, required this.onTap});
+
+  const _NavItem({
+    required this.index,
+    required this.active,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isActive = index >= 0 && index == active;
-    final color = isActive ? CypherColors.accent : CypherColors.textMuted;
     return GestureDetector(
       onTap: () => onTap(index),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 3),
-            Text(label, style: TextStyle(fontSize: 10, fontWeight: isActive ? FontWeight.w600 : FontWeight.w400, color: color)),
-          ],
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: isActive ? CypherColors.accent : CypherColors.textMuted, size: 22),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 9, fontWeight: isActive ? FontWeight.w600 : FontWeight.w400, color: isActive ? CypherColors.accent : CypherColors.textMuted)),
+        ],
       ),
     );
   }
