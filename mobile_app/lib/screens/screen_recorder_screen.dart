@@ -6,7 +6,6 @@ import '../providers/connection_provider.dart';
 import '../providers/file_provider.dart';
 import '../services/api_service.dart';
 import '../theme/colors.dart';
-import '../theme/app_theme.dart';
 import '../widgets/cypher_button.dart';
 import '../widgets/cypher_card.dart';
 
@@ -33,7 +32,6 @@ class _ScreenRecorderScreenState extends State<ScreenRecorderScreen>
   bool _isPaused    = false;
   int  _duration    = 0;
   String? _savedFilename;
-  String? _savedPath;
   Timer? _timer;
 
   // Settings (locked when recording)
@@ -119,7 +117,7 @@ class _ScreenRecorderScreenState extends State<ScreenRecorderScreen>
         fps:     _fps,
         audio:   _audio,
       );
-      setState(() { _isRecording = true; _isPaused = false; _savedFilename = null; _savedPath = null; _duration = 0; });
+      setState(() { _isRecording = true; _isPaused = false; _savedFilename = null; _duration = 0; });
       _startTimer();
     } catch (e) {
       _toast('Failed to start: ${e.toString().replaceAll('Exception: ', '')}', err: true);
@@ -146,7 +144,6 @@ class _ScreenRecorderScreenState extends State<ScreenRecorderScreen>
         _isPaused      = false;
         _duration      = 0;
         _savedFilename = name;
-        _savedPath     = path;
       });
       if (_downloadAfterStop && name != null && path != null) {
         _downloadToPhone(path, name);
@@ -219,9 +216,9 @@ class _ScreenRecorderScreenState extends State<ScreenRecorderScreen>
             Container(
               width: 72, height: 72,
               decoration: BoxDecoration(
-                color: CypherColors.success.withOpacity(0.1),
+                color: CypherColors.bgCard,
                 shape: BoxShape.circle,
-                border: Border.all(color: CypherColors.success.withOpacity(0.3)),
+                border: Border.all(color: CypherColors.success, width: 1.5),
               ),
               child: const Icon(Icons.check_rounded, color: CypherColors.success, size: 36),
             ),
@@ -295,7 +292,9 @@ class _ScreenRecorderScreenState extends State<ScreenRecorderScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: CypherColors.bgDeep,
       appBar: AppBar(
+        backgroundColor: CypherColors.bgDeep,
         title: const Text('Screen Recorder'),
         actions: [
           if (!_isRecording && !_counting)
@@ -379,10 +378,7 @@ class _TimerRing extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: CypherColors.bgCard,
-          border: Border.all(color: ringColor.withOpacity(0.35), width: 3),
-          boxShadow: isRecording && !isPaused
-              ? [BoxShadow(color: CypherColors.error.withOpacity(0.2), blurRadius: 40, spreadRadius: 2)]
-              : [],
+          border: Border.all(color: ringColor, width: isRecording ? 2.5 : 1.5),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -645,9 +641,9 @@ class _RecordingInfo extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: CypherColors.error.withOpacity(0.06),
+        color: CypherColors.bgCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: CypherColors.error.withOpacity(0.2)),
+        border: Border.all(color: CypherColors.error),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

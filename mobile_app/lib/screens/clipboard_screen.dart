@@ -179,11 +179,13 @@ class _ClipboardScreenState extends State<ClipboardScreen>
     final pcText = sp.pcClipboard ?? '';
 
     return Scaffold(
+      backgroundColor: CypherColors.bgDeep,
       appBar: AppBar(
+        backgroundColor: CypherColors.bgDeep,
         title: const Text('Clipboard'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Icons.refresh_rounded, size: 20),
             tooltip: 'Refresh',
             onPressed: () {
               final ip = context.read<ConnectionProvider>().ip ?? '';
@@ -194,14 +196,13 @@ class _ClipboardScreenState extends State<ClipboardScreen>
         ],
         bottom: TabBar(
           controller: _tabs,
-          tabs: const [
-            Tab(text: 'Sync'),
-            Tab(text: 'History'),
-          ],
+          tabs: const [Tab(text: 'Sync'), Tab(text: 'History')],
           indicatorColor: CypherColors.accent,
           labelColor: CypherColors.accent,
           unselectedLabelColor: CypherColors.textMuted,
           dividerColor: CypherColors.border,
+          labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
         ),
       ),
       body: TabBarView(
@@ -218,7 +219,7 @@ class _ClipboardScreenState extends State<ClipboardScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
       children: [
-        const CypherSectionHeader(title: 'PC Clipboard'),
+        const _ClipLabel('PC CLIPBOARD'),
         const SizedBox(height: 8),
         CypherCard(
           child: Column(
@@ -248,7 +249,7 @@ class _ClipboardScreenState extends State<ClipboardScreen>
         ),
 
         const SizedBox(height: 20),
-        const CypherSectionHeader(title: 'Phone Clipboard'),
+        const _ClipLabel('PHONE CLIPBOARD'),
         const SizedBox(height: 8),
         CypherCard(
           child: Column(
@@ -272,7 +273,7 @@ class _ClipboardScreenState extends State<ClipboardScreen>
         ),
 
         const SizedBox(height: 20),
-        const CypherSectionHeader(title: 'Quick Send'),
+        const _ClipLabel('QUICK SEND'),
         const SizedBox(height: 8),
         CypherCard(
           child: Column(
@@ -406,7 +407,7 @@ class _ClipboardScreenState extends State<ClipboardScreen>
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: CypherColors.bgOverlay,
+                                  color: CypherColors.bgCard,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: CypherColors.border),
                                 ),
@@ -430,4 +431,15 @@ class _ClipboardScreenState extends State<ClipboardScreen>
       ],
     );
   }
+}
+
+class _ClipLabel extends StatelessWidget {
+  final String text;
+  const _ClipLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: CypherColors.textMuted, letterSpacing: 0.8),
+  );
 }

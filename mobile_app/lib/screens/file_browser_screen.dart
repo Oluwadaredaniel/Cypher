@@ -142,7 +142,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     final items = _visibleItems(fp);
 
     return Scaffold(
+      backgroundColor: CypherColors.bgDeep,
       appBar: AppBar(
+        backgroundColor: CypherColors.bgDeep,
         title: Text(_isSearching ? '' : _titleFor(widget.initialPath)),
         actions: [
           if (_isSearching)

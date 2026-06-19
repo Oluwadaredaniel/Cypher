@@ -28,6 +28,7 @@ import 'screens/process_manager_screen.dart';
 import 'screens/app_launcher_screen.dart';
 import 'screens/active_tasks_screen.dart';
 import 'screens/screen_recorder_screen.dart';
+import 'screens/power_screen.dart';
 import 'screens/phone_browser_screen.dart';
 import 'screens/drop_zone_screen.dart';
 import 'screens/wake_on_lan_screen.dart';
@@ -164,6 +165,8 @@ class CypherApp extends StatelessWidget {
         page = const ActiveTasksScreen();
       case '/recorder':
         page = const ScreenRecorderScreen();
+      case '/power':
+        page = const PowerScreen();
       case '/phone_browser':
         page = const PhoneBrowserScreen();
       case '/drop':

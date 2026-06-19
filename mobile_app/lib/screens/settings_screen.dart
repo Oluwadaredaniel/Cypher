@@ -8,7 +8,7 @@ import '../theme/colors.dart';
 import '../theme/app_theme.dart';
 import '../services/update_service.dart';
 import '../widgets/cypher_button.dart';
-import '../widgets/cypher_card.dart';
+import '../widgets/cypher_card.dart'; // CypherCard
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -118,14 +118,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final cp = context.watch<ConnectionProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      backgroundColor: CypherColors.bgDeep,
+      appBar: AppBar(
+        backgroundColor: CypherColors.bgDeep,
+        title: const Text('Settings'),
+      ),
       body: _isLoading
         ? const Center(child: CircularProgressIndicator(color: CypherColors.accent))
         : ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
             children: [
-              const CypherSectionHeader(title: 'Connection'),
-              const SizedBox(height: 8),
+              const _Label('CONNECTION'),
+              const SizedBox(height: 10),
               CypherCard(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -140,8 +144,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
 
               const SizedBox(height: 20),
-              const CypherSectionHeader(title: 'Auto-Connect'),
-              const SizedBox(height: 8),
+              const _Label('AUTO-CONNECT'),
+              const SizedBox(height: 10),
               CypherCard(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: _ToggleRow(
@@ -153,8 +157,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
 
               const SizedBox(height: 20),
-              const CypherSectionHeader(title: 'Alerts'),
-              const SizedBox(height: 8),
+              const _Label('ALERTS'),
+              const SizedBox(height: 10),
               CypherCard(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
@@ -186,8 +190,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
 
               const SizedBox(height: 20),
-              const CypherSectionHeader(title: 'Preferences'),
-              const SizedBox(height: 8),
+              const _Label('PREFERENCES'),
+              const SizedBox(height: 10),
               CypherCard(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: _ToggleRow(
@@ -199,8 +203,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
 
               const SizedBox(height: 20),
-              const CypherSectionHeader(title: 'About'),
-              const SizedBox(height: 8),
+              const _Label('ABOUT'),
+              const SizedBox(height: 10),
               CypherCard(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -259,8 +263,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
 
               const SizedBox(height: 20),
-              const CypherSectionHeader(title: 'Danger Zone'),
-              const SizedBox(height: 8),
+              const _Label('DANGER ZONE'),
+              const SizedBox(height: 10),
               CypherCard(
                 onTap: _forgetPC,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -325,4 +329,15 @@ class _ToggleRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _Label extends StatelessWidget {
+  final String text;
+  const _Label(this.text);
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: CypherColors.textMuted, letterSpacing: 0.8),
+  );
 }

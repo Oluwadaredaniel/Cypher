@@ -49,6 +49,26 @@ class _ActivityScreenState extends State<ActivityScreen> {
     }
   }
 
+  IconData _categoryIcon(Map item) {
+    final cat = _getCategory(item);
+    switch (cat) {
+      case 'Files':       return Icons.folder_rounded;
+      case 'Controls':    return Icons.keyboard_rounded;
+      case 'Connections': return Icons.wifi_rounded;
+      default:            return Icons.history_rounded;
+    }
+  }
+
+  Color _categoryColor(Map item) {
+    final cat = _getCategory(item);
+    switch (cat) {
+      case 'Files':       return CypherColors.storage;
+      case 'Controls':    return CypherColors.accent;
+      case 'Connections': return CypherColors.info;
+      default:            return CypherColors.textSecondary;
+    }
+  }
+
   List<Map> _getFiltered(List rawList) {
     final items = rawList.cast<Map>();
     if (_activeFilter == 'All') return items;
@@ -62,7 +82,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
     final filtered = _getFiltered(sp.activity);
 
     return Scaffold(
+      backgroundColor: CypherColors.bgDeep,
       appBar: AppBar(
+        backgroundColor: CypherColors.bgDeep,
         title: const Text('Activity'),
         actions: [
           if (sp.activity.isNotEmpty)
@@ -137,18 +159,21 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         final ts = _formatTimestamp(item);
                         final isUrgent = item['is_urgent'] as bool? ?? false;
 
+                        final catIcon = _categoryIcon(item);
+                        final catColor = isUrgent ? CypherColors.error : _categoryColor(item);
                         return CypherCard(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                           child: Row(
                             children: [
                               Container(
-                                width: 8, height: 8,
+                                width: 36, height: 36,
                                 decoration: BoxDecoration(
-                                  color: isUrgent ? CypherColors.error : CypherColors.success,
-                                  shape: BoxShape.circle,
+                                  color: catColor.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(9),
                                 ),
+                                child: Icon(catIcon, size: 16, color: catColor),
                               ),
-                              const SizedBox(width: 14),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,10 +181,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                     Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: CypherColors.textPrimary)),
                                     if (desc.isNotEmpty)
                                       Text(desc, style: const TextStyle(fontSize: 12, color: CypherColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    Text(ts, style: AppTheme.caption(context)),
                                   ],
                                 ),
                               ),
+                              Text(ts, style: const TextStyle(fontSize: 11, color: CypherColors.textMuted)),
                             ],
                           ),
                         );

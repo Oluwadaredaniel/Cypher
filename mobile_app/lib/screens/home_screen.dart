@@ -457,48 +457,48 @@ class _MoreTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       children: [
-        _SectionHeader(title: 'Files & Transfer'),
+        const _MoreSectionLabel('FILES & TRANSFER'),
         const SizedBox(height: 10),
-        _MoreItem(icon: Icons.folder_rounded,           title: 'Browse Files',    subtitle: 'PC files',        onTap: () => requireConnection(() => Navigator.pushNamed(context, '/browser'))),
-        _MoreItem(icon: Icons.send_rounded,             title: 'Send to PC',      subtitle: 'Upload files',    onTap: () => requireConnection(() => Navigator.pushNamed(context, '/send'))),
-        _MoreItem(icon: Icons.content_paste_rounded,    title: 'Clipboard',       subtitle: 'Sync & history',  onTap: () => requireConnection(() => Navigator.pushNamed(context, '/clipboard'))),
+        _MoreItem(icon: Icons.folder_rounded,             color: CypherColors.storage, title: 'Browse Files',   subtitle: 'PC file system',   onTap: () => requireConnection(() => Navigator.pushNamed(context, '/browser'))),
+        _MoreItem(icon: Icons.upload_rounded,             color: CypherColors.accent,  title: 'Send to PC',     subtitle: 'Upload files',     onTap: () => requireConnection(() => Navigator.pushNamed(context, '/send'))),
+        _MoreItem(icon: Icons.content_paste_rounded,      color: CypherColors.info,    title: 'Clipboard',      subtitle: 'Sync & history',   onTap: () => requireConnection(() => Navigator.pushNamed(context, '/clipboard'))),
         const SizedBox(height: 20),
-        _SectionHeader(title: 'Control & Commands'),
+        const _MoreSectionLabel('CONTROL & COMMANDS'),
         const SizedBox(height: 10),
-        _MoreItem(icon: Icons.keyboard_rounded,         title: 'Remote Control',  subtitle: 'Type & hotkeys',  onTap: () => requireConnection(() => Navigator.pushNamed(context, '/controls'))),
-        _MoreItem(icon: Icons.screenshot_monitor_rounded, title: 'Screenshot',    subtitle: 'Capture screen',  onTap: () => requireConnection(() => Navigator.pushNamed(context, '/recorder'))),
-        _MoreItem(icon: Icons.power_settings_new_rounded, title: 'Power',         subtitle: 'Shutdown, sleep', onTap: () => requireConnection(() => Navigator.pushNamed(context, '/power'))),
+        _MoreItem(icon: Icons.keyboard_rounded,           color: CypherColors.cpu,     title: 'Remote Control', subtitle: 'Type & media',     onTap: () => requireConnection(() => Navigator.pushNamed(context, '/controls'))),
+        _MoreItem(icon: Icons.screenshot_monitor_rounded, color: CypherColors.info,    title: 'Screen Capture', subtitle: 'Screenshot & rec', onTap: () => requireConnection(() => Navigator.pushNamed(context, '/recorder'))),
+        _MoreItem(icon: Icons.power_settings_new_rounded, color: CypherColors.error,   title: 'Power',          subtitle: 'Shutdown, sleep',  onTap: () => requireConnection(() => Navigator.pushNamed(context, '/power'))),
         const SizedBox(height: 20),
-        _SectionHeader(title: 'System'),
+        const _MoreSectionLabel('APP'),
         const SizedBox(height: 10),
-        _MoreItem(icon: Icons.settings_rounded,         title: 'Settings',        subtitle: 'Configuration',   onTap: () => Navigator.pushNamed(context, '/settings')),
-        _MoreItem(icon: Icons.history_rounded,          title: 'Activity',        subtitle: 'Recent actions',  onTap: () => Navigator.pushNamed(context, '/activity')),
+        _MoreItem(icon: Icons.settings_rounded,           color: CypherColors.textSecondary, title: 'Settings', subtitle: 'Configuration',   onTap: () => Navigator.pushNamed(context, '/settings')),
+        _MoreItem(icon: Icons.history_rounded,            color: CypherColors.success, title: 'Activity',       subtitle: 'Recent actions',   onTap: () => Navigator.pushNamed(context, '/activity')),
       ],
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader({required this.title});
+class _MoreSectionLabel extends StatelessWidget {
+  final String text;
+  const _MoreSectionLabel(this.text);
 
   @override
-  Widget build(BuildContext context) {
-    return Text(
-      title.toUpperCase(),
-      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: CypherColors.textMuted, letterSpacing: 0.8),
-    );
-  }
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: CypherColors.textMuted, letterSpacing: 0.8),
+  );
 }
 
 class _MoreItem extends StatelessWidget {
   final IconData icon;
+  final Color color;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
 
   const _MoreItem({
     required this.icon,
+    required this.color,
     required this.title,
     required this.subtitle,
     required this.onTap,
@@ -510,29 +510,30 @@ class _MoreItem extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: CypherCard(
         onTap: onTap,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         child: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: CypherColors.bgOverlay,
-                borderRadius: BorderRadius.circular(9),
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, size: 18, color: CypherColors.textSecondary),
+              child: Icon(icon, size: 18, color: color),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: CypherColors.textPrimary)),
+                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: CypherColors.textPrimary)),
+                  const SizedBox(height: 1),
                   Text(subtitle, style: const TextStyle(fontSize: 12, color: CypherColors.textMuted)),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 18, color: CypherColors.textMuted),
+            const Icon(Icons.chevron_right_rounded, size: 16, color: CypherColors.textMuted),
           ],
         ),
       ),
@@ -562,9 +563,9 @@ class _BottomNav extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _NavItem(index: 0,  active: activeTab, icon: Icons.home_rounded,         label: 'Home',    onTap: onTab),
-              _NavItem(index: -1, active: -1,         icon: Icons.send_rounded,          label: 'Send',    onTap: (_) => Navigator.pushNamed(context, '/send')),
+              _NavItem(index: -1, active: -1,         icon: Icons.upload_rounded,        label: 'Send',    onTap: (_) => Navigator.pushNamed(context, '/send')),
               _NavItem(index: -2, active: -1,         icon: Icons.keyboard_rounded,      label: 'Control', onTap: (_) => Navigator.pushNamed(context, '/controls')),
-              _NavItem(index: 1,  active: activeTab, icon: Icons.more_horiz_rounded,    label: 'More',    onTap: onTab),
+              _NavItem(index: 1,  active: activeTab, icon: Icons.apps_rounded,           label: 'More',    onTap: onTab),
             ],
           ),
         ),
