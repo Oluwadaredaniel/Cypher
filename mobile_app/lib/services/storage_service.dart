@@ -40,6 +40,8 @@ class StorageService {
     await p.remove(_keyIp);
     await p.remove(_keyIsPaired);
     await p.remove(_keyPcName);
+    await p.remove(_keyDeviceId);
+    await p.remove(_keyDeviceName);
   }
 
   // ── JSON Storage ──────────────────────────────────────────────

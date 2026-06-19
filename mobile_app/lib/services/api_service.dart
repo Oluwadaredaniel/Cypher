@@ -644,15 +644,18 @@ class ApiService {
     await _handleResponse(res);
   }
 
-  // Preview URL (used in video/audio player)
+  // Preview URL (used in video/audio/image player — token passed as query param
+  // because media player widgets cannot set custom headers; token is local-network only)
   static Future<String> getPreviewUrl(String ip, String remotePath) async {
     final token = await StorageService.getToken();
-    return '${_baseUrl(ip)}/files/preview?path=${Uri.encodeComponent(remotePath)}&token=$token';
+    final encodedPath = Uri.encodeComponent(remotePath);
+    return '${_baseUrl(ip)}/files/preview?path=$encodedPath&token=${Uri.encodeComponent(token ?? '')}';
   }
 
   static Future<String> getThumbnailUrl(String ip, String remotePath) async {
     final token = await StorageService.getToken();
-    return '${_baseUrl(ip)}/files/thumbnail?path=${Uri.encodeComponent(remotePath)}&token=$token';
+    final encodedPath = Uri.encodeComponent(remotePath);
+    return '${_baseUrl(ip)}/files/thumbnail?path=$encodedPath&token=${Uri.encodeComponent(token ?? '')}';
   }
 
   // ── Wake-on-LAN ────────────────────────────────────────────────

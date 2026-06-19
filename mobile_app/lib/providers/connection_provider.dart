@@ -172,8 +172,10 @@ class ConnectionProvider extends ChangeNotifier with WidgetsBindingObserver {
   void _startHeartbeat() {
     _heartbeat?.cancel();
     _heartbeat = Timer.periodic(const Duration(seconds: 8), (_) async {
-      if (_ip == null) return;
-      final alive = await DiscoveryService.isReachable(_ip!);
+      final ip = _ip;
+      if (ip == null) return;
+      final alive = await DiscoveryService.isReachable(ip);
+      if (_ip == null) return; // disconnected while awaiting
       if (!alive && _status == ConnectionStatus.connected) {
         _setStatus(ConnectionStatus.disconnected);
         _error = 'Connection lost';

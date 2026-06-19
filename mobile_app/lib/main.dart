@@ -72,16 +72,15 @@ Future<void> _requestPermissions() async {
     // Request all permissions
     final statuses = await permissions.request();
 
-    // Log permission status for debugging
     for (final status in statuses.entries) {
       if (status.value.isDenied) {
-        print('Permission ${status.key} denied');
+        debugPrint('Permission ${status.key} denied');
       } else if (status.value.isPermanentlyDenied) {
-        print('Permission ${status.key} permanently denied - open app settings');
+        debugPrint('Permission ${status.key} permanently denied');
       }
     }
   } catch (e) {
-    print('Error requesting permissions: $e');
+    debugPrint('Error requesting permissions: $e');
   }
 }
 
