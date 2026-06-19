@@ -37,33 +37,51 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  void _requireConnection(BuildContext context, VoidCallback action) {
+    final cp = context.read<ConnectionProvider>();
+    if (!cp.isConnected) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: CypherColors.bgCard,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Not Connected', style: TextStyle(color: CypherColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+          content: const Text(
+            'Connect to your PC first to use this feature.',
+            style: TextStyle(color: CypherColors.textSecondary, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/connection');
+              },
+              child: const Text('Connect', style: TextStyle(color: CypherColors.accent)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: CypherColors.textMuted)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    action();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cp = context.watch<ConnectionProvider>();
     final sp = context.watch<SystemProvider>();
-
-    if (!cp.isConnected) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.wifi_off_rounded, size: 48, color: CypherColors.textMuted),
-              const SizedBox(height: 12),
-              const Text('Disconnected', style: TextStyle(color: CypherColors.textSecondary, fontSize: 16)),
-            ],
-          ),
-        ),
-      );
-    }
 
     return Scaffold(
       body: SafeArea(
         child: IndexedStack(
           index: _activeTab,
           children: [
-            _HomeTab(cp: cp, sp: sp),
-            _MoreTab(),
+            _HomeTab(cp: cp, sp: sp, requireConnection: (cb) => _requireConnection(context, cb)),
+            _MoreTab(requireConnection: (cb) => _requireConnection(context, cb)),
           ],
         ),
       ),
@@ -79,12 +97,36 @@ class _HomeScreenState extends State<HomeScreen> {
 class _HomeTab extends StatelessWidget {
   final ConnectionProvider cp;
   final SystemProvider sp;
-  const _HomeTab({required this.cp, required this.sp});
+  final void Function(VoidCallback) requireConnection;
+  const _HomeTab({required this.cp, required this.sp, required this.requireConnection});
 
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
+        if (!cp.isConnected)
+          SliverToBoxAdapter(
+            child: GestureDetector(
+              onTap: () => Navigator.pushNamed(context, '/connection'),
+              child: Container(
+                color: CypherColors.accent.withOpacity(0.12),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, size: 16, color: CypherColors.accent),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Not connected — tap to connect to your PC',
+                        style: TextStyle(fontSize: 12, color: CypherColors.accent),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: CypherColors.accent),
+                  ],
+                ),
+              ),
+            ),
+          ),
         // Header
         SliverToBoxAdapter(
           child: Padding(
@@ -120,14 +162,14 @@ class _HomeTab extends StatelessWidget {
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
-                            color: CypherColors.battery,
+                          decoration: BoxDecoration(
+                            color: cp.isConnected ? CypherColors.battery : CypherColors.textMuted,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Text(
-                          'Connected',
+                        Text(
+                          cp.isConnected ? 'Connected' : 'Offline',
                           style: TextStyle(
                             fontSize: 12,
                             color: CypherColors.textSecondary,
@@ -217,28 +259,31 @@ class _HomeTab extends StatelessWidget {
                   label: 'Get Files',
                   subtitle: 'from PC',
                   color: CypherColors.storage,
-                  onTap: () => Navigator.pushNamed(context, '/browser'),
+                  onTap: () => requireConnection(() => Navigator.pushNamed(context, '/browser')),
                 ),
                 _QuickControlTile(
                   icon: Icons.send_rounded,
                   label: 'Send Files',
                   subtitle: 'to PC',
                   color: CypherColors.accent,
-                  onTap: () => Navigator.pushNamed(context, '/send'),
+                  onTap: () => requireConnection(() => Navigator.pushNamed(context, '/send')),
                 ),
                 _QuickControlTile(
                   icon: Icons.screenshot_monitor_rounded,
                   label: 'Screenshot',
                   subtitle: 'capture screen',
                   color: CypherColors.info,
-                  onTap: () => _takeScreenshot(context),
+                  onTap: () => requireConnection(() => _takeScreenshot(context)),
                 ),
                 _QuickControlTile(
                   icon: Icons.lock_rounded,
                   label: 'Lock PC',
                   subtitle: 'secure now',
                   color: CypherColors.error,
-                  onTap: () => context.read<SystemProvider>().lock(Provider.of<ConnectionProvider>(context, listen: false).ip!),
+                  onTap: () => requireConnection(() {
+                    final ip = Provider.of<ConnectionProvider>(context, listen: false).ip;
+                    if (ip != null) context.read<SystemProvider>().lock(ip);
+                  }),
                 ),
               ],
             ),
@@ -408,6 +453,9 @@ class _QuickControlTile extends StatelessWidget {
 
 // ── MORE TAB ──────────────────────────────────────────────────
 class _MoreTab extends StatelessWidget {
+  final void Function(VoidCallback) requireConnection;
+  const _MoreTab({required this.requireConnection});
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -415,13 +463,13 @@ class _MoreTab extends StatelessWidget {
       children: [
         _SectionHeader(title: 'Files & Transfer'),
         const SizedBox(height: 10),
-        _MoreItem(icon: Icons.folder_rounded, title: 'Browse Files', subtitle: 'PC files', onTap: () => Navigator.pushNamed(context, '/browser')),
-        _MoreItem(icon: Icons.send_rounded, title: 'Send to PC', subtitle: 'Upload files', onTap: () => Navigator.pushNamed(context, '/send')),
+        _MoreItem(icon: Icons.folder_rounded, title: 'Browse Files', subtitle: 'PC files', onTap: () => requireConnection(() => Navigator.pushNamed(context, '/browser'))),
+        _MoreItem(icon: Icons.send_rounded, title: 'Send to PC', subtitle: 'Upload files', onTap: () => requireConnection(() => Navigator.pushNamed(context, '/send'))),
         const SizedBox(height: 20),
         _SectionHeader(title: 'Control & Commands'),
         const SizedBox(height: 10),
-        _MoreItem(icon: Icons.keyboard_rounded, title: 'Remote Control', subtitle: 'Type & hotkeys', onTap: () => Navigator.pushNamed(context, '/controls')),
-        _MoreItem(icon: Icons.screenshot_monitor_rounded, title: 'Screenshot', subtitle: 'Capture screen', onTap: () => Navigator.pushNamed(context, '/recorder')),
+        _MoreItem(icon: Icons.keyboard_rounded, title: 'Remote Control', subtitle: 'Type & hotkeys', onTap: () => requireConnection(() => Navigator.pushNamed(context, '/controls'))),
+        _MoreItem(icon: Icons.screenshot_monitor_rounded, title: 'Screenshot', subtitle: 'Capture screen', onTap: () => requireConnection(() => Navigator.pushNamed(context, '/recorder'))),
         const SizedBox(height: 20),
         _SectionHeader(title: 'System'),
         const SizedBox(height: 10),
