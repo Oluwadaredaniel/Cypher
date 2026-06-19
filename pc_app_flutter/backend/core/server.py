@@ -1491,13 +1491,55 @@ def download_files_zip():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/files/upload-destinations', methods=['GET'])
+def get_upload_destinations():
+    """Get list of folders where files can be uploaded."""
+    try:
+        destinations = []
+        home = Path.home()
+
+        # Add common folders
+        for folder_name in ['Desktop', 'Documents', 'Downloads', 'Pictures', 'Music', 'Videos']:
+            folder_path = home / folder_name
+            if folder_path.exists():
+                destinations.append({
+                    "name": folder_name,
+                    "path": str(folder_path),
+                    "icon": folder_name.lower()
+                })
+
+        return jsonify({"success": True, "destinations": destinations})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/files/upload', methods=['POST'])
 def upload_file_stream():
     if 'file' not in request.files:
         return jsonify({"success": False, "error": "No file part"}), 400
 
     files = request.files.getlist('file')
-    dest = request.form.get('destination', str(Path.home() / "Downloads"))
+    destination = request.form.get('destination', 'Downloads')
+
+    # Map common folder names to full paths
+    folder_map = {
+        'Desktop': str(Path.home() / 'Desktop'),
+        'Documents': str(Path.home() / 'Documents'),
+        'Downloads': str(Path.home() / 'Downloads'),
+        'Pictures': str(Path.home() / 'Pictures'),
+        'Music': str(Path.home() / 'Music'),
+        'Videos': str(Path.home() / 'Videos'),
+    }
+
+    # If destination looks like a folder name, map it; otherwise treat as path
+    if destination in folder_map:
+        dest = folder_map[destination]
+    elif destination.startswith('/') or (len(destination) > 1 and destination[1] == ':'):
+        dest = destination  # Absolute path
+    else:
+        dest = str(Path.home() / destination)  # Relative to home
+
+    # Ensure destination directory exists
+    os.makedirs(dest, exist_ok=True)
 
     restricted_paths = ["C:\\Windows", "C:\\Program Files", "C:\\Users\\Default"]
     if any(dest.lower().startswith(r.lower()) for r in restricted_paths):
