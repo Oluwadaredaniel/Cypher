@@ -60,11 +60,29 @@ void main() async {
 
 Future<void> _requestPermissions() async {
   try {
-    await [
-      Permission.storage,
-      Permission.manageExternalStorage,
-    ].request();
-  } catch (_) {}
+    final permissions = [
+      Permission.storage,           // Read/Write files
+      Permission.manageExternalStorage, // Full storage access (Android 11+)
+      Permission.camera,            // Camera for potential future features
+      Permission.locationWhenInUse, // Location for local network discovery
+      Permission.photos,            // Photo access for screenshots
+      Permission.mediaLibrary,      // Media access
+    ];
+
+    // Request all permissions
+    final statuses = await permissions.request();
+
+    // Log permission status for debugging
+    for (final status in statuses.entries) {
+      if (status.value.isDenied) {
+        print('Permission ${status.key} denied');
+      } else if (status.value.isPermanentlyDenied) {
+        print('Permission ${status.key} permanently denied - open app settings');
+      }
+    }
+  } catch (e) {
+    print('Error requesting permissions: $e');
+  }
 }
 
 class CypherApp extends StatelessWidget {

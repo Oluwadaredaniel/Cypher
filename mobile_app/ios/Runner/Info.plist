@@ -45,5 +45,33 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- PERMISSIONS DESCRIPTIONS -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>CYPHER needs local network access to discover and connect to your PC</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_cypher._tcp</string>
+	</array>
+
+	<!-- STORAGE PERMISSIONS -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CYPHER needs access to your photos to share files with your PC</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>CYPHER needs permission to save screenshots to your photo library</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>CYPHER needs access to your documents to upload files to your PC</string>
+
+	<!-- CAMERA PERMISSIONS -->
+	<key>NSCameraUsageDescription</key>
+	<string>CYPHER may request camera access for future features</string>
+
+	<!-- LOCATION PERMISSIONS -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>CYPHER uses location to improve local network discovery</string>
+
+	<!-- NETWORK PERMISSIONS -->
+	<key>NSLocalNetworkPermissionUsageDescription</key>
+	<string>CYPHER discovers PCs on your local network</string>
 </dict>
 </plist>
