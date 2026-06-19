@@ -59,18 +59,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Stack(
+        child: IndexedStack(
+          index: _activeTab,
           children: [
-            IndexedStack(
-              index: _activeTab,
-              children: [
-                _HomeTab(cp: cp, sp: sp),
-                _MoreTab(),
-              ],
-            ),
-            _BottomNav(activeTab: _activeTab, onTab: (i) => setState(() => _activeTab = i)),
+            _HomeTab(cp: cp, sp: sp),
+            _MoreTab(),
           ],
         ),
+      ),
+      bottomNavigationBar: _BottomNav(
+        activeTab: _activeTab,
+        onTab: (i) => setState(() => _activeTab = i),
       ),
     );
   }
@@ -315,7 +314,7 @@ class _HomeTab extends StatelessWidget {
             ),
           ),
 
-        const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
   }
@@ -412,7 +411,7 @@ class _MoreTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       children: [
         _SectionHeader(title: 'Files & Transfer'),
         const SizedBox(height: 10),
@@ -509,25 +508,24 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      bottom: 20,
-      left: 20,
-      right: 20,
-      child: Container(
-        height: 64,
-        decoration: BoxDecoration(
-          color: CypherColors.bgCard,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: CypherColors.border),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavItem(index: 0, active: activeTab, icon: Icons.home_rounded, label: 'Home', onTap: onTab),
-            _NavItem(index: -1, active: -1, icon: Icons.send_rounded, label: 'Send', onTap: (_) => Navigator.pushNamed(context, '/send')),
-            _NavItem(index: -2, active: -1, icon: Icons.keyboard_rounded, label: 'Control', onTap: (_) => Navigator.pushNamed(context, '/controls')),
-            _NavItem(index: 1, active: activeTab, icon: Icons.more_horiz_rounded, label: 'More', onTap: onTab),
-          ],
+    return Container(
+      decoration: BoxDecoration(
+        color: CypherColors.bgCard,
+        border: Border(top: BorderSide(color: CypherColors.border, width: 1)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _NavItem(index: 0, active: activeTab, icon: Icons.home_rounded, label: 'Home', onTap: onTab),
+              _NavItem(index: -1, active: -1, icon: Icons.send_rounded, label: 'Send', onTap: (_) => Navigator.pushNamed(context, '/send')),
+              _NavItem(index: -2, active: -1, icon: Icons.keyboard_rounded, label: 'Control', onTap: (_) => Navigator.pushNamed(context, '/controls')),
+              _NavItem(index: 1, active: activeTab, icon: Icons.more_horiz_rounded, label: 'More', onTap: onTab),
+            ],
+          ),
         ),
       ),
     );
