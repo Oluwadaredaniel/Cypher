@@ -19,7 +19,8 @@ class SystemProvider extends ChangeNotifier {
   String? _pcClipboard;
   bool _loading = false;
 
-  Timer? _statsTimer;
+  Timer?  _statsTimer;
+  String? _pollingIp;
 
   double get cpu            => _cpu;
   double get ram            => _ram;
@@ -38,7 +39,9 @@ class SystemProvider extends ChangeNotifier {
 
   // ── Poll Loop ─────────────────────────────────────────────────
   void startPolling(String ip) {
+    if (_statsTimer != null && _pollingIp == ip) return;
     _statsTimer?.cancel();
+    _pollingIp = ip;
     _fetchStats(ip);
     _statsTimer = Timer.periodic(const Duration(seconds: 3), (_) => _fetchStats(ip));
   }
@@ -46,6 +49,7 @@ class SystemProvider extends ChangeNotifier {
   void stopPolling() {
     _statsTimer?.cancel();
     _statsTimer = null;
+    _pollingIp = null;
   }
 
   Future<void> _fetchStats(String ip) async {
