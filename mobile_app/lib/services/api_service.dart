@@ -204,6 +204,21 @@ class ApiService {
     return savePath;
   }
 
+  // ── Upload Destinations ───────────────────────────────────────
+  static Future<List<Map<String, dynamic>>> getUploadDestinations(String ip) async {
+    final token = await StorageService.getToken();
+    final res = await http.get(
+      Uri.parse('${_baseUrl(ip)}/files/upload-destinations'),
+      headers: {'X-Auth-Token': token ?? ''},
+    ).timeout(const Duration(seconds: 5));
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      return List<Map<String, dynamic>>.from(data['destinations'] ?? []);
+    }
+    return [];
+  }
+
   // ── File Upload ───────────────────────────────────────────────
   static Future<Map<String, dynamic>> uploadFile(
     String ip,

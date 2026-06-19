@@ -22,7 +22,7 @@ class SendToPCScreen extends StatefulWidget {
 class _SendToPCScreenState extends State<SendToPCScreen> {
   List<String> _selectedPaths = [];
   String _destination = 'Desktop';
-  List<String> _folderOptions = ['Desktop', 'Documents', 'Downloads'];
+  Map<String, String> _destinations = {}; // name -> path
   bool _loadingFolders = false;
   bool _uploading = false;
 
@@ -40,12 +40,24 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
   Future<void> _loadFolders() async {
     setState(() => _loadingFolders = true);
     try {
-      final data = await ApiService.getSettings(_ip);
-      final shared = (data['shared_folders'] as List? ?? []).map((e) => e.toString()).toList();
-      if (shared.isNotEmpty) {
-        setState(() => _folderOptions = ['Desktop', 'Documents', 'Downloads', ...shared]);
+      final dests = await ApiService.getUploadDestinations(_ip);
+      Map<String, String> map = {};
+      for (var dest in dests) {
+        map[dest['name'] as String] = dest['path'] as String;
       }
-    } catch (_) {}
+      if (map.isNotEmpty) {
+        setState(() {
+          _destinations = map;
+          _destination = map.keys.first; // Set to first available
+        });
+      }
+    } catch (_) {
+      // Fallback to defaults
+      setState(() {
+        _destinations = {'Desktop': 'Desktop', 'Documents': 'Documents', 'Downloads': 'Downloads'};
+        _destination = 'Desktop';
+      });
+    }
     if (mounted) setState(() => _loadingFolders = false);
   }
 
@@ -164,11 +176,10 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
                     ? const SizedBox(height: 40, child: Center(child: CircularProgressIndicator(color: CypherColors.accent, strokeWidth: 2)))
                     : Wrap(
                         spacing: 8, runSpacing: 8,
-                        children: _folderOptions.map((folder) {
-                          final sel   = _destination == folder;
-                          final label = folder.split(RegExp(r'[/\\]')).last;
+                        children: _destinations.keys.map((folderName) {
+                          final sel = _destination == folderName;
                           return GestureDetector(
-                            onTap: () { HapticFeedback.selectionClick(); setState(() => _destination = folder); },
+                            onTap: () { HapticFeedback.selectionClick(); setState(() => _destination = folderName); },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 150),
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -178,7 +189,7 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
                                 border: Border.all(color: sel ? CypherColors.accent : CypherColors.border),
                               ),
                               child: Text(
-                                label,
+                                folderName,
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: sel ? Colors.white : CypherColors.textSecondary,
