@@ -32,7 +32,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigate() async {
-    await Future.delayed(const Duration(milliseconds: 1800));
+    await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
 
     final onboarded = await StorageService.getOnboarded();
@@ -41,17 +41,17 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
 
-    final cp = context.read<ConnectionProvider>();
-
-    // Auto-connect if enabled & already paired
-    if (cp.autoConnectEnabled && cp.ip != null && cp.token != null) {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return;
+    // If the user has paired before, always go home.
+    // The home screen handles both connected and offline states.
+    final isPaired = await StorageService.getIsPaired();
+    if (isPaired) {
+      Navigator.pushReplacementNamed(context, '/home');
+      return;
     }
 
+    final cp = context.read<ConnectionProvider>();
     if (cp.isConnected) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
