@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../providers/connection_provider.dart';
 import '../providers/system_provider.dart';
@@ -66,6 +68,20 @@ class _ControlsScreenState extends State<ControlsScreen> {
     }
   }
 
+  Future<void> _saveScreenshot() async {
+    if (_screenshotBytes == null) return;
+    try {
+      final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      final fileName = 'Screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
+      final filePath = '${dir.path}/$fileName';
+      final file = File(filePath);
+      await file.writeAsBytes(_screenshotBytes!);
+      _toast('Saved to Downloads');
+    } catch (e) {
+      _toast('Failed to save screenshot', err: true);
+    }
+  }
+
   Future<void> _sendType() async {
     final text = _typeCtrl.text.trim();
     if (text.isEmpty) return;
@@ -125,7 +141,25 @@ class _ControlsScreenState extends State<ControlsScreen> {
                             : const Center(child: Icon(Icons.monitor_rounded, color: CypherColors.textMuted, size: 40)),
                   ),
                   const SizedBox(height: 12),
-                  CypherButton(label: 'Capture Screen', onTap: _takeScreenshot, loading: _isTakingScreenshot),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CypherButton(label: 'Capture Screen', onTap: _takeScreenshot, loading: _isTakingScreenshot),
+                      ),
+                      if (_screenshotBytes != null) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: CypherButton(
+                            label: 'Save',
+                            onTap: _saveScreenshot,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: CypherColors.success,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
