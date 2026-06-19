@@ -69,21 +69,31 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
             slivers: [
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 32, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(20, 36, 20, 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: 44,
-                        height: 44,
+                        width: 64,
+                        height: 64,
                         decoration: BoxDecoration(
-                          color: CypherColors.accentDim,
-                          borderRadius: BorderRadius.circular(12),
+                          color: CypherColors.bgCard,
+                          borderRadius: BorderRadius.circular(18),
                           border: Border.all(color: CypherColors.borderFocus),
+                          boxShadow: [
+                            BoxShadow(
+                              color: CypherColors.accentGlow,
+                              blurRadius: 28,
+                              spreadRadius: -6,
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.wifi_rounded, color: CypherColors.accent, size: 22),
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Image.asset('assets/icon/icon.png', fit: BoxFit.contain),
+                        ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
                       Text('Find Your PC', style: AppTheme.headline(context)),
                       const SizedBox(height: 6),
                       Text(
@@ -226,6 +236,14 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                       TextButton(
                         onPressed: () => Navigator.pushNamed(context, '/guide'),
                         child: const Text('Setup guide'),
+                      ),
+                      const SizedBox(height: 4),
+                      TextButton(
+                        onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+                        child: const Text(
+                          'Explore without connecting',
+                          style: TextStyle(fontSize: 12, color: CypherColors.textMuted),
+                        ),
                       ),
                     ],
                   ),

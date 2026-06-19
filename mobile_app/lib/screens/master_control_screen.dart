@@ -21,11 +21,15 @@ class MasterControlScreen extends StatelessWidget {
               child: Container(
                 width: 80, height: 80,
                 decoration: BoxDecoration(
-                  color: CypherColors.accentDim,
+                  color: CypherColors.bgCard,
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: CypherColors.accent.withOpacity(0.4)),
+                  border: Border.all(color: CypherColors.borderFocus),
+                  boxShadow: [BoxShadow(color: CypherColors.accentGlow, blurRadius: 28, spreadRadius: -6)],
                 ),
-                child: const Icon(Icons.shield_rounded, color: CypherColors.accent, size: 40),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Image.asset('assets/icon/icon.png', fit: BoxFit.contain),
+                ),
               ),
             ),
             const SizedBox(height: 16),

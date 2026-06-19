@@ -35,9 +35,11 @@ class ApiService {
       if (decoded is Map<String, dynamic>) return Future.value(decoded);
       return Future.value({'data': decoded});
     }
-    if (res.statusCode == 401) throw ApiException('Unauthorized — re-pair device', 401);
-    if (res.statusCode == 403) throw ApiException('Access denied', 403);
-    if (res.statusCode == 404) throw ApiException('Not found', 404);
+    if (res.statusCode == 401) throw ApiException('Session expired — re-pair this device to reconnect', 401);
+    if (res.statusCode == 403) throw ApiException('Permission denied — this feature may be restricted on your PC', 403);
+    if (res.statusCode == 404) throw ApiException('Feature not found — update CYPHER on your PC to get this feature', 404);
+    if (res.statusCode == 429) throw ApiException('Too many requests — wait a moment and try again', 429);
+    if (res.statusCode >= 500) throw ApiException('PC server error (${res.statusCode}) — try again', res.statusCode);
     throw ApiException(_extractErrorMessage(res), res.statusCode);
   }
 

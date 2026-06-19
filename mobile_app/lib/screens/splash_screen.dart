@@ -20,9 +20,11 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700));
     _opacity = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _ctrl, curve: const Interval(0, 0.6, curve: Curves.easeOut)),
+      CurvedAnimation(
+          parent: _ctrl, curve: const Interval(0, 0.6, curve: Curves.easeOut)),
     );
     _scale = Tween<double>(begin: 0.85, end: 1).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
@@ -92,10 +94,12 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.shield_rounded,
-                      color: CypherColors.accent,
-                      size: 44,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Image.asset(
+                        'assets/icon/icon.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),

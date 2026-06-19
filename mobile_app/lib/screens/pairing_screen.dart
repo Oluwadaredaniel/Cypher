@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -45,10 +46,16 @@ class _PairingScreenState extends State<PairingScreen> {
     }
     setState(() { _loading = true; _error = null; });
 
-    final deviceInfo = await DeviceInfoPlugin().androidInfo;
-    final deviceId   = await StorageService.getDeviceId() ?? const Uuid().v4();
-    final deviceName = '${deviceInfo.manufacturer} ${deviceInfo.model}';
+    final deviceId = await StorageService.getDeviceId() ?? const Uuid().v4();
     await StorageService.saveDeviceId(deviceId);
+    final String deviceName;
+    if (Platform.isIOS) {
+      final info = await DeviceInfoPlugin().iosInfo;
+      deviceName = info.name;
+    } else {
+      final info = await DeviceInfoPlugin().androidInfo;
+      deviceName = '${info.manufacturer} ${info.model}';
+    }
 
     final cp = context.read<ConnectionProvider>();
     final ok = await cp.pair(_code, deviceId, deviceName);
@@ -159,6 +166,14 @@ class _PairingScreenState extends State<PairingScreen> {
                 label: 'Back to Scan',
                 variant: CypherButtonVariant.secondary,
                 onTap: () => Navigator.pushReplacementNamed(context, '/connection'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false),
+                child: const Text(
+                  'Skip — explore without pairing',
+                  style: TextStyle(fontSize: 12, color: CypherColors.textMuted),
+                ),
               ),
             ],
           ),
