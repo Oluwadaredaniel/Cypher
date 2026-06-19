@@ -22,8 +22,13 @@ class SendToPCScreen extends StatefulWidget {
 class _SendToPCScreenState extends State<SendToPCScreen> {
   List<String> _selectedPaths = [];
   String _destination = 'Desktop';
+  String _destinationPath = ''; // Full path
   Map<String, String> _destinations = {}; // name -> path
+  List<Map<String, dynamic>> _subfolders = [];
+  String _currentBrowsePath = '';
+  String _currentDisplayName = '';
   bool _loadingFolders = false;
+  bool _browsingFolders = false;
   bool _uploading = false;
 
   @override
@@ -48,17 +53,41 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
       if (map.isNotEmpty) {
         setState(() {
           _destinations = map;
-          _destination = map.keys.first; // Set to first available
+          _destination = map.keys.first;
+          _destinationPath = map[_destination] ?? '';
         });
       }
     } catch (_) {
-      // Fallback to defaults
       setState(() {
         _destinations = {'Desktop': 'Desktop', 'Documents': 'Documents', 'Downloads': 'Downloads'};
         _destination = 'Desktop';
       });
     }
     if (mounted) setState(() => _loadingFolders = false);
+  }
+
+  Future<void> _browseFolders(String? path) async {
+    setState(() => _browsingFolders = true);
+    try {
+      final result = await ApiService.browseFolders(_ip, path: path);
+      if (result['success'] == true) {
+        setState(() {
+          _subfolders = List<Map<String, dynamic>>.from(result['folders'] ?? []);
+          _currentBrowsePath = result['current_path'] ?? '';
+          _currentDisplayName = result['display_name'] ?? 'Select Folder';
+        });
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _browsingFolders = false);
+  }
+
+  void _selectFolder(String folderPath, String folderName) {
+    setState(() {
+      _destination = folderName;
+      _destinationPath = folderPath;
+      _subfolders = [];
+      _currentBrowsePath = '';
+    });
   }
 
   Future<void> _pickFiles() async {
@@ -79,9 +108,12 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
     setState(() => _uploading = true);
 
     final fp = context.read<FileProvider>();
+    // Use full path if available, otherwise use folder name
+    final dest = _destinationPath.isNotEmpty ? _destinationPath : _destination;
+
     for (final path in _selectedPaths) {
       final name = path.split(RegExp(r'[/\\]')).last;
-      await fp.upload(_ip, path, _destination, name);
+      await fp.upload(_ip, path, dest, name);
     }
 
     if (mounted) {
@@ -172,14 +204,76 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
                   // Destination
                   const Text('Destination folder', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: CypherColors.textSecondary)),
                   const SizedBox(height: 8),
-                  _loadingFolders
-                    ? const SizedBox(height: 40, child: Center(child: CircularProgressIndicator(color: CypherColors.accent, strokeWidth: 2)))
-                    : Wrap(
-                        spacing: 8, runSpacing: 8,
-                        children: _destinations.keys.map((folderName) {
-                          final sel = _destination == folderName;
+
+                  // Show folder browser if browsing, otherwise show quick selections
+                  if (_subfolders.isNotEmpty)
+                    CypherCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          // Header with back button
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: CypherColors.bgOverlay,
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                            ),
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_back_rounded, color: CypherColors.accent),
+                                  onPressed: () { HapticFeedback.selectionClick(); _browseFolders(null); },
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _currentDisplayName,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: CypherColors.textPrimary),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () => _selectFolder(_currentBrowsePath, _currentDisplayName),
+                                  icon: const Icon(Icons.check_rounded, size: 16),
+                                  label: const Text('Select', style: TextStyle(fontSize: 12)),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    backgroundColor: CypherColors.success,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Folders list
+                          ..._subfolders.map((folder) => ListTile(
+                            leading: const Icon(Icons.folder_rounded, color: CypherColors.accent, size: 20),
+                            title: Text(folder['name'] ?? '', style: const TextStyle(fontSize: 13, color: CypherColors.textPrimary)),
+                            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: CypherColors.textMuted),
+                            onTap: () { HapticFeedback.selectionClick(); _browseFolders(folder['path']); },
+                          )),
+                        ],
+                      ),
+                    )
+                  else
+                    Wrap(
+                      spacing: 8, runSpacing: 8,
+                      children: [
+                        ..._destinations.entries.map((entry) {
+                          final sel = _destination == entry.key;
                           return GestureDetector(
-                            onTap: () { HapticFeedback.selectionClick(); setState(() => _destination = folderName); },
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _destination = entry.key;
+                                _destinationPath = entry.value;
+                              });
+                            },
+                            onLongPress: () {
+                              HapticFeedback.selectionClick();
+                              _browseFolders(entry.value);
+                            },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 150),
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -189,7 +283,7 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
                                 border: Border.all(color: sel ? CypherColors.accent : CypherColors.border),
                               ),
                               child: Text(
-                                folderName,
+                                entry.key,
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: sel ? Colors.white : CypherColors.textSecondary,
@@ -199,7 +293,14 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
                             ),
                           );
                         }).toList(),
-                      ),
+                      ],
+                    ),
+
+                  const SizedBox(height: 4),
+                  Text(
+                    'Long press a folder to browse subfolders',
+                    style: const TextStyle(fontSize: 11, color: CypherColors.textMuted, fontStyle: FontStyle.italic),
+                  ),
 
                   const SizedBox(height: 16),
                 ],

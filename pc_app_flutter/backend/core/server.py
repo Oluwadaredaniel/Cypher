@@ -1512,6 +1512,65 @@ def get_upload_destinations():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/files/browse-folders', methods=['GET'])
+def browse_folders():
+    """Browse subfolders in a given path for upload destination selection."""
+    try:
+        path_str = request.args.get('path')
+        if not path_str:
+            # Return root folders if no path specified
+            home = Path.home()
+            folders = []
+            for folder_name in ['Desktop', 'Documents', 'Downloads', 'Pictures', 'Music', 'Videos']:
+                folder_path = home / folder_name
+                if folder_path.exists() and folder_path.is_dir():
+                    folders.append({
+                        "name": folder_name,
+                        "path": str(folder_path),
+                        "is_dir": True,
+                    })
+            return jsonify({"success": True, "folders": folders, "current_path": str(home)})
+
+        path = Path(path_str)
+
+        # Security: prevent access to restricted paths
+        restricted = ["C:\\Windows", "C:\\Program Files", "C:\\Users\\Default"]
+        if any(str(path).lower().startswith(r.lower()) for r in restricted):
+            return jsonify({"success": False, "error": "Access Denied"}), 403
+
+        if not path.exists() or not path.is_dir():
+            return jsonify({"success": False, "error": "Invalid path"}), 400
+
+        folders = []
+        try:
+            for item in sorted(path.iterdir()):
+                try:
+                    if item.is_dir() and not item.name.startswith('.'):
+                        folders.append({
+                            "name": item.name,
+                            "path": str(item.absolute()),
+                            "is_dir": True,
+                        })
+                except (PermissionError, OSError):
+                    pass
+        except (PermissionError, OSError):
+            pass
+
+        # Get parent folder if not at root
+        parent_path = None
+        if str(path.parent) != str(path):
+            parent_path = str(path.parent)
+
+        return jsonify({
+            "success": True,
+            "folders": folders,
+            "current_path": str(path),
+            "parent_path": parent_path,
+            "display_name": path.name or str(path)
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/files/upload', methods=['POST'])
 def upload_file_stream():
     if 'file' not in request.files:

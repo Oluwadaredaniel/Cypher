@@ -246,6 +246,20 @@ class ApiService {
     return [];
   }
 
+  // ── Browse Folders ────────────────────────────────────────────
+  static Future<Map<String, dynamic>> browseFolders(String ip, {String? path}) async {
+    final token = await StorageService.getToken();
+    final uri = Uri.parse('${_baseUrl(ip)}/files/browse-folders');
+    final queryUri = path != null ? uri.replace(queryParameters: {'path': path}) : uri;
+
+    final res = await http.get(queryUri, headers: {'X-Auth-Token': token ?? ''}).timeout(const Duration(seconds: 5));
+
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return {"success": false, "folders": []};
+  }
+
   // ── File Upload ───────────────────────────────────────────────
   static Future<Map<String, dynamic>> uploadFile(
     String ip,
