@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'theme/app_theme.dart';
 import 'providers/connection_provider.dart';
@@ -50,7 +51,20 @@ void main() async {
     systemNavigationBarColor: Color(0xFF0F0F11),
     systemNavigationBarIconBrightness: Brightness.light,
   ));
+
+  // Request permissions for file operations
+  await _requestPermissions();
+
   runApp(const CypherApp());
+}
+
+Future<void> _requestPermissions() async {
+  try {
+    await [
+      Permission.storage,
+      Permission.manageExternalStorage,
+    ].request();
+  } catch (_) {}
 }
 
 class CypherApp extends StatelessWidget {

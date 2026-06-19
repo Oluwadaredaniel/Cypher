@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/discovery_service.dart';
 
 enum ConnectionStatus { disconnected, connecting, connected, pairing }
 
-class ConnectionProvider extends ChangeNotifier {
+class ConnectionProvider extends ChangeNotifier with WidgetsBindingObserver {
   ConnectionStatus _status = ConnectionStatus.disconnected;
   String? _ip;
   String? _pcName;
@@ -16,6 +17,7 @@ class ConnectionProvider extends ChangeNotifier {
   bool _isScanning = false;
   Timer? _heartbeat;
   Map<String, dynamic> _systemStatus = {};
+  AppLifecycleState _lastLifecycleState = AppLifecycleState.resumed;
 
   ConnectionStatus get status    => _status;
   String?          get ip        => _ip;
@@ -32,6 +34,8 @@ class ConnectionProvider extends ChangeNotifier {
 
   // ── Init ──────────────────────────────────────────────────────
   Future<void> init() async {
+    WidgetsBinding.instance.addObserver(this);
+
     final ip    = await StorageService.getIp();
     final token = await StorageService.getToken();
     final name  = await StorageService.getPcName();
@@ -45,6 +49,16 @@ class ConnectionProvider extends ChangeNotifier {
       if (_autoConnectEnabled) {
         await _tryReconnect();
       }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lastLifecycleState = state;
+    if (state == AppLifecycleState.resumed && _status == ConnectionStatus.disconnected && _ip != null) {
+      _tryReconnect();
+    } else if (state == AppLifecycleState.paused) {
+      // Keep heartbeat running in background
     }
   }
 
@@ -199,6 +213,7 @@ class ConnectionProvider extends ChangeNotifier {
   @override
   void dispose() {
     _heartbeat?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 }

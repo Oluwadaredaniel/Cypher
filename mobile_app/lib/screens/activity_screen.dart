@@ -27,43 +27,26 @@ class _ActivityScreenState extends State<ActivityScreen> {
     });
   }
 
-  String _translateAction(String endpoint) {
-    if (endpoint.contains('/files/browse'))    return 'Browsed files';
-    if (endpoint.contains('/files/download'))  return 'Downloaded a file';
-    if (endpoint.contains('/files/upload'))    return 'Sent a file to PC';
-    if (endpoint.contains('/files/delete'))    return 'Deleted a file';
-    if (endpoint.contains('/power/shutdown'))  return 'Shut down PC';
-    if (endpoint.contains('/power/restart'))   return 'Restarted PC';
-    if (endpoint.contains('/power/sleep'))     return 'Put PC to sleep';
-    if (endpoint.contains('/power/lock'))      return 'Locked PC';
-    if (endpoint.contains('/screenshot'))      return 'Took a screenshot';
-    if (endpoint.contains('/clipboard'))       return 'Used clipboard';
-    if (endpoint.contains('/media'))           return 'Controlled media';
-    if (endpoint.contains('/type'))            return 'Typed on PC';
-    if (endpoint.contains('/apps/launch'))     return 'Opened an app';
-    return 'Performed an action';
-  }
-
-  String _filterCategory(Map item) {
-    final ep = item['endpoint']?.toString() ?? '';
-    if (ep.contains('/files')) return 'Files';
-    if (ep.contains('/power') || ep.contains('/media') || ep.contains('/screenshot') || ep.contains('/type') || ep.contains('/clipboard')) return 'Controls';
-    if (ep.contains('/pair') || ep.contains('/events') || item['type'] == 'event') return 'Connections';
+  String _getCategory(Map item) {
+    final category = item['category']?.toString().toLowerCase() ?? 'other';
+    if (category.contains('file') || category == 'transfers') return 'Files';
+    if (category.contains('command') || category.contains('control') || category.contains('media')) return 'Controls';
+    if (category.contains('connection') || category.contains('security') || category.contains('pairing')) return 'Connections';
     return 'Other';
   }
 
-  String _formatTimestamp(String ts) {
+  String _filterCategory(Map item) {
+    return _getCategory(item);
+  }
+
+  String _formatTimestamp(Map item) {
     try {
-      final dt = DateTime.parse(ts.replaceAll(' ', 'T'));
-      final now = DateTime.now();
-      final today     = DateTime(now.year, now.month, now.day);
-      final yesterday = today.subtract(const Duration(days: 1));
-      final itemDay   = DateTime(dt.year, dt.month, dt.day);
-      final timeStr   = '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
-      if (itemDay == today)     return 'Today at $timeStr';
-      if (itemDay == yesterday) return 'Yesterday at $timeStr';
-      return '${dt.day}/${dt.month} at $timeStr';
-    } catch (_) { return ts; }
+      final date = item['date']?.toString() ?? '';
+      final time = item['time']?.toString() ?? '';
+      return '$date at $time';
+    } catch (_) {
+      return 'Just now';
+    }
   }
 
   List<Map> _getFiltered(List rawList) {
@@ -149,11 +132,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: 6),
                       itemBuilder: (_, i) {
                         final item = filtered[i];
-                        final action = item['details']?.toString().isNotEmpty == true
-                            ? item['details'].toString()
-                            : _translateAction(item['endpoint']?.toString() ?? '');
-                        final success = item['success'] as bool? ?? true;
-                        final ts = _formatTimestamp(item['timestamp']?.toString() ?? '');
+                        final title = item['title']?.toString() ?? 'Action';
+                        final desc = item['desc']?.toString() ?? '';
+                        final ts = _formatTimestamp(item);
+                        final isUrgent = item['is_urgent'] as bool? ?? false;
 
                         return CypherCard(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -162,7 +144,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                               Container(
                                 width: 8, height: 8,
                                 decoration: BoxDecoration(
-                                  color: success ? CypherColors.success : CypherColors.error,
+                                  color: isUrgent ? CypherColors.error : CypherColors.success,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -171,23 +153,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(action, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: CypherColors.textPrimary)),
+                                    Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: CypherColors.textPrimary)),
+                                    if (desc.isNotEmpty)
+                                      Text(desc, style: const TextStyle(fontSize: 12, color: CypherColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
                                     Text(ts, style: AppTheme.caption(context)),
                                   ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: (success ? CypherColors.success : CypherColors.error).withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  success ? 'Done' : 'Failed',
-                                  style: TextStyle(
-                                    fontSize: 10, fontWeight: FontWeight.w600,
-                                    color: success ? CypherColors.success : CypherColors.error,
-                                  ),
                                 ),
                               ),
                             ],

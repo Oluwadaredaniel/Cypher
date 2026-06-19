@@ -184,8 +184,15 @@ class ApiService {
       throw ApiException('Download failed (${streamedRes.statusCode})', streamedRes.statusCode);
     }
 
-    final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
-    final savePath = p.join(dir.path, 'CYPHER', 'Downloads', fileName);
+    // Get actual Downloads directory
+    Directory? downloadDir;
+    try {
+      downloadDir = await getDownloadsDirectory();
+    } catch (_) {
+      downloadDir = await getApplicationDocumentsDirectory();
+    }
+
+    final savePath = p.join(downloadDir?.path ?? '', fileName);
     await Directory(p.dirname(savePath)).create(recursive: true);
 
     final total = streamedRes.contentLength ?? 0;
