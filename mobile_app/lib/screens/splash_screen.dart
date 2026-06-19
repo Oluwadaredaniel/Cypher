@@ -79,27 +79,13 @@ class _SplashScreenState extends State<SplashScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      color: CypherColors.bgCard,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: CypherColors.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: CypherColors.accentGlow,
-                          blurRadius: 48,
-                          spreadRadius: -8,
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Image.asset(
-                        'assets/icon/icon.png',
-                        fit: BoxFit.contain,
-                      ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: Image.asset(
+                      'assets/icon/icon.png',
+                      width: 104,
+                      height: 104,
+                      fit: BoxFit.cover,
                     ),
                   ),
                   const SizedBox(height: 20),

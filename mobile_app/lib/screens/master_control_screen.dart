@@ -18,18 +18,9 @@ class MasterControlScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: Container(
-                width: 80, height: 80,
-                decoration: BoxDecoration(
-                  color: CypherColors.bgCard,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: CypherColors.borderFocus),
-                  boxShadow: [BoxShadow(color: CypherColors.accentGlow, blurRadius: 28, spreadRadius: -6)],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Image.asset('assets/icon/icon.png', fit: BoxFit.contain),
-                ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Image.asset('assets/icon/icon.png', width: 80, height: 80, fit: BoxFit.cover),
               ),
             ),
             const SizedBox(height: 16),

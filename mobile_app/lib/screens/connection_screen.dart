@@ -73,24 +73,13 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: CypherColors.bgCard,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: CypherColors.borderFocus),
-                          boxShadow: [
-                            BoxShadow(
-                              color: CypherColors.accentGlow,
-                              blurRadius: 28,
-                              spreadRadius: -6,
-                            ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Image.asset('assets/icon/icon.png', fit: BoxFit.contain),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: Image.asset(
+                          'assets/icon/icon.png',
+                          width: 64,
+                          height: 64,
+                          fit: BoxFit.cover,
                         ),
                       ),
                       const SizedBox(height: 20),
