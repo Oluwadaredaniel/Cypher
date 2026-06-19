@@ -86,8 +86,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    if (confirm == true && mounted) {
+    if (confirm == true) {
       await StorageService.clearPairing();
+      if (!mounted) return;
       context.read<ConnectionProvider>().disconnect();
       Navigator.pushNamedAndRemoveUntil(context, '/connection', (_) => false);
     }

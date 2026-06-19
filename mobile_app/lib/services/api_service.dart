@@ -38,11 +38,15 @@ class ApiService {
     if (res.statusCode == 401) throw ApiException('Unauthorized — re-pair device', 401);
     if (res.statusCode == 403) throw ApiException('Access denied', 403);
     if (res.statusCode == 404) throw ApiException('Not found', 404);
+    throw ApiException(_extractErrorMessage(res), res.statusCode);
+  }
+
+  static String _extractErrorMessage(http.Response res) {
     try {
       final body = jsonDecode(res.body) as Map<String, dynamic>;
-      throw ApiException(body['error'] ?? 'Request failed (${res.statusCode})', res.statusCode);
+      return body['error'] as String? ?? 'Request failed (${res.statusCode})';
     } catch (_) {
-      throw ApiException('Request failed (${res.statusCode})', res.statusCode);
+      return 'Request failed (${res.statusCode})';
     }
   }
 
@@ -275,8 +279,23 @@ class ApiService {
     final uri = Uri.parse('${_baseUrl(ip)}/files/upload');
     final request = http.MultipartRequest('POST', uri)
       ..headers['X-Auth-Token'] = token ?? ''
-      ..fields['destination'] = destination
-      ..files.add(await http.MultipartFile.fromPath('file', filePath));
+      ..fields['destination'] = destination;
+
+    if (onProgress != null) {
+      var sent = 0;
+      request.files.add(http.MultipartFile(
+        'file',
+        file.openRead().map((chunk) {
+          sent += chunk.length;
+          onProgress(sent, fileSize);
+          return chunk;
+        }),
+        fileSize,
+        filename: fileName,
+      ));
+    } else {
+      request.files.add(await http.MultipartFile.fromPath('file', filePath));
+    }
 
     final streamedRes = await request.send().timeout(const Duration(minutes: 60));
     final res = await http.Response.fromStream(streamedRes);

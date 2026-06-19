@@ -36,16 +36,14 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     final onboarded = await StorageService.getOnboarded();
+    if (!mounted) return;
     if (!onboarded) {
       Navigator.pushReplacementNamed(context, '/onboarding');
       return;
     }
 
-    if (!mounted) return;
-
-    // If the user has paired before, always go home.
-    // The home screen handles both connected and offline states.
     final isPaired = await StorageService.getIsPaired();
+    if (!mounted) return;
     if (isPaired) {
       Navigator.pushReplacementNamed(context, '/home');
       return;
