@@ -184,16 +184,36 @@ class ApiService {
       throw ApiException('Download failed (${streamedRes.statusCode})', streamedRes.statusCode);
     }
 
-    // Get actual Downloads directory
-    Directory? downloadDir;
+    // Get actual user-visible Downloads directory
+    // getDownloadsDirectory() returns app-specific cache, not user Downloads
+    // So we need to construct the path manually to the public Downloads folder
+    Directory downloadDir;
+
     try {
-      downloadDir = await getDownloadsDirectory();
+      // Try to get external storage directory (works on Android 10+)
+      final external = await getExternalStorageDirectory();
+      if (external != null) {
+        // Navigate up to parent and into actual Downloads folder
+        // Path is usually /storage/emulated/0/
+        final parts = external.path.split('/');
+        final storageIndex = parts.indexOf('storage');
+        if (storageIndex >= 0) {
+          final publicPath = parts.sublist(0, storageIndex + 2).join('/') + '/Download';
+          downloadDir = Directory(publicPath);
+        } else {
+          downloadDir = external;
+        }
+      } else {
+        downloadDir = await getApplicationDocumentsDirectory();
+      }
     } catch (_) {
       downloadDir = await getApplicationDocumentsDirectory();
     }
 
-    final savePath = p.join(downloadDir?.path ?? '', fileName);
-    await Directory(p.dirname(savePath)).create(recursive: true);
+    // Ensure directory exists
+    await downloadDir.create(recursive: true);
+
+    final savePath = p.join(downloadDir.path, fileName);
 
     final total = streamedRes.contentLength ?? 0;
     int received = 0;

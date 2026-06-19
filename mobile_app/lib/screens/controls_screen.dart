@@ -71,12 +71,33 @@ class _ControlsScreenState extends State<ControlsScreen> {
   Future<void> _saveScreenshot() async {
     if (_screenshotBytes == null) return;
     try {
-      final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      // Get user-visible Downloads folder (not app cache)
+      Directory downloadDir;
+      try {
+        final external = await getExternalStorageDirectory();
+        if (external != null) {
+          final parts = external.path.split('/');
+          final storageIndex = parts.indexOf('storage');
+          if (storageIndex >= 0) {
+            final publicPath = parts.sublist(0, storageIndex + 2).join('/') + '/Download';
+            downloadDir = Directory(publicPath);
+          } else {
+            downloadDir = external;
+          }
+        } else {
+          downloadDir = await getApplicationDocumentsDirectory();
+        }
+      } catch (_) {
+        downloadDir = await getApplicationDocumentsDirectory();
+      }
+
+      await downloadDir.create(recursive: true);
+
       final fileName = 'Screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
-      final filePath = '${dir.path}/$fileName';
+      final filePath = '${downloadDir.path}/$fileName';
       final file = File(filePath);
       await file.writeAsBytes(_screenshotBytes!);
-      _toast('Saved to Downloads');
+      _toast('Saved to Downloads folder');
     } catch (e) {
       _toast('Failed to save screenshot', err: true);
     }
