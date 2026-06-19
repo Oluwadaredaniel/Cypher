@@ -60,7 +60,10 @@ class _ControlsScreenState extends State<ControlsScreen> {
     setState(() => _isTakingScreenshot = true);
     try {
       final bytes = await ApiService.getScreenshot(ip);
-      setState(() { _screenshotBytes = bytes; _isTakingScreenshot = false; });
+      setState(() {
+        _screenshotBytes = bytes;
+        _isTakingScreenshot = false;
+      });
       _toast('Screenshot captured');
     } catch (_) {
       setState(() => _isTakingScreenshot = false);
@@ -79,7 +82,8 @@ class _ControlsScreenState extends State<ControlsScreen> {
           final parts = external.path.split('/');
           final storageIndex = parts.indexOf('storage');
           if (storageIndex >= 0) {
-            final publicPath = '${parts.sublist(0, storageIndex + 2).join('/')}/Download';
+            final publicPath =
+                '${parts.sublist(0, storageIndex + 2).join('/')}/Download';
             downloadDir = Directory(publicPath);
           } else {
             downloadDir = external;
@@ -93,7 +97,8 @@ class _ControlsScreenState extends State<ControlsScreen> {
 
       await downloadDir.create(recursive: true);
 
-      final fileName = 'Screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
+      final fileName =
+          'Screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
       final filePath = '${downloadDir.path}/$fileName';
       final file = File(filePath);
       await file.writeAsBytes(_screenshotBytes!);
@@ -116,148 +121,165 @@ class _ControlsScreenState extends State<ControlsScreen> {
     }
   }
 
-  Future<void> _hotkey(List<String> keys) async {
-    final ip = context.read<ConnectionProvider>().ip ?? '';
-    try { await ApiService.remoteHotkey(ip, keys); } catch (_) {}
-  }
-
   @override
   Widget build(BuildContext context) {
     final sp = context.watch<SystemProvider>();
     final ip = context.read<ConnectionProvider>().ip ?? '';
 
     return Scaffold(
+      backgroundColor: CypherColors.bgDeep,
       appBar: AppBar(
-        title: const Text('Controls'),
-        actions: [
-          if (sp.activeWindow.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(child: Text(sp.activeWindow, style: AppTheme.caption(context), overflow: TextOverflow.ellipsis)),
-            ),
-        ],
+        backgroundColor: CypherColors.bgDeep,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Remote Control', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: CypherColors.textPrimary)),
+            if (sp.activeWindow.isNotEmpty)
+              Text(sp.activeWindow, style: const TextStyle(fontSize: 11, color: CypherColors.textMuted), overflow: TextOverflow.ellipsis),
+          ],
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Screenshot
-            CypherSectionHeader(title: 'Screenshot'),
-            const SizedBox(height: 8),
-            CypherCard(
-              child: Column(
-                children: [
-                  Container(
-                    width: double.infinity, height: 180,
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      color: CypherColors.bgDeep,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: _isTakingScreenshot
-                        ? const Center(child: CircularProgressIndicator(color: CypherColors.accent))
-                        : _screenshotBytes != null
-                            ? InteractiveViewer(child: Image.memory(_screenshotBytes!, fit: BoxFit.contain))
-                            : const Center(child: Icon(Icons.monitor_rounded, color: CypherColors.textMuted, size: 40)),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CypherButton(label: 'Capture Screen', onTap: _takeScreenshot, loading: _isTakingScreenshot),
-                      ),
-                      if (_screenshotBytes != null) ...[
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: CypherButton(
-                            label: 'Save',
-                            onTap: _saveScreenshot,
-                            variant: CypherButtonVariant.primary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
+            // ── Media ─────────────────────────────────────────────
+            _SectionLabel('MEDIA'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+              decoration: BoxDecoration(
+                color: CypherColors.bgCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: CypherColors.border),
               ),
-            ),
-
-            // Remote keyboard
-            const SizedBox(height: 20),
-            const CypherSectionHeader(title: 'Remote Keyboard'),
-            const SizedBox(height: 8),
-            CypherCard(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _typeCtrl,
-                      decoration: const InputDecoration(hintText: 'Type on PC...'),
-                      onSubmitted: (_) => _sendType(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.send_rounded, color: CypherColors.accent),
-                    onPressed: _sendType,
-                  ),
-                ],
-              ),
-            ),
-
-            // Hotkeys
-            const SizedBox(height: 20),
-            const CypherSectionHeader(title: 'Hotkeys'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8, runSpacing: 8,
-              children: [
-                _HotkeyChip('Copy',       () => _hotkey(['ctrl', 'c'])),
-                _HotkeyChip('Paste',      () => _hotkey(['ctrl', 'v'])),
-                _HotkeyChip('Select All', () => _hotkey(['ctrl', 'a'])),
-                _HotkeyChip('Undo',       () => _hotkey(['ctrl', 'z'])),
-                _HotkeyChip('Redo',       () => _hotkey(['ctrl', 'y'])),
-                _HotkeyChip('Close App',  () => _hotkey(['alt', 'f4'])),
-                _HotkeyChip('Task Mgr',   () => _hotkey(['ctrl', 'shift', 'esc'])),
-                _HotkeyChip('Desktop',    () => _hotkey(['win', 'd'])),
-                _HotkeyChip('Alt+Tab',    () => _hotkey(['alt', 'tab'])),
-                _HotkeyChip('File Exp',   () => _hotkey(['win', 'e'])),
-              ],
-            ),
-
-            // Media
-            const SizedBox(height: 20),
-            const CypherSectionHeader(title: 'Media'),
-            const SizedBox(height: 8),
-            CypherCard(
               child: Column(
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      ControlButton(icon: Icons.skip_previous_rounded, label: 'Prev',  onTap: () => sp.prevTrack(ip)),
-                      ControlButton(icon: Icons.play_arrow_rounded,    label: 'Play',  onTap: () => sp.togglePlayPause(ip), active: sp.isPlaying, size: 64),
-                      ControlButton(icon: Icons.skip_next_rounded,     label: 'Next',  onTap: () => sp.nextTrack(ip)),
-                      ControlButton(icon: Icons.volume_off_rounded,    label: 'Mute',  onTap: () => sp.toggleMute(ip)),
+                      ControlButton(icon: Icons.skip_previous_rounded, label: 'Prev',   onTap: () => sp.prevTrack(ip)),
+                      ControlButton(icon: sp.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          label: sp.isPlaying ? 'Pause' : 'Play',
+                          onTap: () => sp.togglePlayPause(ip),
+                          active: sp.isPlaying,
+                          size: 68),
+                      ControlButton(icon: Icons.skip_next_rounded,     label: 'Next',   onTap: () => sp.nextTrack(ip)),
+                      ControlButton(icon: Icons.volume_off_rounded,    label: 'Mute',   onTap: () => sp.toggleMute(ip)),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.volume_mute_rounded, size: 16, color: CypherColors.textMuted),
+                      const Icon(Icons.volume_mute_rounded, size: 14, color: CypherColors.textMuted),
                       Expanded(
                         child: Slider(
                           value: sp.volume.toDouble(),
                           min: 0, max: 100,
                           onChangeEnd: (v) => sp.setVolume(ip, v.toInt()),
-                          onChanged: (v) => sp.setVolume(ip, v.toInt()),
+                          onChanged:   (v) => sp.setVolume(ip, v.toInt()),
                         ),
                       ),
-                      const Icon(Icons.volume_up_rounded, size: 16, color: CypherColors.textMuted),
-                      const SizedBox(width: 4),
-                      Text('${sp.volume}%', style: AppTheme.caption(context)),
+                      const Icon(Icons.volume_up_rounded, size: 14, color: CypherColors.textMuted),
+                      const SizedBox(width: 6),
+                      Text('${sp.volume}%', style: const TextStyle(fontSize: 12, color: CypherColors.textSecondary)),
                     ],
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Remote Keyboard ───────────────────────────────────
+            const SizedBox(height: 20),
+            _SectionLabel('REMOTE KEYBOARD'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: CypherColors.bgCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: CypherColors.border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _typeCtrl,
+                      style: const TextStyle(fontSize: 14, color: CypherColors.textPrimary),
+                      decoration: const InputDecoration(
+                        hintText: 'Type on PC…',
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      onSubmitted: (_) => _sendType(),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _sendType,
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: CypherColors.accent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Screenshot ────────────────────────────────────────
+            const SizedBox(height: 20),
+            _SectionLabel('SCREENSHOT'),
+            const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                color: CypherColors.bgCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: CypherColors.border),
+              ),
+              child: Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+                    child: Container(
+                      width: double.infinity,
+                      height: 160,
+                      color: CypherColors.bgDeep,
+                      child: _isTakingScreenshot
+                          ? const Center(child: CircularProgressIndicator(color: CypherColors.accent, strokeWidth: 2))
+                          : _screenshotBytes != null
+                              ? InteractiveViewer(child: Image.memory(_screenshotBytes!, fit: BoxFit.contain))
+                              : const Center(child: Icon(Icons.monitor_rounded, color: CypherColors.textDisabled, size: 36)),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: CypherButton(
+                            label: _isTakingScreenshot ? 'Capturing…' : 'Capture',
+                            onTap: _takeScreenshot,
+                            loading: _isTakingScreenshot,
+                          ),
+                        ),
+                        if (_screenshotBytes != null) ...[
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: CypherButton(
+                              label: 'Save',
+                              onTap: _saveScreenshot,
+                              variant: CypherButtonVariant.secondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -269,24 +291,13 @@ class _ControlsScreenState extends State<ControlsScreen> {
   }
 }
 
-class _HotkeyChip extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _HotkeyChip(this.label, this.onTap);
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: CypherColors.bgCard,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: CypherColors.border),
-        ),
-        child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: CypherColors.textSecondary)),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: CypherColors.textMuted, letterSpacing: 0.8),
+  );
 }

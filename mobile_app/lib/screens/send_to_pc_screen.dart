@@ -27,8 +27,6 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
   List<Map<String, dynamic>> _subfolders = [];
   String _currentBrowsePath = '';
   String _currentDisplayName = '';
-  bool _loadingFolders = false;
-  bool _browsingFolders = false;
   bool _uploading = false;
 
   @override
@@ -43,7 +41,6 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
   String get _ip => context.read<ConnectionProvider>().ip ?? '';
 
   Future<void> _loadFolders() async {
-    setState(() => _loadingFolders = true);
     try {
       final dests = await ApiService.getUploadDestinations(_ip);
       Map<String, String> map = {};
@@ -63,11 +60,9 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
         _destination = 'Desktop';
       });
     }
-    if (mounted) setState(() => _loadingFolders = false);
   }
 
   Future<void> _browseFolders(String? path) async {
-    setState(() => _browsingFolders = true);
     try {
       final result = await ApiService.browseFolders(_ip, path: path);
       if (result['success'] == true) {
@@ -78,7 +73,6 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
         });
       }
     } catch (_) {}
-    if (mounted) setState(() => _browsingFolders = false);
   }
 
   void _selectFolder(String folderPath, String folderName) {
@@ -140,7 +134,11 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Send to PC')),
+      backgroundColor: CypherColors.bgDeep,
+      appBar: AppBar(
+        backgroundColor: CypherColors.bgDeep,
+        title: const Text('Send to PC'),
+      ),
       body: Column(
         children: [
           Expanded(
@@ -202,8 +200,8 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
                   const SizedBox(height: 20),
 
                   // Destination
-                  const Text('Destination folder', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: CypherColors.textSecondary)),
-                  const SizedBox(height: 8),
+                  const Text('DESTINATION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: CypherColors.textMuted, letterSpacing: 0.8)),
+                  const SizedBox(height: 10),
 
                   // Show folder browser if browsing, otherwise show quick selections
                   if (_subfolders.isNotEmpty)
@@ -213,20 +211,17 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
                         children: [
                           // Header with back button
                           Container(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             decoration: BoxDecoration(
-                              color: CypherColors.bgOverlay,
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                              border: Border(bottom: BorderSide(color: CypherColors.border)),
                             ),
                             child: Row(
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_back_rounded, color: CypherColors.accent),
-                                  onPressed: () { HapticFeedback.selectionClick(); _browseFolders(null); },
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
+                                GestureDetector(
+                                  onTap: () { HapticFeedback.selectionClick(); _browseFolders(null); },
+                                  child: const Icon(Icons.arrow_back_rounded, color: CypherColors.accent, size: 20),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
                                     _currentDisplayName,
@@ -234,13 +229,15 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                ElevatedButton.icon(
-                                  onPressed: () => _selectFolder(_currentBrowsePath, _currentDisplayName),
-                                  icon: const Icon(Icons.check_rounded, size: 16),
-                                  label: const Text('Select', style: TextStyle(fontSize: 12)),
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    backgroundColor: CypherColors.success,
+                                GestureDetector(
+                                  onTap: () => _selectFolder(_currentBrowsePath, _currentDisplayName),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: CypherColors.accent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text('Select', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
                                   ),
                                 ),
                               ],
@@ -261,76 +258,51 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
                       children: _destinations.entries.map((entry) {
                         final sel = _destination == entry.key;
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: sel ? CypherColors.accent.withOpacity(0.1) : CypherColors.bgCard,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: sel ? CypherColors.accent : CypherColors.border),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      HapticFeedback.selectionClick();
-                                      setState(() {
-                                        _destination = entry.key;
-                                        _destinationPath = entry.value;
-                                      });
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 24, height: 24,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: sel ? CypherColors.accent : CypherColors.bgOverlay,
-                                            ),
-                                            child: Center(
-                                              child: Container(
-                                                width: 12, height: 12,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  color: sel ? Colors.white : Colors.transparent,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              entry.key,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w500,
-                                                color: CypherColors.textPrimary,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _destination = entry.key;
+                                _destinationPath = entry.value;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                              decoration: BoxDecoration(
+                                color: CypherColors.bgCard,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: sel ? CypherColors.accent : CypherColors.border,
+                                  width: sel ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.folder_rounded, size: 18, color: sel ? CypherColors.accent : CypherColors.textMuted),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      entry.key,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: sel ? FontWeight.w600 : FontWeight.w400,
+                                        color: sel ? CypherColors.textPrimary : CypherColors.textSecondary,
                                       ),
                                     ),
                                   ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: TextButton.icon(
-                                    icon: const Icon(Icons.folder_open_rounded, size: 16),
-                                    label: const Text('Browse', style: TextStyle(fontSize: 11)),
-                                    onPressed: () {
-                                      HapticFeedback.selectionClick();
-                                      _browseFolders(entry.value);
-                                    },
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: CypherColors.accent,
-                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  if (sel)
+                                    const Icon(Icons.check_circle_rounded, size: 18, color: CypherColors.accent)
+                                  else
+                                    GestureDetector(
+                                      onTap: () {
+                                        HapticFeedback.selectionClick();
+                                        _browseFolders(entry.value);
+                                      },
+                                      child: const Text('Browse', style: TextStyle(fontSize: 11, color: CypherColors.accent)),
                                     ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         );
