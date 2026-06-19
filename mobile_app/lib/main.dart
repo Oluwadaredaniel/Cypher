@@ -180,18 +180,11 @@ class CypherApp extends StatelessWidget {
     return PageRouteBuilder(
       settings: s,
       pageBuilder: (_, __, ___) => page,
-      transitionDuration: const Duration(milliseconds: 260),
+      transitionDuration: const Duration(milliseconds: 150),
       transitionsBuilder: (_, anim, __, child) {
-        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
         return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween(
-              begin: const Offset(0.04, 0),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
-          ),
+          opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+          child: child,
         );
       },
     );

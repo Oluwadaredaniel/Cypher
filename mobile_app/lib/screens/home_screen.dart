@@ -200,7 +200,7 @@ class _HomeTab extends StatelessWidget {
           ),
         ),
 
-        const SliverSizedBox(height: 24),
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
         // Quick Controls (2x2)
         SliverToBoxAdapter(
@@ -246,7 +246,7 @@ class _HomeTab extends StatelessWidget {
           ),
         ),
 
-        const SliverSizedBox(height: 24),
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
         // Recent Activity
         if (sp.activity.isNotEmpty)
@@ -315,7 +315,7 @@ class _HomeTab extends StatelessWidget {
             ),
           ),
 
-        const SliverSizedBox(height: 100),
+        const SliverToBoxAdapter(child: SizedBox(height: 100)),
       ],
     );
   }
@@ -349,7 +349,7 @@ class _StatCard extends StatelessWidget {
 }
 
 // ── QUICK CONTROL TILE ────────────────────────────────────────
-class _QuickControlTile extends StatefulWidget {
+class _QuickControlTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String subtitle;
@@ -365,58 +365,42 @@ class _QuickControlTile extends StatefulWidget {
   });
 
   @override
-  State<_QuickControlTile> createState() => _QuickControlTileState();
-}
-
-class _QuickControlTileState extends State<_QuickControlTile> {
-  bool _pressed = false;
-
-  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.95 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: Container(
-          decoration: BoxDecoration(
-            color: widget.color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: widget.color.withOpacity(0.2),
-              width: 1.5,
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: color.withOpacity(0.2),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: CypherColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(widget.icon, color: widget.color, size: 32),
-              const SizedBox(height: 8),
-              Text(
-                widget.label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: CypherColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 10,
+                color: CypherColors.textMuted,
               ),
-              const SizedBox(height: 2),
-              Text(
-                widget.subtitle,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: CypherColors.textMuted,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

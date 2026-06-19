@@ -29,7 +29,7 @@ class _StatRingState extends State<StatRing> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 250),
       vsync: this,
     );
     _controller.forward();
@@ -38,7 +38,7 @@ class _StatRingState extends State<StatRing> with SingleTickerProviderStateMixin
   @override
   void didUpdateWidget(StatRing oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value) {
+    if ((oldWidget.value - widget.value).abs() > 0.03) {
       _controller.forward(from: 0.0);
     }
   }
