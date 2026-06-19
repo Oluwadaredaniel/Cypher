@@ -79,7 +79,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
           final parts = external.path.split('/');
           final storageIndex = parts.indexOf('storage');
           if (storageIndex >= 0) {
-            final publicPath = parts.sublist(0, storageIndex + 2).join('/') + '/Download';
+            final publicPath = '${parts.sublist(0, storageIndex + 2).join('/')}/Download';
             downloadDir = Directory(publicPath);
           } else {
             downloadDir = external;
@@ -173,9 +173,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
                           child: CypherButton(
                             label: 'Save',
                             onTap: _saveScreenshot,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: CypherColors.success,
-                            ),
+                            variant: CypherButtonVariant.primary,
                           ),
                         ),
                       ],

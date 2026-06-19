@@ -42,7 +42,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
 
   Future<void> _checkDone() async {
     final done = await StorageService.getOnboarded();
-    if (done && mounted) Navigator.pushReplacementNamed(context, '/setup');
+    if (done && mounted) Navigator.pushReplacementNamed(context, '/connection');
   }
 
   @override
@@ -63,7 +63,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
   Future<void> _finish() async {
     await StorageService.setOnboarded(true);
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/setup');
+    Navigator.pushReplacementNamed(context, '/connection');
   }
 
   @override

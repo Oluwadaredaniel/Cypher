@@ -21,9 +21,7 @@ import 'screens/guest_screen.dart';
 import 'screens/activity_screen.dart';
 import 'screens/notification_screen.dart';
 import 'screens/settings_screen.dart';
-import 'screens/disconnected_screen.dart';
 import 'screens/send_to_pc_screen.dart';
-import 'screens/transfer_progress_screen.dart';
 import 'screens/guide_screen.dart';
 import 'screens/master_control_screen.dart';
 import 'screens/process_manager_screen.dart';
@@ -31,10 +29,8 @@ import 'screens/app_launcher_screen.dart';
 import 'screens/active_tasks_screen.dart';
 import 'screens/screen_recorder_screen.dart';
 import 'screens/phone_browser_screen.dart';
-import 'screens/setup_screen.dart';
 import 'screens/drop_zone_screen.dart';
 import 'screens/wake_on_lan_screen.dart';
-import 'screens/clipboard_history_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -52,7 +48,6 @@ void main() async {
     systemNavigationBarIconBrightness: Brightness.light,
   ));
 
-  // Request permissions for file operations
   await _requestPermissions();
 
   runApp(const CypherApp());
@@ -61,15 +56,14 @@ void main() async {
 Future<void> _requestPermissions() async {
   try {
     final permissions = [
-      Permission.storage,           // Read/Write files
-      Permission.manageExternalStorage, // Full storage access (Android 11+)
-      Permission.camera,            // Camera for potential future features
-      Permission.locationWhenInUse, // Location for local network discovery
-      Permission.photos,            // Photo access for screenshots
-      Permission.mediaLibrary,      // Media access
+      Permission.storage,
+      Permission.manageExternalStorage,
+      Permission.camera,
+      Permission.locationWhenInUse,
+      Permission.photos,
+      Permission.mediaLibrary,
     ];
 
-    // Request all permissions
     final statuses = await permissions.request();
 
     for (final status in statuses.entries) {
@@ -115,7 +109,8 @@ class CypherApp extends StatelessWidget {
       case '/onboarding':
         page = const OnboardingScreen();
       case '/setup':
-        page = const SetupScreen();
+        // setup_screen merged into connection_screen
+        page = const ConnectionScreen();
       case '/connection':
         page = const ConnectionScreen();
       case '/pairing':
@@ -128,14 +123,17 @@ class CypherApp extends StatelessWidget {
       case '/preview':
         final a = s.arguments as Map<String, dynamic>? ?? {};
         page = FilePreviewScreen(
-          filePath:  a['filePath']  ?? '',
-          fileName:  a['fileName']  ?? '',
-          fileSize:  a['fileSize']  ?? 0,
+          filePath:      a['filePath']      ?? '',
+          fileName:      a['fileName']      ?? '',
+          fileSize:      a['fileSize']      ?? 0,
           fileExtension: a['fileExtension'] ?? '',
         );
       case '/controls':
         page = const ControlsScreen();
       case '/clipboard':
+        page = const ClipboardScreen();
+      case '/clipboard-history':
+        // clipboard history merged into clipboard screen
         page = const ClipboardScreen();
       case '/guest':
         page = const GuestScreen();
@@ -146,12 +144,14 @@ class CypherApp extends StatelessWidget {
       case '/settings':
         page = const SettingsScreen();
       case '/disconnected':
-        page = const DisconnectedScreen();
+        // disconnected state handled by home screen banner
+        page = const HomeScreen();
       case '/send':
         final a = s.arguments as Map<String, dynamic>?;
         page = SendToPCScreen(sharedFiles: a?['sharedFiles']);
       case '/transfers':
-        page = const TransferProgressScreen();
+        // transfers merged into active_tasks
+        page = const ActiveTasksScreen();
       case '/guide':
         page = const GuideScreen();
       case '/master_control':
@@ -170,8 +170,6 @@ class CypherApp extends StatelessWidget {
         page = const DropZoneScreen();
       case '/wol':
         page = const WakeOnLanScreen();
-      case '/clipboard-history':
-        page = const ClipboardHistoryScreen();
       default:
         page = const SplashScreen();
     }
