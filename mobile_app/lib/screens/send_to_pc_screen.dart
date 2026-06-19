@@ -257,50 +257,85 @@ class _SendToPCScreenState extends State<SendToPCScreen> {
                       ),
                     )
                   else
-                    Wrap(
-                      spacing: 8, runSpacing: 8,
-                      children: [
-                        ..._destinations.entries.map((entry) {
-                          final sel = _destination == entry.key;
-                          return GestureDetector(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                _destination = entry.key;
-                                _destinationPath = entry.value;
-                              });
-                            },
-                            onLongPress: () {
-                              HapticFeedback.selectionClick();
-                              _browseFolders(entry.value);
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                              decoration: BoxDecoration(
-                                color: sel ? CypherColors.accent : CypherColors.bgCard,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: sel ? CypherColors.accent : CypherColors.border),
-                              ),
-                              child: Text(
-                                entry.key,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: sel ? Colors.white : CypherColors.textSecondary,
-                                  fontWeight: sel ? FontWeight.w600 : FontWeight.w400,
-                                ),
-                              ),
+                    Column(
+                      children: _destinations.entries.map((entry) {
+                        final sel = _destination == entry.key;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: sel ? CypherColors.accent.withOpacity(0.1) : CypherColors.bgCard,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: sel ? CypherColors.accent : CypherColors.border),
                             ),
-                          );
-                        }).toList(),
-                      ],
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      HapticFeedback.selectionClick();
+                                      setState(() {
+                                        _destination = entry.key;
+                                        _destinationPath = entry.value;
+                                      });
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 24, height: 24,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: sel ? CypherColors.accent : CypherColors.bgOverlay,
+                                            ),
+                                            child: Center(
+                                              child: Container(
+                                                width: 12, height: 12,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color: sel ? Colors.white : Colors.transparent,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              entry.key,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                                color: CypherColors.textPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: TextButton.icon(
+                                    icon: const Icon(Icons.folder_open_rounded, size: 16),
+                                    label: const Text('Browse', style: TextStyle(fontSize: 11)),
+                                    onPressed: () {
+                                      HapticFeedback.selectionClick();
+                                      _browseFolders(entry.value);
+                                    },
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: CypherColors.accent,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     ),
-
-                  const SizedBox(height: 4),
-                  Text(
-                    'Long press a folder to browse subfolders',
-                    style: const TextStyle(fontSize: 11, color: CypherColors.textMuted, fontStyle: FontStyle.italic),
-                  ),
 
                   const SizedBox(height: 16),
                 ],
