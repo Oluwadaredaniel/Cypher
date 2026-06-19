@@ -1,0 +1,16 @@
+flask
+flask-cors
+psutil
+pillow
+pyautogui
+pycaw
+comtypes
+pyperclip
+plyer
+requests
+qrcode
+pystray
+pygetwindow
+gunicorn
+pymongo[srv]
+dnspython
