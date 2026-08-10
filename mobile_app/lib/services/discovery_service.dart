@@ -16,7 +16,6 @@ class DiscoveryService {
   DiscoveryService._();
 
   static const _serviceType = '_cypher._tcp';
-  static Discovery? _discovery;
 
   // ── mDNS Discovery ───────────────────────────────────────────
   static Future<List<DiscoveredPc>> discoverViaMdns({
@@ -77,7 +76,8 @@ class DiscoveryService {
   // ── Full Discovery (mDNS → Subnet → Manual) ──────────────────
   static Future<List<DiscoveredPc>> discover() async {
     // 1. Try mDNS first (fastest)
-    final mdnsResults = await discoverViaMdns(timeout: const Duration(seconds: 5));
+    final mdnsResults =
+        await discoverViaMdns(timeout: const Duration(seconds: 5));
     if (mdnsResults.isNotEmpty) return mdnsResults;
 
     // 2. Subnet scan for all 4 network scenarios
@@ -107,11 +107,14 @@ class DiscoveryService {
 
     // Try to get our own IP and scan our subnet
     try {
-      final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
+      final interfaces =
+          await NetworkInterface.list(type: InternetAddressType.IPv4);
       for (final iface in interfaces) {
         for (final addr in iface.addresses) {
           final parts = addr.address.split('.');
-          if (parts.length == 4 && addr.address != '127.0.0.1' && !addr.address.startsWith('169.254')) {
+          if (parts.length == 4 &&
+              addr.address != '127.0.0.1' &&
+              !addr.address.startsWith('169.254')) {
             final base = '${parts[0]}.${parts[1]}.${parts[2]}';
             // Scan first 50 addresses on our subnet
             for (int i = 1; i <= 50; i++) {

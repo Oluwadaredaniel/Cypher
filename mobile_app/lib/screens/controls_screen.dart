@@ -8,9 +8,7 @@ import '../providers/connection_provider.dart';
 import '../providers/system_provider.dart';
 import '../services/api_service.dart';
 import '../theme/colors.dart';
-import '../theme/app_theme.dart';
 import '../widgets/cypher_button.dart';
-import '../widgets/cypher_card.dart';
 import '../widgets/control_button.dart';
 
 class ControlsScreen extends StatefulWidget {
@@ -133,9 +131,16 @@ class _ControlsScreenState extends State<ControlsScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Remote Control', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: CypherColors.textPrimary)),
+            const Text('Remote Control',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: CypherColors.textPrimary)),
             if (sp.activeWindow.isNotEmpty)
-              Text(sp.activeWindow, style: const TextStyle(fontSize: 11, color: CypherColors.textMuted), overflow: TextOverflow.ellipsis),
+              Text(sp.activeWindow,
+                  style: const TextStyle(
+                      fontSize: 11, color: CypherColors.textMuted),
+                  overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
@@ -159,31 +164,48 @@ class _ControlsScreenState extends State<ControlsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      ControlButton(icon: Icons.skip_previous_rounded, label: 'Prev',   onTap: () => sp.prevTrack(ip)),
-                      ControlButton(icon: sp.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      ControlButton(
+                          icon: Icons.skip_previous_rounded,
+                          label: 'Prev',
+                          onTap: () => sp.prevTrack(ip)),
+                      ControlButton(
+                          icon: sp.isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
                           label: sp.isPlaying ? 'Pause' : 'Play',
                           onTap: () => sp.togglePlayPause(ip),
                           active: sp.isPlaying,
                           size: 68),
-                      ControlButton(icon: Icons.skip_next_rounded,     label: 'Next',   onTap: () => sp.nextTrack(ip)),
-                      ControlButton(icon: Icons.volume_off_rounded,    label: 'Mute',   onTap: () => sp.toggleMute(ip)),
+                      ControlButton(
+                          icon: Icons.skip_next_rounded,
+                          label: 'Next',
+                          onTap: () => sp.nextTrack(ip)),
+                      ControlButton(
+                          icon: Icons.volume_off_rounded,
+                          label: 'Mute',
+                          onTap: () => sp.toggleMute(ip)),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.volume_mute_rounded, size: 14, color: CypherColors.textMuted),
+                      const Icon(Icons.volume_mute_rounded,
+                          size: 14, color: CypherColors.textMuted),
                       Expanded(
                         child: Slider(
                           value: sp.volume.toDouble(),
-                          min: 0, max: 100,
+                          min: 0,
+                          max: 100,
                           onChangeEnd: (v) => sp.setVolume(ip, v.toInt()),
-                          onChanged:   (v) => sp.setVolume(ip, v.toInt()),
+                          onChanged: (v) => sp.setVolume(ip, v.toInt()),
                         ),
                       ),
-                      const Icon(Icons.volume_up_rounded, size: 14, color: CypherColors.textMuted),
+                      const Icon(Icons.volume_up_rounded,
+                          size: 14, color: CypherColors.textMuted),
                       const SizedBox(width: 6),
-                      Text('${sp.volume}%', style: const TextStyle(fontSize: 12, color: CypherColors.textSecondary)),
+                      Text('${sp.volume}%',
+                          style: const TextStyle(
+                              fontSize: 12, color: CypherColors.textSecondary)),
                     ],
                   ),
                 ],
@@ -206,7 +228,8 @@ class _ControlsScreenState extends State<ControlsScreen> {
                   Expanded(
                     child: TextField(
                       controller: _typeCtrl,
-                      style: const TextStyle(fontSize: 14, color: CypherColors.textPrimary),
+                      style: const TextStyle(
+                          fontSize: 14, color: CypherColors.textPrimary),
                       decoration: const InputDecoration(
                         hintText: 'Type on PC…',
                         border: InputBorder.none,
@@ -220,12 +243,14 @@ class _ControlsScreenState extends State<ControlsScreen> {
                   GestureDetector(
                     onTap: _sendType,
                     child: Container(
-                      width: 36, height: 36,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: CypherColors.accent,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 16),
+                      child: const Icon(Icons.send_rounded,
+                          color: Colors.white, size: 16),
                     ),
                   ),
                 ],
@@ -245,16 +270,24 @@ class _ControlsScreenState extends State<ControlsScreen> {
               child: Column(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(13)),
                     child: Container(
                       width: double.infinity,
                       height: 160,
                       color: CypherColors.bgDeep,
                       child: _isTakingScreenshot
-                          ? const Center(child: CircularProgressIndicator(color: CypherColors.accent, strokeWidth: 2))
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                  color: CypherColors.accent, strokeWidth: 2))
                           : _screenshotBytes != null
-                              ? InteractiveViewer(child: Image.memory(_screenshotBytes!, fit: BoxFit.contain))
-                              : const Center(child: Icon(Icons.monitor_rounded, color: CypherColors.textDisabled, size: 36)),
+                              ? InteractiveViewer(
+                                  child: Image.memory(_screenshotBytes!,
+                                      fit: BoxFit.contain))
+                              : const Center(
+                                  child: Icon(Icons.monitor_rounded,
+                                      color: CypherColors.textDisabled,
+                                      size: 36)),
                     ),
                   ),
                   Padding(
@@ -263,7 +296,8 @@ class _ControlsScreenState extends State<ControlsScreen> {
                       children: [
                         Expanded(
                           child: CypherButton(
-                            label: _isTakingScreenshot ? 'Capturing…' : 'Capture',
+                            label:
+                                _isTakingScreenshot ? 'Capturing…' : 'Capture',
                             onTap: _takeScreenshot,
                             loading: _isTakingScreenshot,
                           ),
@@ -297,7 +331,11 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-    text,
-    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: CypherColors.textMuted, letterSpacing: 0.8),
-  );
+        text,
+        style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: CypherColors.textMuted,
+            letterSpacing: 0.8),
+      );
 }
